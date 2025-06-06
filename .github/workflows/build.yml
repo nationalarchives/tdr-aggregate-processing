@@ -3,10 +3,14 @@ on:
   push:
     branches:
       - main
+permissions:
+  id-token: write
+  contents: write
 jobs:
   pre-deploy:
     uses: nationalarchives/tdr-github-actions/.github/workflows/lambda_build.yml@main
     with:
+      lambda-name: dataload-processing
       repo-name: tdr-dataload-processing
       artifact-name: dataload-processing
       build-command: |
@@ -18,7 +22,7 @@ jobs:
     needs: pre-deploy
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - run: gh workflow run deploy.yml -f environment=intg -f to-deploy=${{ needs.pre-deploy.outputs.next-version }}
         env:
           GITHUB_TOKEN: ${{ secrets.WORKFLOW_PAT }}
