@@ -1,4 +1,4 @@
-name: TDR Deploy Data Load Processing Lambda
+name: TDR Deploy Aggregate Processing Lambda
 on:
   workflow_dispatch:
     inputs:
@@ -15,7 +15,7 @@ on:
         description: 'Version to deploy'
         required: true
 
-run-name: Deploying Data Load Processing Lambda ${{inputs.to-deploy}} to ${{inputs.environment}}
+run-name: Deploying Aggregate Processing Lambda ${{inputs.to-deploy}} to ${{inputs.environment}}
 permissions:
   id-token: write
   contents: write
@@ -23,8 +23,8 @@ jobs:
   deploy:
     uses: nationalarchives/tdr-github-actions/.github/workflows/lambda_deploy.yml@main
     with:
-      lambda-name: dataload-processing
-      deployment-package: dataload-processing.jar
+      lambda-name: aggregate-processing
+      deployment-package: aggregate-processing.jar
       environment: ${{ github.event.inputs.environment }}
       to-deploy: ${{ github.event.inputs.to-deploy }}
     secrets:
