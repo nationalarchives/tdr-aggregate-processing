@@ -4,7 +4,7 @@ import sbt.Keys.fork
 ThisBuild / scalaVersion := "2.13.14"
 ThisBuild / version := "0.1.0"
 ThisBuild / organization := "uk.gov.nationalarchives"
-ThisBuild / organizationName := "dataload-processing"
+ThisBuild / organizationName := "aggregate-processing"
 
 libraryDependencies ++= Seq(
   scalaTest % Test
@@ -18,4 +18,4 @@ libraryDependencies ++= Seq(
   case PathList("META-INF", xs@_*) => MergeStrategy.discard
   case _ => MergeStrategy.first
 }
-(assembly / assemblyJarName) := "dataload-processing.jar"
+(assembly / assemblyJarName) := "aggregate-processing.jar"
