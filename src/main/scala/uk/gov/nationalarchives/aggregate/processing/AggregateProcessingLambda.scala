@@ -32,10 +32,11 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
     parse(sqsMessage.getBody) match {
       case Left(parsingError) =>
         throw new IllegalArgumentException(s"Invalid JSON object: ${parsingError.message}")
-      case Right(json) => decode[AggregateEvent](json.toString()) match {
-        case Left(decodingError) => throw new IllegalArgumentException(s"Invalid event: ${decodingError.getMessage}")
-        case Right(event) => event
-      }
+      case Right(json) =>
+        decode[AggregateEvent](json.toString()) match {
+          case Left(decodingError) => throw new IllegalArgumentException(s"Invalid event: ${decodingError.getMessage}")
+          case Right(event)        => event
+        }
     }
   }
 }
