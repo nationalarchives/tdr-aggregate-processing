@@ -25,7 +25,9 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
   def process(sqsMessage: SQSMessage): List[S3Object] = {
     val event = parseSqsMessage(sqsMessage)
     logger.info(s"Processing assets with prefix ${event.metadataSourceObjectPrefix}")
-    s3Utils.listAllObjectsWithPrefix(event.metadataSourceBucket, event.metadataSourceObjectPrefix)
+    val s3Objects = s3Utils.listAllObjectsWithPrefix(event.metadataSourceBucket, event.metadataSourceObjectPrefix)
+    logger.info(s"Retrieved ${s3Objects.size} objects with prefix: ${event.metadataSourceObjectPrefix}")
+    s3Objects
   }
 
   private def parseSqsMessage(sqsMessage: SQSMessage): AggregateEvent = {
