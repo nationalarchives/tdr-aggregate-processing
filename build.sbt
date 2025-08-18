@@ -18,6 +18,7 @@ libraryDependencies ++= Seq(
   s3Utils,
   scalaLogging,
   scalaTest % Test,
+  utf8Validator,
   typesafeConfig,
   wiremock % Test
 )

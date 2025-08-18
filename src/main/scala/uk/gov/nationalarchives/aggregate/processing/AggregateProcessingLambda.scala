@@ -7,10 +7,11 @@ import io.circe._
 import io.circe.generic.semiauto.deriveDecoder
 import io.circe.parser._
 import com.typesafe.scalalogging.Logger
-import uk.gov.nationalarchives.aggregate.processing.AggregateProcessingLambda.{AggregateEvent, logger, s3Utils}
+import uk.gov.nationalarchives.aggregate.processing.AggregateProcessingLambda.{AggregateEvent, assetProcessing, logger, s3Utils}
 import uk.gov.nationalarchives.aws.utils.s3.{S3Clients, S3Utils}
 import com.typesafe.config.{Config, ConfigFactory}
 import software.amazon.awssdk.services.s3.model.S3Object
+import uk.gov.nationalarchives.aggregate.processing.modules.AssetProcessing
 
 import scala.jdk.CollectionConverters.CollectionHasAsScala
 
@@ -27,6 +28,13 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
     logger.info(s"Processing assets with prefix ${event.metadataSourceObjectPrefix}")
     val s3Objects = s3Utils.listAllObjectsWithPrefix(event.metadataSourceBucket, event.metadataSourceObjectPrefix)
     logger.info(s"Retrieved ${s3Objects.size} objects with prefix: ${event.metadataSourceObjectPrefix}")
+    for (elem <- s3Objects) { assetProcessing.processAsset(event.metadataSourceBucket, elem.key()) }
+    /* TODO:
+    * - check result from processing assets
+    * - send Consignment API request 'addFilesAndMetadata'
+    * - create draft metadata CSV if appropriate
+    * - call TransferOrchestration with result from processing assets
+    * */
     s3Objects
   }
 
@@ -47,6 +55,7 @@ object AggregateProcessingLambda {
   val logger: Logger = Logger[AggregateProcessingLambda]
   private val configFactory: Config = ConfigFactory.load()
   val s3Utils: S3Utils = S3Utils(S3Clients.s3Async(configFactory.getString("s3.endpoint")))
+  val assetProcessing: AssetProcessing = AssetProcessing.apply()
 
   case class AggregateEvent(metadataSourceBucket: String, metadataSourceObjectPrefix: String)
 }
