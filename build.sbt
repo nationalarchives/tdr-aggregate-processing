@@ -19,7 +19,8 @@ libraryDependencies ++= Seq(
   scalaLogging,
   scalaTest % Test,
   typesafeConfig,
-  wiremock % Test
+  wiremock % Test,
+  utf8Validator
 )
 
 (Test / fork) := true

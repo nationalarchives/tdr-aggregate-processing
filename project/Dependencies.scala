@@ -14,11 +14,13 @@ object Dependencies {
   lazy val logback = "ch.qos.logback" % "logback-classic" % "1.5.18"
   lazy val logstash = "net.logstash.logback" % "logstash-logback-encoder" % "8.1"
 
-  lazy val s3Utils = "uk.gov.nationalarchives" %% "s3-utils" % "0.1.286"
+  lazy val s3Utils = "uk.gov.nationalarchives" %% "s3-utils" % "0.1.294"
   lazy val scalaLogging = "com.typesafe.scala-logging" %% "scala-logging" % "3.9.5"
   lazy val scalaTest = "org.scalatest" %% "scalatest" % "3.2.19"
 
   lazy val typesafeConfig = "com.typesafe" % "config" % "1.4.4"
 
   lazy val wiremock = "com.github.tomakehurst" % "wiremock" % "3.0.1"
+
+  lazy val utf8Validator = "uk.gov.nationalarchives" % "utf8-validator" % "1.2"
 }
