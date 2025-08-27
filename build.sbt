@@ -20,6 +20,8 @@ libraryDependencies ++= Seq(
   scalaTest % Test,
   typesafeConfig,
   wiremock % Test,
+  mockitoScala % Test,
+  mockitoScalaTest % Test,
   utf8Validator
 )
 
