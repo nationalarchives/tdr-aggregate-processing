@@ -41,7 +41,8 @@ class AssetProcessingSpec extends ExternalServiceSpec {
       assetProcessing.processAsset("s3Bucket", "user/sharepoint/consignmentId/metadata/matchId.metadata")
     }
     verify(mockLogger).error(
-      "AssetProcessingError$: consignmentId: consignmentId, matchId: Some(matchId.metadata), source: sharepoint, errorCode: ASSET_PROCESSING.UTF.INVALID, errorMessage: Invalid UTF-8 Sequence, expecting: 4bytes, but got: 3bytes - reached end of stream. @ byte position: -1")
+      "AssetProcessingError$: consignmentId: consignmentId, matchId: Some(matchId.metadata), source: sharepoint, errorCode: ASSET_PROCESSING.UTF.INVALID, errorMessage: Invalid UTF-8 Sequence, expecting: 4bytes, but got: 3bytes - reached end of stream. @ byte position: -1"
+    )
     exception.getMessage shouldEqual s"UTF8 validation failed for S3 object: s3://s3Bucket/user/sharepoint/consignmentId/metadata/matchId.metadata"
   }
 }
