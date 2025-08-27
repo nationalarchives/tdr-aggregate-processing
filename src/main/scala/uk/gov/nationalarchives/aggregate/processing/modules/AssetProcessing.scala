@@ -8,14 +8,17 @@ import uk.gov.nationalarchives.aggregate.processing.utilities.UTF8ValidationHand
 import uk.gov.nationalarchives.aws.utils.s3.{S3Clients, S3Utils}
 import uk.gov.nationalarchives.utf8.validator.Utf8Validator
 
-import scala.util.{Failure, Try}
+import scala.util.{Failure, Success, Try}
 
 class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
   //  Class to handle the processing of the metadata JSON sidecar
   def processAsset(s3Bucket: String, objectKey: String): Map[String, AssetProcessingResult] = {
     logger.info(s"Processing asset metadata for: $objectKey")
-    val inputStream = s3Utils.getObjectAsStream(s3Bucket, objectKey)
-    validUTF8(inputStream, s3Bucket, objectKey)
+    getObjectAsStream(s3Utils, s3Bucket, objectKey) match {
+      case Some(inputStream) =>
+        validUTF8(inputStream, objectKey)
+      case None => ()
+    }
     /* TODO:
      *  - convert to Json object
      *  - check if contains and TDR 'supplied' fields, if so create 'SuppliedMetadata' case classes for each value
@@ -27,24 +30,37 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
     Map()
   }
 
-  private def validUTF8(inputStream: java.io.InputStream, s3Bucket: String, objectKey: String): Unit = {
+  private def getObjectAsStream(s3Utils: S3Utils, s3Bucket: String, objectKey: String): Option[java.io.InputStream] = {
+    Try(s3Utils.getObjectAsStream(s3Bucket, objectKey)) match {
+      case Failure(ex) =>
+        val s3ReadError = generateErrorMessage(objectKey, "ASSET_PROCESSING.S3.READ_ERROR", ex)
+        ErrorHandling.handleError(s3ReadError, logger)
+        None
+      case Success(inputStream) => Some(inputStream)
+    }
+  }
+
+  private def validUTF8(inputStream: java.io.InputStream, objectKey: String): Unit = {
     val utf8Validator = new Utf8Validator(new UTF8ValidationHandler()(logger))
     Try(utf8Validator.validate(inputStream)) match {
       case Failure(ex) =>
-        val consignmentId = objectKey.split('/')(2)
-        val matchId = objectKey.split('/').last
-        val source = objectKey.split('/')(1)
-        val utf8Error = AssetProcessingError(
-          consignmentId = consignmentId,
-          matchId = Some(matchId),
-          source = source,
-          errorCode = "ASSET_PROCESSING.UTF.INVALID",
-          errorMsg = ex.getMessage
-        )
+        val utf8Error = generateErrorMessage(objectKey, "ASSET_PROCESSING.UTF.INVALID", ex)
         ErrorHandling.handleError(utf8Error, logger)
-        throw new RuntimeException(s"UTF8 validation failed for S3 object: s3://$s3Bucket/$objectKey", ex)
-      case _ => logger.info("UTF8 validation passed")
+      case _ => logger.info(s"UTF8 validation passed: $objectKey")
     }
+  }
+
+  private def generateErrorMessage(objectKey: String, errorCode: String, errorMsg: Throwable) = {
+    val consignmentId = objectKey.split('/')(2)
+    val matchId = objectKey.split('/').last.stripSuffix(".metadata")
+    val source = objectKey.split('/')(1)
+    AssetProcessingError(
+      consignmentId = consignmentId,
+      matchId = Some(matchId),
+      source = source,
+      errorCode = errorCode,
+      errorMsg = errorMsg.getMessage
+    )
   }
 }
 
@@ -53,7 +69,7 @@ object AssetProcessing {
   case class AssetProcessingResult(matchId: String, processingErrors: Boolean = false, suppliedMetadata: List[SuppliedMetadata] = List())
   case class AssetProcessingError(consignmentId: String, matchId: Option[String], source: String, errorCode: String, errorMsg: String) extends BaseError {
     override def toString: String = {
-      s"${AssetProcessingError.getClass.getSimpleName}: consignmentId: $consignmentId, matchId: $matchId, source: $source, errorCode: $errorCode, errorMessage: $errorMsg"
+      s"${this.simpleName}: consignmentId: $consignmentId, matchId: $matchId, source: $source, errorCode: $errorCode, errorMessage: $errorMsg"
     }
   }
   val logger: Logger = Logger[AssetProcessing]

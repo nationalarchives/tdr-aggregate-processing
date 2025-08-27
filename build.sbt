@@ -15,14 +15,14 @@ libraryDependencies ++= Seq(
   circeParser,
   logback,
   logstash,
+  mockitoScala % Test,
+  mockitoScalaTest % Test,
   s3Utils,
   scalaLogging,
   scalaTest % Test,
   typesafeConfig,
-  wiremock % Test,
-  mockitoScala % Test,
-  mockitoScalaTest % Test,
-  utf8Validator
+  utf8Validator,
+  wiremock % Test
 )
 
 (Test / fork) := true
