@@ -36,7 +36,6 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     inputCaptor.getValue.userIdOverride.get shouldBe userId
   }
 
-
   "orchestrate" should "log an error for asset processing event when asset processing contains errors and update the consignment status correctly" in {
     val mockLogger = mock[UnderlyingLogger]
     val mockGraphQlApi = mock[GraphQlApi]
@@ -52,7 +51,8 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
 
     new TransferOrchestration(mockGraphQlApi)(Logger(mockLogger)).orchestrate(event)
     verify(mockLogger).error(
-      s"TransferError$$: consignmentId: $consignmentId, errorCode: ASSET_PROCESSING.completedWithIssues, errorMessage: One or more assets failed to process.")
+      s"TransferError$$: consignmentId: $consignmentId, errorCode: ASSET_PROCESSING.completedWithIssues, errorMessage: One or more assets failed to process."
+    )
 
     input.getValue.consignmentId shouldBe consignmentId
     input.getValue.statusType shouldBe "Upload"

@@ -39,8 +39,7 @@ class GraphQlApiSpec extends ExternalServiceSpec {
 
     doAnswer(() => Future(new BearerAccessToken("token")))
       .when(keycloak)
-      .serviceAccountToken[Identity](any[String], any[String])(any[SttpBackend[Identity, Any]],
-        any[ClassTag[Identity[_]]], any[TdrKeycloakDeployment])
+      .serviceAccountToken[Identity](any[String], any[String])(any[SttpBackend[Identity, Any]], any[ClassTag[Identity[_]]], any[TdrKeycloakDeployment])
 
     doAnswer(() => Future(GraphQlResponse[ucs.Data](Option(ucs.Data(Some(1))), Nil)))
       .when(updateConsignmentStatusClient)
@@ -59,8 +58,7 @@ class GraphQlApiSpec extends ExternalServiceSpec {
 
     doAnswer(() => Future(new BearerAccessToken("token")))
       .when(keycloak)
-      .serviceAccountToken[Identity](any[String], any[String])(any[SttpBackend[Identity, Any]],
-        any[ClassTag[Identity[_]]], any[TdrKeycloakDeployment])
+      .serviceAccountToken[Identity](any[String], any[String])(any[SttpBackend[Identity, Any]], any[ClassTag[Identity[_]]], any[TdrKeycloakDeployment])
 
     doAnswer(() => Future(GraphQlResponse[ucs.Data](None, Nil)))
       .when(updateConsignmentStatusClient)

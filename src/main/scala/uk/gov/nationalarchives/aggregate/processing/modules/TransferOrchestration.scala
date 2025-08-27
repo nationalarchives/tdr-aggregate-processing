@@ -17,7 +17,7 @@ class TransferOrchestration(graphQlApi: GraphQlApi)(implicit logger: Logger) {
   def orchestrate[T <: Product](orchestrationEvent: T): Try[IO[OrchestrationResult]] = {
     orchestrationEvent match {
       case assetProcessingEvent: AssetProcessingEvent => Success(orchestrateProcessingEvent(assetProcessingEvent))
-      case _ => Failure(throw new RuntimeException(s"Unrecognized orchestration event: ${orchestrationEvent.getClass.getName}"))
+      case _                                          => Failure(throw new RuntimeException(s"Unrecognized orchestration event: ${orchestrationEvent.getClass.getName}"))
     }
   }
 
@@ -29,12 +29,11 @@ class TransferOrchestration(graphQlApi: GraphQlApi)(implicit logger: Logger) {
     } else Some("Completed")
 
     if (errors) {
-      val transferError = TransferError(
-        consignmentId, "ASSET_PROCESSING.completedWithIssues", "One or more assets failed to process.")
+      val transferError = TransferError(consignmentId, "ASSET_PROCESSING.completedWithIssues", "One or more assets failed to process.")
       ErrorHandling.handleError(transferError, logger)
     } else {
       logger.info(s"Triggering file checks for consignment: $consignmentId")
-      //TODO: trigger backend checks step functions
+      // TODO: trigger backend checks step functions
       if (event.suppliedMetadata) {
         logger.info(s"Triggering draft metadata validation for consignment: $consignmentId")
       }

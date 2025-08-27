@@ -14,9 +14,9 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 class GraphQlApi(keycloak: KeycloakUtils, updateConsignmentStatusClient: GraphQLClient[ucs.Data, ucs.Variables])(implicit
-                                          logger: Logger,
-                                          keycloakDeployment: TdrKeycloakDeployment,
-                                          backend: SttpBackend[Identity, Any]
+    logger: Logger,
+    keycloakDeployment: TdrKeycloakDeployment,
+    backend: SttpBackend[Identity, Any]
 ) {
   def updateConsignmentStatus(clientSecret: String, consignmentStatusInput: ConsignmentStatusInput): IO[Option[Int]] = {
     val consignmentId = consignmentStatusInput.consignmentId
@@ -43,10 +43,7 @@ object GraphQlApi {
   val logger = Logger[GraphQlApi]
 
   def apply()(implicit
-              backend: SttpBackend[Identity, Any],
-              keycloakDeployment: TdrKeycloakDeployment
-  ) = new GraphQlApi(keycloakUtils, updateConsignmentStatusClient)(
-    logger,
-    keycloakDeployment,
-    backend)
+      backend: SttpBackend[Identity, Any],
+      keycloakDeployment: TdrKeycloakDeployment
+  ) = new GraphQlApi(keycloakUtils, updateConsignmentStatusClient)(logger, keycloakDeployment, backend)
 }
