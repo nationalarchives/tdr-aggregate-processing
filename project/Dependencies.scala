@@ -29,5 +29,7 @@ object Dependencies {
 
   lazy val typesafeConfig = "com.typesafe" % "config" % "1.4.4"
 
+  lazy val utf8Validator = "uk.gov.nationalarchives" % "utf8-validator" % "1.2"
+
   lazy val wiremock = "com.github.tomakehurst" % "wiremock" % "3.0.1"
 }
