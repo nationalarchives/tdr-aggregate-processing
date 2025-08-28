@@ -15,10 +15,13 @@ libraryDependencies ++= Seq(
   circeParser,
   logback,
   logstash,
+  mockitoScala % Test,
+  mockitoScalaTest % Test,
   s3Utils,
   scalaLogging,
   scalaTest % Test,
   typesafeConfig,
+  utf8Validator,
   wiremock % Test
 )
 
