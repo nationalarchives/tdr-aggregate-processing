@@ -11,9 +11,9 @@ class ErrorHandlingSpec extends AnyFlatSpec {
   "handleError" should "log the correct error message" in {
     val mockLogger = mock[UnderlyingLogger]
     val error = AssetProcessingError(
-      consignmentId = "consignmentId123",
+      consignmentId = Some("consignmentId123"),
       matchId = Some("matchId456"),
-      source = "sourceSystem",
+      source = Some("sourceSystem"),
       errorCode = "ASSET_PROCESSING.TEST_ERROR",
       errorMsg = "Test error message"
     )
@@ -29,9 +29,9 @@ class ErrorHandlingSpec extends AnyFlatSpec {
   it should "log the error message even if matchId is None" in {
     val mockLogger = mock[UnderlyingLogger]
     val error = AssetProcessingError(
-      consignmentId = "consignmentId123",
+      consignmentId = None,
       matchId = None,
-      source = "sourceSystem",
+      source = None,
       errorCode = "ASSET_PROCESSING.TEST_ERROR",
       errorMsg = "Test error message"
     )
