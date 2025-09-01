@@ -130,11 +130,11 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
     Nil
   }
 
-  private def generateErrorMessage(assetDetails: AssetProcessingEvent, errorCode: String, errorMessage: String): AssetProcessingError = {
+  private def generateErrorMessage(event: AssetProcessingEvent, errorCode: String, errorMessage: String): AssetProcessingError = {
     AssetProcessingError(
-      consignmentId = Some(assetDetails.consignmentId.toString),
-      matchId = Some(assetDetails.matchId),
-      source = Some(assetDetails.source),
+      consignmentId = Some(event.consignmentId.toString),
+      matchId = Some(event.matchId),
+      source = Some(event.source),
       errorCode = errorCode,
       errorMsg = errorMessage
     )
