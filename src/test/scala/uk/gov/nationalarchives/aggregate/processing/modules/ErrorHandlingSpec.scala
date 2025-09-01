@@ -26,7 +26,7 @@ class ErrorHandlingSpec extends AnyFlatSpec {
     )
   }
 
-  it should "log the error when optional fields is None" in {
+  it should "log an error when optional fields are None" in {
     val mockLogger = mock[UnderlyingLogger]
     val error = AssetProcessingError(
       consignmentId = None,

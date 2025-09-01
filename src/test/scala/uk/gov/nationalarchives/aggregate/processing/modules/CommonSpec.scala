@@ -27,12 +27,4 @@ class CommonSpec extends AnyFlatSpec {
     processErrorValue.values.size shouldBe 3
     processErrorValue.values.map(_.toString).toList shouldEqual expectedValues
   }
-
-//  "StateStatusValue" should "contain the correct enums" in {
-//    val stateStatusValue = Common.StateStatusValue
-//    val expectedValues = List("Completed", "CompletedWithIssues", "Failed")
-//
-//    stateStatusValue.values.size shouldBe 3
-//    stateStatusValue.values.map(_.toString).toList shouldEqual expectedValues
-//  }
 }
