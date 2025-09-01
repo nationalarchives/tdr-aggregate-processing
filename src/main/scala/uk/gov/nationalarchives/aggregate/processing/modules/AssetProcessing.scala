@@ -5,6 +5,9 @@ import com.typesafe.scalalogging.Logger
 import graphql.codegen.types.ClientSideMetadataInput
 import io.circe.{Json, parser}
 import uk.gov.nationalarchives.aggregate.processing.modules.AssetProcessing._
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorType.{EncodingError, JsonError, MetadataFieldError, ObjectKeyParsingError, S3Error => s3e}
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorValue.{Invalid, Missing, ReadError}
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.{AssetProcessing => ptAp}
 import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling.BaseError
 import uk.gov.nationalarchives.aggregate.processing.utilities.UTF8ValidationHandler
 import uk.gov.nationalarchives.aws.utils.s3.{S3Clients, S3Utils}
@@ -21,25 +24,93 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
       Timestamp.from(Instant.parse(sc.s(args: _*)))
   }
 
+  private def handleProcessError(error: AssetProcessingError): AssetProcessingResult = {
+    ErrorHandling.handleError(error, logger)
+    AssetProcessingResult(error.matchId, processingErrors = true, None)
+  }
+
   def processAsset(s3Bucket: String, objectKey: String): AssetProcessingResult = {
     logger.info(s"Processing asset metadata for: $objectKey")
-    val assetDetails = parseObjectKey(objectKey)
-    if (assetDetails.isEmpty) {
-      val invalidObjectKeyError = AssetProcessingError(None, None, None, "ASSET_PROCESSING.OBJECT_KEY.INVALID", s"Invalid object key: $objectKey")
-      ErrorHandling.handleError(invalidObjectKeyError, logger)
-      AssetProcessingResult(None, processingErrors = true, None)
-    } else {
-      val matchId = assetDetails.get.matchId
-      val metadataObjectParseResult = parseMetadataObject(s3Utils, s3Bucket, assetDetails.get)
-      if (metadataObjectParseResult.json.isEmpty) {
-        AssetProcessingResult(Some(matchId), metadataObjectParseResult.errors, None)
-      } else {
-        val metadataJson = metadataObjectParseResult.json.get
-        val input = toClientSideMetadataInput(metadataJson, assetDetails.get)
-        val suppliedMetadata = toSuppliedMetadata(metadataJson)
-        val processingErrors = metadataObjectParseResult.errors || input.isEmpty
-        AssetProcessingResult(Some(matchId), processingErrors, input, suppliedMetadata)
+    handleEvent(s3Bucket, objectKey)
+  }
+
+  private def handleEvent(s3Bucket: String, objectKey: String): AssetProcessingResult = {
+    Try {
+      val elements = objectKey.split('/')
+      val userId = UUID.fromString(elements(0))
+      val source = elements(1)
+      val consignmentId = UUID.fromString(elements(2))
+
+      val objectElements = elements.last.split("\\.")
+      val matchId = objectElements(0)
+      val objectType = objectElements(1)
+
+      AssetProcessingEvent(userId, consignmentId, matchId, source, objectType, s3Bucket, objectKey)
+    }.fold(
+      ex => {
+        val error = AssetProcessingError(None, None, None, s"$ptAp.$ObjectKeyParsingError.$Invalid", s"Invalid object key: $objectKey: ${ex.getMessage}")
+        handleProcessError(error)
+      },
+      event => parseMetadataObject(s3Utils, s3Bucket, event)
+    )
+  }
+
+  private def parseMetadataObject(s3Utils: S3Utils, s3Bucket: String, event: AssetProcessingEvent): AssetProcessingResult = {
+    Try(s3Utils.getObjectAsStream(s3Bucket, event.objectKey)).fold(
+      ex => {
+        val error = generateErrorMessage(event, s"$ptAp.$s3e.$ReadError", ex.getMessage)
+        handleProcessError(error)
+      },
+      inputStream => {
+        validUTF8(inputStream, event)
       }
+    )
+  }
+
+  private def validUTF8(inputStream: java.io.InputStream, event: AssetProcessingEvent): AssetProcessingResult = {
+    val utf8Validator = new Utf8Validator(new UTF8ValidationHandler())
+    Try(utf8Validator.validate(inputStream)).fold(
+      ex => {
+        val error = generateErrorMessage(event, s"$ptAp.$EncodingError.$Invalid", ex.getMessage)
+        handleProcessError(error)
+      },
+      _ => {
+        inputStream.reset()
+        parser
+          .parse(inputStream.readAllBytes().map(_.toChar).mkString)
+          .fold(
+            ex => {
+              val error = generateErrorMessage(event, s"$ptAp.$JsonError.$Invalid", ex.getMessage())
+              handleProcessError(error)
+            },
+            json => parseMetadataJson(json, event)
+          )
+      }
+    )
+  }
+
+  private def parseMetadataJson(metadataJson: Json, event: AssetProcessingEvent): AssetProcessingResult = {
+    val requiredFieldNames = Set("matchId", "FileRef", "sha256ClientSideChecksum", "Modified", "Length") // TODO: retrieve from schema
+    val retrievedJsonFields = getJsonField(requiredFieldNames, metadataJson)
+    val matchId = event.matchId
+    val objectKey = event.objectKey
+
+    if (retrievedJsonFields.size != requiredFieldNames.size) {
+      val missingFields = requiredFieldNames.toList.diff(retrievedJsonFields.keys.toList)
+      val errorMessage: String = s"Missing fields: ${missingFields.mkString(",")}"
+      val error = generateErrorMessage(event, s"$ptAp.$MetadataFieldError.$Missing", errorMessage)
+      handleProcessError(error)
+    } else {
+      val suppliedMetadata = toSuppliedMetadata(metadataJson)
+      // TODO; handle conversion errors gracefully
+      val lastModified = t"${retrievedJsonFields("Modified")}".getTime
+      val fileSize = retrievedJsonFields("Length").toLong
+      // TODO: provide mapping in config json for input field names
+      val clientSideMetadataInput =
+        ClientSideMetadataInput(retrievedJsonFields("FileRef"), retrievedJsonFields("sha256ClientSideChecksum"), lastModified, fileSize, retrievedJsonFields("matchId"))
+
+      logger.info(s"Asset metadata successfully processed for: $objectKey")
+      AssetProcessingResult(Some(matchId), processingErrors = false, Some(clientSideMetadataInput), suppliedMetadata)
     }
   }
 
@@ -54,83 +125,28 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
       .toMap
   }
 
-  private def toClientSideMetadataInput(metadataJson: Json, assetDetails: AssetDetails): Option[ClientSideMetadataInput] = {
-    val requiredFieldNames = Set("matchId", "FileRef", "sha256ClientSideChecksum", "Modified", "Length") // TODO: retrieve from schema
-    val retrievedJsonFields = getJsonField(requiredFieldNames, metadataJson)
-    if (retrievedJsonFields.size != requiredFieldNames.size) {
-      requiredFieldNames.toList
-        .diff(retrievedJsonFields.toList)
-        .foreach(f => {
-          val error =
-            AssetProcessingError(Some(assetDetails.consignmentId.toString), Some(assetDetails.matchId), Some(assetDetails.source), s"ASSET_PROCESSING.MISSING_FIELD.$f", "")
-          ErrorHandling.handleError(error, logger)
-        })
-      None
-    } else {
-      // TODO: provide mapping in config json for input field names
-      val lastModified = t"${retrievedJsonFields("Modified")}".getTime
-      val fileSize = retrievedJsonFields("Length").toLong
-      Some(ClientSideMetadataInput(retrievedJsonFields("FileRef"), retrievedJsonFields("sha256ClientSideChecksum"), lastModified, fileSize, retrievedJsonFields("matchId")))
-    }
-  }
-
   private def toSuppliedMetadata(metadataJson: Json): List[SuppliedMetadata] = {
     // TODO: check for any supplied metadata fields
     Nil
   }
 
-  private def parseMetadataObject(s3Utils: S3Utils, s3Bucket: String, assetDetails: AssetDetails): MetadataObjectParseResult = {
-    Try(s3Utils.getObjectAsStream(s3Bucket, assetDetails.objectKey)) match {
-      case Failure(ex) =>
-        val s3ReadError = generateErrorMessage(assetDetails, "ASSET_PROCESSING.S3.READ_ERROR", ex)
-        ErrorHandling.handleError(s3ReadError, logger)
-        MetadataObjectParseResult(errors = true, None)
-      case Success(inputStream) =>
-        val utfError = validUTF8(inputStream, assetDetails.objectKey)
-        inputStream.reset()
-        val json = parser.parse(inputStream.readAllBytes().map(_.toChar).mkString) match {
-          case Left(failure) =>
-            val jsonError = generateErrorMessage(assetDetails, "ASSET_PROCESSING.JSON.INVALID", failure)
-            ErrorHandling.handleError(jsonError, logger)
-            None
-          case Right(json) => Some(json)
-        }
-        val hasErrors = utfError || json.isEmpty
-        MetadataObjectParseResult(hasErrors, json)
-    }
-  }
-
-  private def validUTF8(inputStream: java.io.InputStream, objectKey: String): Boolean = {
-    val utf8Validator = new Utf8Validator(new UTF8ValidationHandler()(logger))
-    Try(utf8Validator.validate(inputStream)) match {
-      case Failure(ex) =>
-        val utf8Error = generateErrorMessage(parseObjectKey(objectKey).get, "ASSET_PROCESSING.UTF.INVALID", ex)
-        ErrorHandling.handleError(utf8Error, logger)
-        true
-      case _ =>
-        logger.info(s"UTF8 validation passed: $objectKey")
-        false
-    }
-  }
-
-  private def generateErrorMessage(assetDetails: AssetDetails, errorCode: String, errorMsg: Throwable): AssetProcessingError = {
+  private def generateErrorMessage(assetDetails: AssetProcessingEvent, errorCode: String, errorMessage: String): AssetProcessingError = {
     AssetProcessingError(
       consignmentId = Some(assetDetails.consignmentId.toString),
       matchId = Some(assetDetails.matchId),
       source = Some(assetDetails.source),
       errorCode = errorCode,
-      errorMsg = errorMsg.getMessage
+      errorMsg = errorMessage
     )
   }
 }
 
 object AssetProcessing {
-  private case class AssetDetails(consignmentId: UUID, matchId: String, source: String, objectKey: String)
-  private case class MetadataObjectParseResult(errors: Boolean, json: Option[Json])
+  private case class AssetProcessingEvent(userId: UUID, consignmentId: UUID, matchId: String, source: String, objectType: String, s3SourceBucket: String, objectKey: String)
   case class SuppliedMetadata(propertyName: String, propertyValue: String)
   case class AssetProcessingResult(
       matchId: Option[String],
-      processingErrors: Boolean = false,
+      processingErrors: Boolean,
       clientSideMetadataInput: Option[ClientSideMetadataInput],
       suppliedMetadata: List[SuppliedMetadata] = List()
   )
@@ -143,19 +159,6 @@ object AssetProcessing {
 
   private val configFactory: Config = ConfigFactory.load()
   val s3Utils: S3Utils = S3Utils(S3Clients.s3Async(configFactory.getString("s3.endpoint")))
-
-  private def parseObjectKey(objectKey: String): Option[AssetDetails] = {
-    Try {
-      val elements = objectKey.split('/')
-      val consignmentId = UUID.fromString(elements(2))
-      val matchId = elements.last.split("\\.")(0)
-      val source = elements(1)
-      AssetDetails(consignmentId, matchId, source, objectKey)
-    } match {
-      case Failure(ex) => None
-      case Success(ad) => Some(ad)
-    }
-  }
 
   def apply() = new AssetProcessing(s3Utils)(logger)
 }
