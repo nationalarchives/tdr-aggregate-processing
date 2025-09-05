@@ -16,7 +16,6 @@ libraryDependencies ++= Seq(
   generatedGraphql,
   logback,
   logstash,
-  metadataSchema,
   mockitoScala % Test,
   mockitoScalaTest % Test,
   s3Utils,

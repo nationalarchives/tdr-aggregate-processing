@@ -27,12 +27,12 @@ class AssetProcessingSpec extends ExternalServiceSpec {
       "Modified": "2025-07-03T09:19:47Z",
       "FileLeafRef": "file1.txt",
       "FileRef": "/sites/Retail/Shared Documents/file1.txt",
-      "sha256ClientSideChecksum": "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2",
+      "SHA256ClientSideChecksum": "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2",
       "matchId": "$matchId",
       "transferId": "$consignmentId"
     }""".stripMargin
 
-  "processAsset" should "not log errors and return asset processing result when metadata json is valid" in {
+  "processAsset" should "return asset processing result and not log errors when metadata json is valid" in {
     val mockLogger = mock[UnderlyingLogger]
     val s3UtilsMock = mock[S3Utils]
 
@@ -47,6 +47,7 @@ class AssetProcessingSpec extends ExternalServiceSpec {
     val expectedResult = AssetProcessingResult(Some(matchId), processingErrors = false, Some(expectedInput))
 
     when(mockLogger.isInfoEnabled()).thenReturn(true)
+    when(mockLogger.isErrorEnabled).thenReturn(true)
     when(s3UtilsMock.getObjectAsStream(any[String], any[String]))
       .thenReturn(new ByteArrayInputStream(defaultMetadataJsonString.getBytes("UTF-8")))
 
@@ -87,7 +88,7 @@ class AssetProcessingSpec extends ExternalServiceSpec {
       "Modified": "2025-07-03T09:19:47Z",
       "FileLeafRef": "file1.txt",
       "FileRef": "/sites/Retail/Shared Documents/file1.txt",
-      "sha256ClientSideChecksum": "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2",
+      "SHA256ClientSideChecksum": "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2",
       "matchId": "$matchId",
       "transferId": "$consignmentId"
     }""".stripMargin
@@ -105,7 +106,7 @@ class AssetProcessingSpec extends ExternalServiceSpec {
 
     verifyDefaultInfoLogging(mockLogger)
     verify(mockLogger).error(
-      s"AssetProcessingError: consignmentId: Some($consignmentId), matchId: Some($matchId), source: Some(sharepoint), errorCode: ASSET_PROCESSING.METADATA_FIELD.MISSING, errorMessage: Missing fields: Length"
+      s"AssetProcessingError: consignmentId: Some($consignmentId), matchId: Some($matchId), source: Some(sharepoint), errorCode: ASSET_PROCESSING.JSON.INVALID, errorMessage: DecodingFailure at .Length: Missing required field"
     )
   }
 
@@ -176,7 +177,50 @@ class AssetProcessingSpec extends ExternalServiceSpec {
     )
   }
 
-  private def verifyDefaultInfoLogging(logger: UnderlyingLogger) = {
+  "processAsset" should "log an error and return asset processing result when json is an unknown structure" in {
+    val mockLogger = mock[UnderlyingLogger]
+    val s3UtilsMock = mock[S3Utils]
+    val unknownJsonString = s"""{"aField": "aValue", "bField": "bValue}"""
+    val expectedResult = AssetProcessingResult(Some(matchId), processingErrors = true, None)
+
+    when(mockLogger.isErrorEnabled()).thenReturn(true)
+    when(mockLogger.isInfoEnabled()).thenReturn(true)
+    when(s3UtilsMock.getObjectAsStream(any[String], any[String]))
+      .thenReturn(new ByteArrayInputStream(unknownJsonString.getBytes("UTF-8")))
+
+    val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
+    val result = assetProcessing.processAsset("s3Bucket", s"$userId/sharepoint/$consignmentId/metadata/$matchId.metadata")
+
+    result shouldEqual expectedResult
+
+    verifyDefaultInfoLogging(mockLogger)
+    verify(mockLogger).error(
+      s"AssetProcessingError: consignmentId: Some($consignmentId), matchId: Some($matchId), source: Some(sharepoint), errorCode: ASSET_PROCESSING.JSON.INVALID, errorMessage: exhausted input"
+    )
+  }
+
+  "processAsset" should "log an error and return asset processing result when the event matchId does not match the metadata matchId" in {
+    val mockLogger = mock[UnderlyingLogger]
+    val s3UtilsMock = mock[S3Utils]
+    val differentMatchId = UUID.randomUUID()
+    val expectedResult = AssetProcessingResult(None, processingErrors = true, None)
+
+    when(mockLogger.isErrorEnabled()).thenReturn(true)
+    when(mockLogger.isInfoEnabled()).thenReturn(true)
+    when(s3UtilsMock.getObjectAsStream(any[String], any[String]))
+      .thenReturn(new ByteArrayInputStream(defaultMetadataJsonString.getBytes("UTF-8")))
+
+    val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
+    val result = assetProcessing.processAsset("s3Bucket", s"$userId/sharepoint/$consignmentId/metadata/$differentMatchId.metadata")
+
+    result shouldEqual expectedResult
+
+    verify(mockLogger).error(
+      s"AssetProcessingError: consignmentId: Some($consignmentId), matchId: None, source: Some(sharepoint), errorCode: ASSET_PROCESSING.MATCH_ID.MISMATCH, errorMessage: Mismatched match ids: $differentMatchId and $matchId"
+    )
+  }
+
+  private def verifyDefaultInfoLogging(logger: UnderlyingLogger): Unit = {
     verify(logger).info("Processing asset metadata for: {}", s"$userId/sharepoint/$consignmentId/metadata/$matchId.metadata")
   }
 }

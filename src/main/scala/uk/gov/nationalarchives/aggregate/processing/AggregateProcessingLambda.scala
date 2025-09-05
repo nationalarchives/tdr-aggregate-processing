@@ -31,7 +31,18 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
     logger.info(s"Processing assets with prefix $objectsPrefix")
     val s3Objects = s3Utils.listAllObjectsWithPrefix(sourceBucket, objectsPrefix)
     logger.info(s"Retrieved ${s3Objects.size} objects with prefix: $objectsPrefix")
-    s3Objects.map(o => assetProcessor.processAsset(sourceBucket, o.key()))
+    val result = s3Objects.map(o => assetProcessor.processAsset(sourceBucket, o.key()))
+    if (result.exists(_.processingErrors)) {
+      /* TODO:
+          - send failed message;
+          - update consignment status */
+    } else {
+      /* TODO:
+       - send graphql mutation;
+       - trigger backend checks step function;
+       - put draft metadata csv and trigger draft metadata step function if contains supplied metadata
+       - update consignment status  */
+    }
   }
 
   private def parseSqsMessage(sqsMessage: SQSMessage): AggregateEvent = {
