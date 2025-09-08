@@ -66,21 +66,19 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
 
   private def validUTF8(inputStream: java.io.InputStream, event: AssetProcessingEvent): AssetProcessingResult = {
     val utf8Validator = new Utf8Validator(new UTF8ValidationHandler())
-    Try(utf8Validator.validate(inputStream)) match {
-      case Failure(ex) =>
-        val error = generateErrorMessage(event, s"$ptAp.$EncodingError.$Invalid", ex.getMessage)
+    Try {
+      utf8Validator.validate(inputStream)
+      inputStream.reset()
+      parser.parse(inputStream.readAllBytes().map(_.toChar).mkString)
+    } match {
+      case Failure(utfEx) =>
+        val error = generateErrorMessage(event, s"$ptAp.$EncodingError.$Invalid", utfEx.getMessage)
         handleProcessError(error)
-      case _ =>
-        inputStream.reset()
-        parser
-          .parse(inputStream.readAllBytes().map(_.toChar).mkString)
-          .fold(
-            ex => {
-              val error = generateErrorMessage(event, s"$ptAp.$JsonError.$Invalid", ex.getMessage())
-              handleProcessError(error)
-            },
-            json => parseMetadataJson(json, event)
-          )
+      case Success(Left(parseEx)) =>
+        val error = generateErrorMessage(event, s"$ptAp.$JsonError.$Invalid", parseEx.getMessage())
+        handleProcessError(error)
+      case Success(Right(json)) =>
+        parseMetadataJson(json, event)
     }
   }
 
