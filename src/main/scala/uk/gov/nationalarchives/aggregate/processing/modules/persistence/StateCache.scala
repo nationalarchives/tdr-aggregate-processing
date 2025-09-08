@@ -6,6 +6,8 @@ import redis.clients.jedis.UnifiedJedis
 import uk.gov.nationalarchives.aggregate.processing.modules.persistence.Model._
 import uk.gov.nationalarchives.aggregate.processing.modules.persistence.StateCache.cacheClient
 
+import java.util.UUID
+
 class StateCache {
   private val gson = new Gson
 
@@ -15,9 +17,27 @@ class StateCache {
     }
   }
 
-  def setErrorState(state: ErrorState): Long = {
-    val key = s"${state.consignmentId}:${TransferStateCategory.errorState}:${state.transferProcess}"
-    val value = state.matchId
+  def setPathState(pathState: PathState): Long = {
+    val key = s"${pathState.consignmentId}:${TransferStateCategory.pathsState}"
+    val value = pathState.path
+    setAdd(key, value)
+  }
+
+  def getPathState(consignmentId: UUID): Long = {
+    getSetCardinality(consignmentId.toString)
+  }
+
+  def getPaths(consignmentId: UUID): Set[String] = {
+
+  }
+
+  def setErrorState(errorState: ErrorState): Long = {
+    val key = s"${errorState.consignmentId}:${TransferStateCategory.errorState}:${errorState.transferProcess}"
+    val value = errorState.matchId
+    setAdd(key, value)
+  }
+
+  private def setAdd(key: String, value: String): Long = {
     cacheClient.sadd(key, value)
   }
 
@@ -25,26 +45,22 @@ class StateCache {
     val keyPrefix = s"${errorStateFilter.consignmentId}:${TransferStateCategory.errorState}"
     if (errorStateFilter.filter.isEmpty) {
       TransferProcess.values.map(v =>
-        v -> cacheClient.scard(s"$keyPrefix:${v.toString}")
+        v -> getSetCardinality(s"$keyPrefix:${v.toString}")
       ).toMap
     } else {
       errorStateFilter.filter.map(v => {
-        v -> cacheClient.scard(s"$keyPrefix:${v.toString}")
+        v -> getSetCardinality(s"$keyPrefix:${v.toString}")
       }).toMap
     }
   }
 
-  def setAssetData(data: AssetData): Unit = {
-    val assetIdentifier =  if (data.assetId.nonEmpty) {
-      data.assetId.get.toString
-    } else data.matchId
-
-    val key = s"$assetIdentifier:${DataCategory.errorData.toString}"
-    cacheClient.jsonSet(key, data.input)
+  private def getSetCardinality(key: String): Long = {
+    cacheClient.scard(key)
   }
 
-  def getAssetData(key: String): Either[ParsingFailure, Json] = {
-    parser.parse(cacheClient.jsonGet(key).toJsonString)
+  private def scanSet(key: String): Set[String] = {
+    cacheClient.scanIteration()
+    Set()
   }
 }
 

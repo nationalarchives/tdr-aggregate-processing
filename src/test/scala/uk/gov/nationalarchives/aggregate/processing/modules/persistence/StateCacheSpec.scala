@@ -34,27 +34,4 @@ class StateCacheSpec extends  ExternalServiceSpec {
     errorState.keys.head shouldBe TransferProcess.AssetProcessing
     errorState(TransferProcess.AssetProcessing) shouldBe 2
   }
-
-  "a" should "b" in {
-    val cache = new StateCache
-    val consignmentId = UUID.randomUUID()
-    val assetId = UUID.randomUUID()
-    val matchId = "matchID-123"
-    val jsonString = defaultJsonString(matchId, consignmentId)
-    val json: Json = parser.parse(jsonString) match {
-      case Left(ex) => throw ex
-      case Right(jj) => jj
-    }
-
-    val data = AssetData(matchId, Some(assetId), DataCategory.errorData, json)
-    cache.setAssetData(data)
-  }
-
-  "c" should "d" in {
-    val cache = new StateCache
-    val json = cache.getAssetData("e6668974-3a94-4ae9-9139-b4fb75e099d8:error")
-    val expectedJson = parser.parse("")
-    json shouldBe Right(expectedJson)
-    println("HELLO")
-  }
 }

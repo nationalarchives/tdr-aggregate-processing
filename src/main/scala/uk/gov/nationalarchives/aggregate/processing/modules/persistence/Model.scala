@@ -28,6 +28,7 @@ object Model {
   trait State { }
 
   case class ErrorState(consignmentId: UUID, transferProcess: TransferProcess, matchId: String) extends State
+  case class PathState(consignmentId: UUID, path: String) extends State
 
   trait StateFilter { }
 
