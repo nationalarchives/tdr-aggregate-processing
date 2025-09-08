@@ -11,8 +11,6 @@ object Common {
   object ProcessType extends Enumeration {
     type ProcessType = Value
     val AssetProcessing: Value = Value("ASSET_PROCESSING")
-    val DraftMetadataValidation: Value = Value("DRAFT_METADATA_VALIDATION")
-    val FileChecks: Value = Value("FILE_CHECKS")
   }
 
   object ProcessErrorType extends Enumeration {
