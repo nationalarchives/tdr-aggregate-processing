@@ -11,9 +11,9 @@ class ErrorHandlingSpec extends AnyFlatSpec {
   "handleError" should "log the correct error message" in {
     val mockLogger = mock[UnderlyingLogger]
     val error = AssetProcessingError(
-      consignmentId = "consignmentId123",
+      consignmentId = Some("consignmentId123"),
       matchId = Some("matchId456"),
-      source = "sourceSystem",
+      source = Some("sourceSystem"),
       errorCode = "ASSET_PROCESSING.TEST_ERROR",
       errorMsg = "Test error message"
     )
@@ -22,16 +22,16 @@ class ErrorHandlingSpec extends AnyFlatSpec {
     ErrorHandling.handleError(error, Logger(mockLogger))
 
     verify(mockLogger).error(
-      "AssetProcessingError: consignmentId: consignmentId123, matchId: Some(matchId456), source: sourceSystem, errorCode: ASSET_PROCESSING.TEST_ERROR, errorMessage: Test error message"
+      "AssetProcessingError: consignmentId: Some(consignmentId123), matchId: Some(matchId456), source: Some(sourceSystem), errorCode: ASSET_PROCESSING.TEST_ERROR, errorMessage: Test error message"
     )
   }
 
-  it should "log the error message even if matchId is None" in {
+  it should "log an error when optional fields are None" in {
     val mockLogger = mock[UnderlyingLogger]
     val error = AssetProcessingError(
-      consignmentId = "consignmentId123",
+      consignmentId = None,
       matchId = None,
-      source = "sourceSystem",
+      source = None,
       errorCode = "ASSET_PROCESSING.TEST_ERROR",
       errorMsg = "Test error message"
     )
@@ -39,7 +39,7 @@ class ErrorHandlingSpec extends AnyFlatSpec {
 
     ErrorHandling.handleError(error, Logger(mockLogger))
     verify(mockLogger).error(
-      "AssetProcessingError: consignmentId: consignmentId123, matchId: None, source: sourceSystem, errorCode: ASSET_PROCESSING.TEST_ERROR, errorMessage: Test error message"
+      "AssetProcessingError: consignmentId: None, matchId: None, source: None, errorCode: ASSET_PROCESSING.TEST_ERROR, errorMessage: Test error message"
     )
   }
 }
