@@ -13,6 +13,8 @@ libraryDependencies ++= Seq(
   circeCore,
   circeGeneric,
   circeParser,
+  gson,
+  jedis,
   logback,
   logstash,
   mockitoScala % Test,

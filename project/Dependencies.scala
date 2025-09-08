@@ -12,6 +12,10 @@ object Dependencies {
   lazy val circeGeneric = "io.circe" %% "circe-generic" % circeVersion
   lazy val circeParser = "io.circe" %% "circe-parser" % circeVersion
 
+  lazy val gson = "com.google.code.gson" % "gson" % "2.13.1"
+
+  lazy val jedis = "redis.clients" % "jedis" % "6.2.0"
+
   lazy val logback = "ch.qos.logback" % "logback-classic" % "1.5.18"
   lazy val logstash = "net.logstash.logback" % "logstash-logback-encoder" % "8.1"
 
