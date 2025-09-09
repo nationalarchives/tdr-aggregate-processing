@@ -7,6 +7,7 @@ ThisBuild / organization := "uk.gov.nationalarchives"
 ThisBuild / organizationName := "aggregate-processing"
 
 libraryDependencies ++= Seq(
+  authUtils,
   awsLambdaCore,
   awsLambdaEvents,
   awsSqs,
@@ -14,6 +15,7 @@ libraryDependencies ++= Seq(
   circeGeneric,
   circeParser,
   generatedGraphql,
+  graphqlClient,
   logback,
   logstash,
   mockitoScala % Test,
@@ -21,6 +23,7 @@ libraryDependencies ++= Seq(
   s3Utils,
   scalaLogging,
   scalaTest % Test,
+  ssmUtils,
   typesafeConfig,
   utf8Validator,
   wiremock % Test

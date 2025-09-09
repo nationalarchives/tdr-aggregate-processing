@@ -4,6 +4,14 @@ import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper
 
 class CommonSpec extends AnyFlatSpec {
+  "ConsignmentStatusType" should "contain the correct enums" in {
+    val consignmentStatusType = Common.ConsignmentStatusType
+    val expectedValues = List("ClientChecks", "DraftMetadata", "Upload")
+
+    consignmentStatusType.values.size shouldBe 3
+    consignmentStatusType.values.map(_.toString).toList shouldEqual expectedValues
+  }
+
   "ProcessType" should "contain the correct enums" in {
     val processType = Common.ProcessType
     val expectedValues = List("ASSET_PROCESSING")
@@ -26,5 +34,13 @@ class CommonSpec extends AnyFlatSpec {
 
     processErrorValue.values.size shouldBe 3
     processErrorValue.values.map(_.toString).toList shouldEqual expectedValues
+  }
+
+  "StateStatusValue" should "contain the correct enums" in {
+    val stateStatusValue = Common.StateStatusValue
+    val expectedValues = List("Completed", "CompletedWithIssues", "Failed")
+
+    stateStatusValue.values.size shouldBe 3
+    stateStatusValue.values.map(_.toString).toList shouldEqual expectedValues
   }
 }
