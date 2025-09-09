@@ -16,12 +16,11 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec {
 
     val message = new SQSMessage()
     message.setBody(messageBody)
-    val result = new AggregateProcessingLambda().process(message)
+    new AggregateProcessingLambda().process(message)
     wiremockS3.verify(
       getRequestedFor(anyUrl())
         .withUrl("/?list-type=2&max-keys=1000&prefix=%2Fsource%2Fbucket%2Fobject%2Fprefix")
     )
-    result shouldBe List()
   }
 
   "process" should "throw an error for invalid message json" in {
