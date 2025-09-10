@@ -134,12 +134,18 @@ object AssetProcessing {
   implicit val sharePointEncoder: Encoder[RequiredSharePointMetadata] = deriveEncoder[RequiredSharePointMetadata]
 
   trait MetadataSideCar {}
-  case class RequiredSharePointMetadata(matchId: String, transferId: UUID, Modified: String,
-                                        SHA256ClientSideChecksum: String, Length: Long, FileRef: String, FileLeafRef: String)
+  case class RequiredSharePointMetadata(matchId: String, transferId: UUID, Modified: String, SHA256ClientSideChecksum: String, Length: Long, FileRef: String, FileLeafRef: String)
       extends MetadataSideCar
 
-  private case class AssetProcessingEvent(userId: UUID, consignmentId: UUID, matchId: String,
-                                          source: AssetSource, objectType: ObjectType, s3SourceBucket: String, objectKey: String)
+  private case class AssetProcessingEvent(
+      userId: UUID,
+      consignmentId: UUID,
+      matchId: String,
+      source: AssetSource,
+      objectType: ObjectType,
+      s3SourceBucket: String,
+      objectKey: String
+  )
   case class SuppliedMetadata(propertyName: String, propertyValue: String)
   case class AssetProcessingResult(
       matchId: Option[String],

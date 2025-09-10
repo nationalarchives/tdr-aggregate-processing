@@ -68,11 +68,10 @@ object Common {
       val objectElements = if (elements.length > 4) Some(elements.last) else None
       ObjectKeyDetails(userId, consignmentId, assetSource, objectCategory, objectElements)
     } match {
-      case Failure(ex) => throw ex
+      case Failure(ex)               => throw ex
       case Success(objectKeyDetails) => objectKeyDetails
     }
   }
 
-  case class ObjectKeyDetails(userId: UUID, consignmentId: UUID, assetSource: AssetSource,
-                              category: ObjectCategory, objectElements: Option[String])
+  case class ObjectKeyDetails(userId: UUID, consignmentId: UUID, assetSource: AssetSource, category: ObjectCategory, objectElements: Option[String])
 }
