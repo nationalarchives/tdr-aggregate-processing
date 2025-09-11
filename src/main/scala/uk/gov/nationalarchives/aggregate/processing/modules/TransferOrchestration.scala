@@ -4,13 +4,13 @@ import cats.effect.IO
 import com.typesafe.scalalogging.Logger
 import graphql.codegen.types.ConsignmentStatusInput
 import uk.gov.nationalarchives.aggregate.processing.config.ApplicationConfig.getClientSecret
-import uk.gov.nationalarchives.aggregate.processing.graphql.GraphQlApi
-import uk.gov.nationalarchives.aggregate.processing.graphql.GraphQlApi.{backend, keycloakDeployment}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ConsignmentStatusType
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.AssetProcessing
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.StateStatusValue.{Completed, CompletedWithIssues, ConsignmentStatusValue, Failed}
 import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling.BaseError
 import uk.gov.nationalarchives.aggregate.processing.modules.TransferOrchestration.{AssetProcessingEvent, OrchestrationResult, TransferError}
+import uk.gov.nationalarchives.aggregate.processing.persistence.GraphQlApi
+import uk.gov.nationalarchives.aggregate.processing.persistence.GraphQlApi.{backend, keycloakDeployment}
 
 import java.util.UUID
 import scala.util.{Failure, Success, Try}

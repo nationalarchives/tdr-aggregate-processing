@@ -9,7 +9,7 @@ import org.mockito.MockitoSugar.{mock, verify, when}
 import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper
 import org.slf4j.{Logger => UnderlyingLogger}
 import uk.gov.nationalarchives.aggregate.processing.ExternalServiceSpec
-import uk.gov.nationalarchives.aggregate.processing.graphql.GraphQlApi
+import uk.gov.nationalarchives.aggregate.processing.persistence.GraphQlApi
 import uk.gov.nationalarchives.aggregate.processing.modules.TransferOrchestration.AssetProcessingEvent
 
 import java.util.UUID

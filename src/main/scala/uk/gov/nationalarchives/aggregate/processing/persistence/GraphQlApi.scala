@@ -1,4 +1,4 @@
-package uk.gov.nationalarchives.aggregate.processing.graphql
+package uk.gov.nationalarchives.aggregate.processing.persistence
 
 import cats.effect.IO
 import cats.implicits.catsSyntaxOptionId
