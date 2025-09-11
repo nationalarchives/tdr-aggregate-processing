@@ -16,6 +16,7 @@ import sttp.client3.{HttpURLConnectionBackend, Identity, SttpBackend}
 import uk.gov.nationalarchives.aggregate.processing.ExternalServiceSpec
 import uk.gov.nationalarchives.tdr.keycloak.{KeycloakUtils, TdrKeycloakDeployment}
 import uk.gov.nationalarchives.tdr.{GraphQLClient, GraphQlResponse}
+import uk.gov.nationalarchives.tdr.keycloak.{KeycloakUtils, TdrKeycloakDeployment}
 
 import java.util.UUID
 import scala.concurrent.{ExecutionContextExecutor, Future}

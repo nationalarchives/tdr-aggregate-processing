@@ -11,6 +11,8 @@ import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.A
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.StateStatusValue.{Completed, CompletedWithIssues, ConsignmentStatusValue, Failed}
 import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling.BaseError
 import uk.gov.nationalarchives.aggregate.processing.modules.TransferOrchestration.{AssetProcessingEvent, OrchestrationResult, TransferError}
+import uk.gov.nationalarchives.aggregate.processing.persistence.GraphQlApi
+import uk.gov.nationalarchives.aggregate.processing.persistence.GraphQlApi.{backend, keycloakDeployment}
 
 import java.util.UUID
 import scala.util.{Failure, Success, Try}

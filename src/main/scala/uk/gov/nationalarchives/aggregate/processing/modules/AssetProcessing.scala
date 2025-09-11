@@ -6,6 +6,9 @@ import graphql.codegen.types.ClientSideMetadataInput
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
 import io.circe.{Decoder, Encoder, Json, parser}
 import uk.gov.nationalarchives.aggregate.processing.modules.AssetProcessing._
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.AssetSource.AssetSource
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.ObjectType
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.ObjectType.ObjectType
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorType.{EncodingError, JsonError, ObjectKeyParsingError, S3Error => s3e}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorValue.{Invalid, ReadError}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.{AssetProcessing => ptAp}
@@ -37,15 +40,11 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
 
   private def handleEvent(s3Bucket: String, objectKey: String): AssetProcessingResult = {
     Try {
-      val elements = objectKey.split('/')
-      val userId = UUID.fromString(elements(0))
-      val source = elements(1)
-      val consignmentId = UUID.fromString(elements(2))
-
-      val objectElements = elements.last.split("\\.")
+      val objectDetails = Common.objectKeyParser(objectKey)
+      val objectElements = objectDetails.objectElements.get.split("\\.")
       val matchId = objectElements(0)
-      val objectType = objectElements(1)
-      AssetProcessingEvent(userId, consignmentId, matchId, source, objectType, s3Bucket, objectKey)
+      val objectType = ObjectType.withName(objectElements(1))
+      AssetProcessingEvent(objectDetails.userId, objectDetails.consignmentId, matchId, objectDetails.assetSource, objectType, s3Bucket, objectKey)
     } match {
       case Failure(ex) =>
         val error = AssetProcessingError(None, None, None, s"$ptAp.$ObjectKeyParsingError.$Invalid", s"Invalid object key: $objectKey: ${ex.getMessage}")
@@ -90,7 +89,7 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
       .as[RequiredSharePointMetadata]
       .fold(
         ex => {
-          val error = AssetProcessingError(Some(event.consignmentId.toString), Some(event.matchId), Some(event.source), s"$ptAp.$JsonError.$Invalid", ex.getMessage())
+          val error = AssetProcessingError(Some(event.consignmentId.toString), Some(event.matchId), Some(event.source.toString), s"$ptAp.$JsonError.$Invalid", ex.getMessage())
           handleProcessError(error)
         },
         metadata => {
@@ -98,7 +97,7 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
             val error = AssetProcessingError(
               Some(event.consignmentId.toString),
               None,
-              Some(event.source),
+              Some(event.source.toString),
               s"$ptAp.MATCH_ID.MISMATCH",
               s"Mismatched match ids: ${event.matchId} and ${metadata.matchId}"
             )
@@ -123,7 +122,7 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
     AssetProcessingError(
       consignmentId = Some(event.consignmentId.toString),
       matchId = Some(event.matchId),
-      source = Some(event.source),
+      source = Some(event.source.toString),
       errorCode = errorCode,
       errorMsg = errorMessage
     )
@@ -138,7 +137,15 @@ object AssetProcessing {
   case class RequiredSharePointMetadata(matchId: String, transferId: UUID, Modified: String, SHA256ClientSideChecksum: String, Length: Long, FileRef: String, FileLeafRef: String)
       extends MetadataSideCar
 
-  private case class AssetProcessingEvent(userId: UUID, consignmentId: UUID, matchId: String, source: String, objectType: String, s3SourceBucket: String, objectKey: String)
+  private case class AssetProcessingEvent(
+      userId: UUID,
+      consignmentId: UUID,
+      matchId: String,
+      source: AssetSource,
+      objectType: ObjectType,
+      s3SourceBucket: String,
+      objectKey: String
+  )
   case class SuppliedMetadata(propertyName: String, propertyValue: String)
   case class AssetProcessingResult(
       matchId: Option[String],
