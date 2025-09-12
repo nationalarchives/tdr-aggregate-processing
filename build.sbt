@@ -24,6 +24,7 @@ libraryDependencies ++= Seq(
   scalaLogging,
   scalaTest % Test,
   ssmUtils,
+  stepFunctionUtils,
   typesafeConfig,
   utf8Validator,
   wiremock % Test
