@@ -12,6 +12,7 @@ import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper
 import org.slf4j.{Logger => UnderlyingLogger}
 import software.amazon.awssdk.services.sfn.model.StartExecutionResponse
 import uk.gov.nationalarchives.aggregate.processing.ExternalServiceSpec
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.{AssetSource, ObjectCategory, ObjectKeyDetails}
 import uk.gov.nationalarchives.aggregate.processing.modules.TransferOrchestration.{AssetProcessingEvent, BackendChecksStepFunctionInput}
 import uk.gov.nationalarchives.aggregate.processing.persistence.GraphQlApi
 import uk.gov.nationalarchives.aws.utils.stepfunction.StepFunctionUtils
@@ -24,6 +25,7 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     val mockGraphQlApi = mock[GraphQlApi]
     val consignmentId = UUID.randomUUID()
     val userId = UUID.randomUUID()
+    val objectKeyDetails = ObjectKeyDetails(userId, consignmentId, AssetSource.SharePoint, ObjectCategory.Metadata, objectElements = None)
     val sfnUtils = mock[StepFunctionUtils]
     val config = ConfigFactory.load()
 
@@ -32,7 +34,7 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     when(mockLogger.isErrorEnabled()).thenReturn(true)
     when(mockGraphQlApi.updateConsignmentStatus(any[String], inputCaptor.capture())).thenReturn(IO(Some(1)))
 
-    val event = AssetProcessingEvent(userId, consignmentId, processingErrors = false, suppliedMetadata = false)
+    val event = AssetProcessingEvent(objectKeyDetails, processingErrors = false, suppliedMetadata = false)
 
     new TransferOrchestration(mockGraphQlApi, sfnUtils, config)(Logger(mockLogger)).orchestrate(event)
 
@@ -47,6 +49,7 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     val mockGraphQlApi = mock[GraphQlApi]
     val consignmentId = UUID.randomUUID()
     val userId = UUID.randomUUID()
+    val objectKeyDetails = ObjectKeyDetails(userId, consignmentId, AssetSource.SharePoint, ObjectCategory.Metadata, objectElements = None)
     val sfnUtils = mock[StepFunctionUtils]
     val config = ConfigFactory.load()
 
@@ -55,7 +58,7 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     when(mockLogger.isErrorEnabled()).thenReturn(true)
     when(mockGraphQlApi.updateConsignmentStatus(any[String], input.capture())).thenReturn(IO(Some(1)))
 
-    val event = AssetProcessingEvent(userId, consignmentId, processingErrors = true, suppliedMetadata = false)
+    val event = AssetProcessingEvent(objectKeyDetails, processingErrors = true, suppliedMetadata = false)
 
     new TransferOrchestration(mockGraphQlApi, sfnUtils, config)(Logger(mockLogger)).orchestrate(event)
     verify(mockLogger).error(
@@ -90,6 +93,7 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     val mockGraphQlApi = mock[GraphQlApi]
     val consignmentId = UUID.randomUUID()
     val userId = UUID.randomUUID()
+    val objectKeyDetails = ObjectKeyDetails(userId, consignmentId, AssetSource.SharePoint, ObjectCategory.Metadata, objectElements = None)
     val sfnUtils = mock[StepFunctionUtils]
     val config = ConfigFactory.load()
     val sfnResponse = IO.pure(StartExecutionResponse.builder.build)
@@ -101,6 +105,8 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     val nameCaptor: ArgumentCaptor[Option[String]] =
       ArgumentCaptor.forClass(classOf[Option[String]])
 
+    when(mockLogger.isInfoEnabled()).thenReturn(true)
+
     when(
       sfnUtils.startExecution(
         any[String],
@@ -109,7 +115,7 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
       )(any[Encoder[BackendChecksStepFunctionInput]])
     ).thenReturn(sfnResponse)
 
-    val event = AssetProcessingEvent(userId, consignmentId, processingErrors = false, suppliedMetadata = false)
+    val event = AssetProcessingEvent(objectKeyDetails, processingErrors = false, suppliedMetadata = false)
 
     new TransferOrchestration(mockGraphQlApi, sfnUtils, config)(Logger(mockLogger)).orchestrate(event)
 
@@ -127,6 +133,7 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     )
 
     nameCaptor.getValue shouldBe Some(s"transfer_service_$consignmentId")
+    verify(mockLogger).info(s"Triggering file checks for consignment: {}", consignmentId)
   }
 
   "orchestrate" should "not trigger the backend checks step function when asset processing contains errors" in {
@@ -134,6 +141,7 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     val mockGraphQlApi = mock[GraphQlApi]
     val consignmentId = UUID.randomUUID()
     val userId = UUID.randomUUID()
+    val objectKeyDetails = ObjectKeyDetails(userId, consignmentId, AssetSource.SharePoint, ObjectCategory.Metadata, objectElements = None)
     val sfnUtils = mock[StepFunctionUtils]
     val config = ConfigFactory.load()
 
@@ -144,7 +152,9 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     val nameCaptor: ArgumentCaptor[Option[String]] =
       ArgumentCaptor.forClass(classOf[Option[String]])
 
-    val event = AssetProcessingEvent(userId, consignmentId, processingErrors = true, suppliedMetadata = false)
+    when(mockLogger.isErrorEnabled()).thenReturn(true)
+
+    val event = AssetProcessingEvent(objectKeyDetails, processingErrors = true, suppliedMetadata = false)
 
     new TransferOrchestration(mockGraphQlApi, sfnUtils, config)(Logger(mockLogger)).orchestrate(event)
 
@@ -153,5 +163,7 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
       sfnInputCaptor.capture(),
       nameCaptor.capture()
     )(any[Encoder[BackendChecksStepFunctionInput]])
+
+    verify(mockLogger).error(s"TransferError: consignmentId: $consignmentId, errorCode: ASSET_PROCESSING.CompletedWithIssues, errorMessage: One or more assets failed to process.")
   }
 }

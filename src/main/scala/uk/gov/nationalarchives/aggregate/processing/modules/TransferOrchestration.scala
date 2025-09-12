@@ -4,9 +4,10 @@ import cats.effect.IO
 import com.typesafe.config.{Config, ConfigFactory}
 import com.typesafe.scalalogging.Logger
 import graphql.codegen.types.ConsignmentStatusInput
-import io.circe.generic.auto.exportEncoder
+import io.circe.Encoder
+import io.circe.generic.semiauto.deriveEncoder
 import uk.gov.nationalarchives.aggregate.processing.config.ApplicationConfig.getClientSecret
-import uk.gov.nationalarchives.aggregate.processing.modules.Common.ConsignmentStatusType
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.{ConsignmentStatusType, ObjectKeyDetails}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.AssetProcessing
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.StateStatusValue.{Completed, CompletedWithIssues, ConsignmentStatusValue, Failed}
 import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling.BaseError
@@ -21,6 +22,8 @@ import scala.util.{Failure, Success, Try}
 
 class TransferOrchestration(graphQlApi: GraphQlApi, stepFunctionUtils: StepFunctionUtils, config: Config)(implicit logger: Logger) {
 
+  implicit val encoder: Encoder[BackendChecksStepFunctionInput] = deriveEncoder[BackendChecksStepFunctionInput]
+
   def orchestrate[T <: Product](orchestrationEvent: T): Try[IO[OrchestrationResult]] = {
     orchestrationEvent match {
       case assetProcessingEvent: AssetProcessingEvent => Success(orchestrateProcessingEvent(assetProcessingEvent))
@@ -30,8 +33,8 @@ class TransferOrchestration(graphQlApi: GraphQlApi, stepFunctionUtils: StepFunct
 
   private def orchestrateProcessingEvent(event: AssetProcessingEvent): IO[OrchestrationResult] = {
     val errors = event.processingErrors
-    val consignmentId = event.consignmentId
-    val userId = event.userId
+    val consignmentId = event.objectKeyDetails.consignmentId
+    val userId = event.objectKeyDetails.userId
     val consignmentStatusValue: ConsignmentStatusValue = if (errors) { Failed }
     else Completed
 
@@ -41,7 +44,7 @@ class TransferOrchestration(graphQlApi: GraphQlApi, stepFunctionUtils: StepFunct
     } else {
       logger.info(s"Triggering file checks for consignment: $consignmentId")
       val input = BackendChecksStepFunctionInput(consignmentId = consignmentId.toString, s3SourceBucketPrefix = s"$userId/sharepoint/$consignmentId/metadata")
-      stepFunctionUtils.startExecution(stateMachineArn = config.getString("sfn.backendChecksArn"), input, name = Some(s"transfer_service_$consignmentId"))
+      stepFunctionUtils.startExecution(stateMachineArn = config.getString("sfn.backendChecksArn"), input, name = Some(s"transfer_service_$consignmentId"))(encoder)
       if (event.suppliedMetadata) {
         // TODO: trigger draft metadata step function
         logger.info(s"Triggering draft metadata validation for consignment: $consignmentId")
@@ -49,7 +52,7 @@ class TransferOrchestration(graphQlApi: GraphQlApi, stepFunctionUtils: StepFunct
     }
 
     val clientSecret = getClientSecret()
-    val statusInput = ConsignmentStatusInput(consignmentId, ConsignmentStatusType.Upload.toString, Some(consignmentStatusValue.toString), Some(event.userId))
+    val statusInput = ConsignmentStatusInput(consignmentId, ConsignmentStatusType.Upload.toString, Some(consignmentStatusValue.toString), Some(event.objectKeyDetails.userId))
     graphQlApi.updateConsignmentStatus(clientSecret, statusInput)
     IO(OrchestrationResult(consignmentId))
   }
@@ -59,7 +62,10 @@ object TransferOrchestration {
   val config: Config = ConfigFactory.load()
   val logger = Logger[TransferOrchestration]
 
-  case class AssetProcessingEvent(userId: UUID, consignmentId: UUID, processingErrors: Boolean, suppliedMetadata: Boolean)
+  trait StepFunctionInput {}
+  case class BackendChecksStepFunctionInput(consignmentId: String, s3SourceBucketPrefix: String) extends StepFunctionInput
+
+  case class AssetProcessingEvent(objectKeyDetails: ObjectKeyDetails, processingErrors: Boolean, suppliedMetadata: Boolean)
   case class TransferError(consignmentId: UUID, errorCode: String, errorMessage: String) extends BaseError {
     override def toString: String = {
       s"${this.simpleName}: consignmentId: $consignmentId, errorCode: $errorCode, errorMessage: $errorMessage"
@@ -67,7 +73,6 @@ object TransferOrchestration {
   }
 
   case class OrchestrationResult(consignmentId: UUID)
-  case class BackendChecksStepFunctionInput(consignmentId: String, s3SourceBucketPrefix: String)
 
   val stepFunctionUtils = StepFunctionUtils(sfnAsyncClient(config.getString("sfn.endpoint")))
 
