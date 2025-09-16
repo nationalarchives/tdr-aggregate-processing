@@ -1,17 +1,10 @@
 package uk.gov.nationalarchives.aggregate.processing
 
-import com.amazonaws.services.lambda.runtime.events.SQSEvent.SQSMessage
+import cats.effect.unsafe.implicits.global
+import uk.gov.nationalarchives.aggregate.processing.AggregateProcessingLambda.AggregateEvent
 
 object AggregateProcessingLambdaRunner extends App {
-  val messageBody = s"""
-    {
-      "metadataSourceBucket": "source-bucket",
-      "metadataSourceObjectPrefix": "source-bucket-object-prefix"
-    }
-    """.stripMargin
+  val event = AggregateEvent("source-bucket", "source-bucket-object-prefix")
 
-  val sqsMessage = new SQSMessage
-  sqsMessage.setBody(messageBody)
-
-  new AggregateProcessingLambda().process(sqsMessage)
+  new AggregateProcessingLambda().processEvent(event).unsafeRunSync()
 }

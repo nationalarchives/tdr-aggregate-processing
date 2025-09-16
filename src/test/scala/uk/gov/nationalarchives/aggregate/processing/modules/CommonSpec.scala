@@ -16,15 +16,15 @@ class CommonSpec extends AnyFlatSpec {
 
   "ProcessType" should "contain the correct enums" in {
     val processType = Common.ProcessType
-    val expectedValues = List("ASSET_PROCESSING")
+    val expectedValues = List("AGGREGATE_PROCESSING", "ASSET_PROCESSING", "PERSISTENCE")
 
-    processType.values.size shouldBe 1
+    processType.values.size shouldBe 3
     processType.values.map(_.toString).toList shouldEqual expectedValues
   }
 
   "ProcessErrorType" should "contain the correct enums" in {
     val processErrorType = Common.ProcessErrorType
-    val expectedValues = List("ENCODING", "JSON", "METADATA_FIELD", "OBJECT_KEY", "S3")
+    val expectedValues = List("CLIENT_SIDE_METADATA", "ENCODING", "JSON", "OBJECT_KEY", "S3")
 
     processErrorType.values.size shouldBe 5
     processErrorType.values.map(_.toString).toList shouldEqual expectedValues
@@ -32,9 +32,9 @@ class CommonSpec extends AnyFlatSpec {
 
   "ProcessErrorValue" should "contain the correct enums" in {
     val processErrorValue = Common.ProcessErrorValue
-    val expectedValues = List("INVALID", "MISSING", "READ_ERROR")
+    val expectedValues = List("INVALID", "READ_ERROR")
 
-    processErrorValue.values.size shouldBe 3
+    processErrorValue.values.size shouldBe 2
     processErrorValue.values.map(_.toString).toList shouldEqual expectedValues
   }
 
@@ -64,9 +64,9 @@ class CommonSpec extends AnyFlatSpec {
 
   "ObjectCategory" should "contain the correct enums" in {
     val objectCategoryValue = Common.ObjectCategory
-    val expectedValues = List("metadata", "records")
+    val expectedValues = List("metadata")
 
-    objectCategoryValue.values.size shouldBe 2
+    objectCategoryValue.values.size shouldBe 1
     objectCategoryValue.values.map(_.toString).toList shouldEqual expectedValues
   }
 

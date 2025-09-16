@@ -4,13 +4,12 @@ import cats.effect.IO
 import com.typesafe.scalalogging.Logger
 import graphql.codegen.types.ConsignmentStatusInput
 import org.mockito.ArgumentCaptor
-import org.mockito.ArgumentMatchers.any
 import org.mockito.MockitoSugar.{mock, verify, when}
 import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper
 import org.slf4j.{Logger => UnderlyingLogger}
 import uk.gov.nationalarchives.aggregate.processing.ExternalServiceSpec
+import uk.gov.nationalarchives.aggregate.processing.modules.TransferOrchestration.AggregateProcessingEvent
 import uk.gov.nationalarchives.aggregate.processing.persistence.GraphQlApi
-import uk.gov.nationalarchives.aggregate.processing.modules.TransferOrchestration.AssetProcessingEvent
 
 import java.util.UUID
 
@@ -24,9 +23,9 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     val inputCaptor: ArgumentCaptor[ConsignmentStatusInput] = ArgumentCaptor.forClass(classOf[ConsignmentStatusInput])
 
     when(mockLogger.isErrorEnabled()).thenReturn(true)
-    when(mockGraphQlApi.updateConsignmentStatus(any[String], inputCaptor.capture())).thenReturn(IO(Some(1)))
+    when(mockGraphQlApi.updateConsignmentStatus(inputCaptor.capture())).thenReturn(IO(Some(1)))
 
-    val event = AssetProcessingEvent(userId, consignmentId, processingErrors = false, suppliedMetadata = false)
+    val event = AggregateProcessingEvent(userId, consignmentId, processingErrors = false, suppliedMetadata = false)
 
     new TransferOrchestration(mockGraphQlApi)(Logger(mockLogger)).orchestrate(event)
 
@@ -45,9 +44,9 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     val input: ArgumentCaptor[ConsignmentStatusInput] = ArgumentCaptor.forClass(classOf[ConsignmentStatusInput])
 
     when(mockLogger.isErrorEnabled()).thenReturn(true)
-    when(mockGraphQlApi.updateConsignmentStatus(any[String], input.capture())).thenReturn(IO(Some(1)))
+    when(mockGraphQlApi.updateConsignmentStatus(input.capture())).thenReturn(IO(Some(1)))
 
-    val event = AssetProcessingEvent(userId, consignmentId, processingErrors = true, suppliedMetadata = false)
+    val event = AggregateProcessingEvent(userId, consignmentId, processingErrors = true, suppliedMetadata = false)
 
     new TransferOrchestration(mockGraphQlApi)(Logger(mockLogger)).orchestrate(event)
     verify(mockLogger).error(

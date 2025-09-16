@@ -16,7 +16,6 @@ import sttp.client3.{HttpURLConnectionBackend, Identity, SttpBackend}
 import uk.gov.nationalarchives.aggregate.processing.ExternalServiceSpec
 import uk.gov.nationalarchives.tdr.keycloak.{KeycloakUtils, TdrKeycloakDeployment}
 import uk.gov.nationalarchives.tdr.{GraphQLClient, GraphQlResponse}
-import uk.gov.nationalarchives.tdr.keycloak.{KeycloakUtils, TdrKeycloakDeployment}
 
 import java.util.UUID
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -54,7 +53,7 @@ class GraphQlApiSpec extends ExternalServiceSpec {
     val clientSideMetadataInput = List(ClientSideMetadataInput("original-path", "checksome", 1L, 2L, "match-id"))
     val input = AddFileAndMetadataInput(consignmentId, clientSideMetadataInput, None, Some(overrideUserId))
 
-    api.addClientSideMetadata("client-secret", input).unsafeRunSync()
+    api.addClientSideMetadata(input).unsafeRunSync()
     val inputArgs = inputVariablesCaptor.getValue.get.input
     inputArgs.consignmentId shouldBe consignmentId
     inputArgs.metadataInput shouldBe clientSideMetadataInput
@@ -85,7 +84,7 @@ class GraphQlApiSpec extends ExternalServiceSpec {
     val api = new GraphQlApi(keycloak, updateConsignmentStatusClient, addFilesAndMetadataClient)(Logger(mockLogger), tdrKeycloakDeployment, backend)
 
     val exception = intercept[RuntimeException] {
-      api.addClientSideMetadata("client-secret", input).unsafeRunSync()
+      api.addClientSideMetadata(input).unsafeRunSync()
     }
 
     verify(mockLogger).info("Add client side metadata for consignment: {}", consignmentId)
@@ -110,7 +109,7 @@ class GraphQlApiSpec extends ExternalServiceSpec {
       .when(updateConsignmentStatusClient)
       .getResult[Identity](any[BearerAccessToken], any[Document], inputVariablesCaptor.capture())(any[SttpBackend[Identity, Any]], any[ClassTag[Identity[_]]])
 
-    api.updateConsignmentStatus("client-secret", ConsignmentStatusInput(consignmentId, "Upload", Some("Completed"), Some(overrideUserId))).unsafeRunSync()
+    api.updateConsignmentStatus(ConsignmentStatusInput(consignmentId, "Upload", Some("Completed"), Some(overrideUserId))).unsafeRunSync()
     val inputArgs = inputVariablesCaptor.getValue.get.updateConsignmentStatusInput
     inputArgs.consignmentId shouldBe consignmentId
     inputArgs.statusType shouldBe "Upload"
@@ -139,7 +138,7 @@ class GraphQlApiSpec extends ExternalServiceSpec {
     val api = new GraphQlApi(keycloak, updateConsignmentStatusClient, addFilesAndMetadataClient)(Logger(mockLogger), tdrKeycloakDeployment, backend)
 
     val exception = intercept[RuntimeException] {
-      api.updateConsignmentStatus("client-secret", ConsignmentStatusInput(consignmentId, "Upload", Some("Completed"), Some(overrideUserId))).unsafeRunSync()
+      api.updateConsignmentStatus(ConsignmentStatusInput(consignmentId, "Upload", Some("Completed"), Some(overrideUserId))).unsafeRunSync()
     }
 
     verify(mockLogger).info(s"Updating consignment status: Upload for consignment: $consignmentId")

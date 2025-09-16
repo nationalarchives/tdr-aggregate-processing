@@ -1,51 +1,165 @@
 package uk.gov.nationalarchives.aggregate.processing
 
+import com.amazonaws.services.lambda.runtime.Context
+import com.amazonaws.services.lambda.runtime.events.SQSEvent
 import com.amazonaws.services.lambda.runtime.events.SQSEvent.SQSMessage
-import com.github.tomakehurst.wiremock.client.WireMock.{anyUrl, getRequestedFor}
+import com.github.tomakehurst.wiremock.client.WireMock.{anyUrl, exactly, getRequestedFor, postRequestedFor}
+import org.mockito.MockitoSugar.mock
 import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper
+import uk.gov.nationalarchives.aggregate.processing.modules.Common
+
+import java.util.UUID
+import scala.jdk.CollectionConverters._
 
 class AggregateProcessingLambdaSpec extends ExternalServiceSpec {
-  "process" should "process a valid event" in {
-    mockS3GetResponse()
-    val messageBody = s"""
+  private val userId: UUID = UUID.randomUUID()
+  private val consignmentId: UUID = UUID.randomUUID()
+  private val matchId = "match-id"
+  private val source: String = Common.AssetSource.SharePoint.toString
+  private val category: String = Common.ObjectCategory.Metadata.toString
+  private val validMessageBody: String =
+    s"""
     {
       "metadataSourceBucket": "source-bucket",
-      "metadataSourceObjectPrefix": "/source/bucket/object/prefix"
+      "metadataSourceObjectPrefix": "$userId/$source/$consignmentId/$category"
     }
     """.stripMargin
 
-    val message = new SQSMessage()
-    message.setBody(messageBody)
-    new AggregateProcessingLambda().process(message)
+  "handleRequest" should "process all valid messages in SQS event" in {
+    authOkJson()
+    mockS3GetObjectStream(userId, consignmentId.toString, matchId)
+    mockS3ListBucketResponse(userId, consignmentId, List(matchId))
+    mockGraphQlAddFilesAndMetadataResponse
+    mockGraphQlUpdateConsignmentStatusResponse
+    val mockContext = mock[Context]
+
+    val message1 = new SQSMessage()
+    message1.setBody(validMessageBody)
+    val message2 = new SQSMessage()
+    message2.setBody(validMessageBody)
+    val messages: java.util.List[SQSMessage] = List(message1, message2).asJava
+    val sqsEvent = new SQSEvent()
+    sqsEvent.setRecords(messages)
+    new AggregateProcessingLambda().handleRequest(sqsEvent, mockContext)
+
     wiremockS3.verify(
+      exactly(2),
       getRequestedFor(anyUrl())
-        .withUrl("/?list-type=2&max-keys=1000&prefix=%2Fsource%2Fbucket%2Fobject%2Fprefix")
+        .withUrl(s"/?list-type=2&max-keys=1000&prefix=$userId%2F$source%2F$consignmentId%2F$category")
+    )
+
+    wiremockS3.verify(
+      exactly(2),
+      getRequestedFor(anyUrl())
+        .withUrl(s"/$userId/$source/$consignmentId/$category/$matchId.metadata")
+    )
+
+    wiremockGraphqlServer.verify(
+      exactly(4),
+      postRequestedFor(anyUrl())
+        .withUrl("/graphql")
     )
   }
 
-  "process" should "throw an error for invalid message json" in {
+  "handleRequest" should "throw an error for invalid message json" in {
     val nonJsonMessage = "some string"
+    val mockContext = mock[Context]
 
     val message = new SQSMessage()
     message.setBody(nonJsonMessage)
+    val sqsEvent = new SQSEvent()
+    sqsEvent.setRecords(List(message).asJava)
     val exception = intercept[IllegalArgumentException] {
-      new AggregateProcessingLambda().process(message)
+      new AggregateProcessingLambda().handleRequest(sqsEvent, mockContext)
     }
     exception.getMessage shouldBe "Invalid JSON object: expected json value got 'some s...' (line 1, column 1)"
+
+    wiremockS3.verify(
+      exactly(0),
+      getRequestedFor(anyUrl())
+        .withUrl(s"/?list-type=2&max-keys=1000&prefix=$userId%2F$source%2F$consignmentId%2F$category")
+    )
+
+    wiremockS3.verify(
+      exactly(0),
+      getRequestedFor(anyUrl())
+        .withUrl(s"/$userId/$source/$consignmentId/$category/$matchId.metadata")
+    )
+
+    wiremockGraphqlServer.verify(
+      exactly(0),
+      postRequestedFor(anyUrl())
+        .withUrl("/graphql")
+    )
   }
 
-  "process" should "throw an error for invalid event" in {
+  "handleRequest" should "throw an error for invalid event" in {
+    val mockContext = mock[Context]
     val invalidEventMessage = s"""
-    {
-      "property": "value"
-    }
-    """.stripMargin
+      {
+        "property": "value"
+      }
+      """.stripMargin
 
     val message = new SQSMessage()
     message.setBody(invalidEventMessage)
+    val invalidEvent = new SQSEvent()
+    invalidEvent.setRecords(List(message).asJava)
     val exception = intercept[IllegalArgumentException] {
-      new AggregateProcessingLambda().process(message)
+      new AggregateProcessingLambda().handleRequest(invalidEvent, mockContext)
     }
     exception.getMessage shouldBe "Invalid event: DecodingFailure at .metadataSourceBucket: Missing required field"
+
+    wiremockS3.verify(
+      exactly(0),
+      getRequestedFor(anyUrl())
+        .withUrl(s"/?list-type=2&max-keys=1000&prefix=$userId%2F$source%2F$consignmentId%2F$category")
+    )
+
+    wiremockS3.verify(
+      exactly(0),
+      getRequestedFor(anyUrl())
+        .withUrl(s"/$userId/$source/$consignmentId/$category/$matchId.metadata")
+    )
+
+    wiremockGraphqlServer.verify(
+      exactly(0),
+      postRequestedFor(anyUrl())
+        .withUrl("/graphql")
+    )
+  }
+
+  "process" should "throw an error when loading client side metadata fails" in {
+    authOkJson()
+    mockS3GetObjectStream(userId, consignmentId.toString, matchId)
+    mockS3ListBucketResponse(userId, consignmentId, List(matchId))
+    mockGraphQlResponseError
+    val mockContext = mock[Context]
+
+    val message = new SQSMessage()
+    message.setBody(validMessageBody)
+    val messages: java.util.List[SQSMessage] = List(message).asJava
+    val sqsEvent = new SQSEvent()
+    sqsEvent.setRecords(messages)
+
+    new AggregateProcessingLambda().handleRequest(sqsEvent, mockContext)
+
+    wiremockS3.verify(
+      exactly(1),
+      getRequestedFor(anyUrl())
+        .withUrl(s"/?list-type=2&max-keys=1000&prefix=$userId%2F$source%2F$consignmentId%2F$category")
+    )
+
+    wiremockS3.verify(
+      exactly(1),
+      getRequestedFor(anyUrl())
+        .withUrl(s"/$userId/$source/$consignmentId/$category/$matchId.metadata")
+    )
+
+    wiremockGraphqlServer.verify(
+      exactly(1),
+      postRequestedFor(anyUrl())
+        .withUrl("/graphql")
+    )
   }
 }

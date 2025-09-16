@@ -16,14 +16,16 @@ object Common {
 
   object ProcessType extends Enumeration {
     type ProcessType = Value
+    val AggregateProcessing: Value = Value("AGGREGATE_PROCESSING")
     val AssetProcessing: Value = Value("ASSET_PROCESSING")
+    val Persistence: Value = Value("PERSISTENCE")
   }
 
   object ProcessErrorType extends Enumeration {
     type ProcessErrorType = Value
+    val ClientSideMetadataError: Value = Value("CLIENT_SIDE_METADATA")
     val EncodingError: Value = Value("ENCODING")
     val JsonError: Value = Value("JSON")
-    val MetadataFieldError: Value = Value("METADATA_FIELD")
     val ObjectKeyParsingError: Value = Value("OBJECT_KEY")
     val S3Error: Value = Value("S3")
   }
@@ -31,7 +33,6 @@ object Common {
   object ProcessErrorValue extends Enumeration {
     type ProcessErrorValue = Value
     val Invalid: Value = Value("INVALID")
-    val Missing: Value = Value("MISSING")
     val ReadError: Value = Value("READ_ERROR")
   }
 
@@ -55,7 +56,6 @@ object Common {
   object ObjectCategory extends Enumeration {
     type ObjectCategory = Value
     val Metadata: Value = Value("metadata")
-    val Records: Value = Value("records")
   }
 
   def objectKeyParser(objectKey: String): ObjectKeyDetails = {

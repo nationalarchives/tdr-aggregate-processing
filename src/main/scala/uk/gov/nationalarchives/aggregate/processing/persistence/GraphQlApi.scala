@@ -24,7 +24,9 @@ class GraphQlApi(keycloak: KeycloakUtils, updateConsignmentStatusClient: GraphQL
     def toIO: IO[T] = IO.fromFuture(IO(f))
   }
 
-  def updateConsignmentStatus(clientSecret: String, consignmentStatusInput: ConsignmentStatusInput): IO[Option[Int]] = {
+  private val clientSecret = getClientSecret()
+
+  def updateConsignmentStatus(consignmentStatusInput: ConsignmentStatusInput): IO[Option[Int]] = {
     val consignmentId = consignmentStatusInput.consignmentId
 
     logger.info("Updating consignment status: " + consignmentStatusInput.statusType + " for consignment: " + consignmentId)
@@ -35,7 +37,7 @@ class GraphQlApi(keycloak: KeycloakUtils, updateConsignmentStatusClient: GraphQL
     } yield data.updateConsignmentStatus
   }
 
-  def addClientSideMetadata(clientSecret: String, addFileAndMetadataInput: AddFileAndMetadataInput): IO[List[afm.AddFilesAndMetadata]] = {
+  def addClientSideMetadata(addFileAndMetadataInput: AddFileAndMetadataInput): IO[List[afm.AddFilesAndMetadata]] = {
     val consignmentId = addFileAndMetadataInput.consignmentId
 
     logger.info(s"Add client side metadata for consignment: $consignmentId")
