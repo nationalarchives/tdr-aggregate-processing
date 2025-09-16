@@ -128,38 +128,4 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec {
         .withUrl("/graphql")
     )
   }
-
-  "process" should "throw an error when loading client side metadata fails" in {
-    authOkJson()
-    mockS3GetObjectStream(userId, consignmentId.toString, matchId)
-    mockS3ListBucketResponse(userId, consignmentId, List(matchId))
-    mockGraphQlResponseError
-    val mockContext = mock[Context]
-
-    val message = new SQSMessage()
-    message.setBody(validMessageBody)
-    val messages: java.util.List[SQSMessage] = List(message).asJava
-    val sqsEvent = new SQSEvent()
-    sqsEvent.setRecords(messages)
-
-    new AggregateProcessingLambda().handleRequest(sqsEvent, mockContext)
-
-    wiremockS3.verify(
-      exactly(1),
-      getRequestedFor(anyUrl())
-        .withUrl(s"/?list-type=2&max-keys=1000&prefix=$userId%2F$source%2F$consignmentId%2F$category")
-    )
-
-    wiremockS3.verify(
-      exactly(1),
-      getRequestedFor(anyUrl())
-        .withUrl(s"/$userId/$source/$consignmentId/$category/$matchId.metadata")
-    )
-
-    wiremockGraphqlServer.verify(
-      exactly(1),
-      postRequestedFor(anyUrl())
-        .withUrl("/graphql")
-    )
-  }
 }

@@ -13,8 +13,9 @@ import io.circe._
 import io.circe.generic.semiauto.deriveDecoder
 import io.circe.parser._
 import uk.gov.nationalarchives.aggregate.processing.AggregateProcessingLambda._
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.AggregateProcessing
 import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling.{BaseError, handleError}
-import uk.gov.nationalarchives.aggregate.processing.modules.TransferOrchestration.AggregateProcessingEvent
+import uk.gov.nationalarchives.aggregate.processing.modules.TransferOrchestration.{AggregateProcessingEvent, OrchestrationResult}
 import uk.gov.nationalarchives.aggregate.processing.modules.{AssetProcessing, Common, TransferOrchestration}
 import uk.gov.nationalarchives.aggregate.processing.persistence.GraphQlApi
 import uk.gov.nationalarchives.aggregate.processing.persistence.GraphQlApi.{backend, keycloakDeployment}
@@ -35,7 +36,7 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
     val resultsIO = events.map(event =>
       processEvent(event).handleErrorWith(err => {
         val details = Common.objectKeyParser(event.metadataSourceObjectPrefix)
-        val error = AggregateProcessingError(details.consignmentId, "AGGREGATE_PROCESSING", err.getMessage)
+        val error = AggregateProcessingError(details.consignmentId, s"$AggregateProcessing", err.getMessage)
         handleError(error, logger)
         IO.unit
       })
@@ -50,25 +51,32 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
     val objectKeyPrefixDetails = Common.objectKeyParser(objectsPrefix)
     val consignmentId = objectKeyPrefixDetails.consignmentId
     val userId = objectKeyPrefixDetails.userId
+    logger.info(s"Processing assets with prefix $objectsPrefix")
     val s3Objects = s3Utils.listAllObjectsWithPrefix(sourceBucket, objectsPrefix)
+    logger.info(s"Retrieved ${s3Objects.size} objects with prefix: $objectsPrefix")
     val assetProcessingResults = s3Objects.map(o => assetProcessor.processAsset(sourceBucket, o.key()))
     val clientSideMetadataInput = assetProcessingResults.flatMap(_.clientSideMetadataInput)
     val assetProcessingErrors = assetProcessingResults.exists(_.processingErrors)
 
     if (assetProcessingErrors) {
-      val event = AggregateProcessingEvent(userId, consignmentId, processingErrors = true, suppliedMetadata = false)
+      val orchestrationEvent = AggregateProcessingEvent(userId, consignmentId, processingErrors = true, suppliedMetadata = false)
       for {
-        orchestrationResult <- TransferOrchestration().orchestrate(event).get
+        orchestrationResult <- sendOrchestrationEvent(orchestrationEvent)
       } yield orchestrationResult
     } else {
       val input = AddFileAndMetadataInput(consignmentId, clientSideMetadataInput, None, Some(userId))
       for {
         _ <- persistenceApi.addClientSideMetadata(input)
         suppliedMetadata = assetProcessingResults.exists(_.suppliedMetadata.nonEmpty)
-        evt = AggregateProcessingEvent(userId, consignmentId, processingErrors = false, suppliedMetadata = suppliedMetadata)
-        orchestrationResult <- TransferOrchestration().orchestrate(evt).get
+        orchestrationEvent = AggregateProcessingEvent(userId, consignmentId, processingErrors = false, suppliedMetadata = suppliedMetadata)
+        orchestrationResult <- sendOrchestrationEvent(orchestrationEvent)
       } yield orchestrationResult
     }
+  }
+
+  private def sendOrchestrationEvent(event: AggregateProcessingEvent): IO[OrchestrationResult] = {
+    // TODO: handle errors from orchestration gracefully
+    TransferOrchestration().orchestrate(event).get
   }
 
   private def parseSqsMessage(sqsMessage: SQSMessage): AggregateEvent = {

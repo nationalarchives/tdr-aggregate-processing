@@ -18,8 +18,8 @@ class TransferOrchestration(graphQlApi: GraphQlApi)(implicit logger: Logger) {
 
   def orchestrate[T <: Product](orchestrationEvent: T): Try[IO[OrchestrationResult]] = {
     orchestrationEvent match {
-      case assetProcessingEvent: AggregateProcessingEvent => Success(orchestrateProcessingEvent(assetProcessingEvent))
-      case _                                              => Failure(throw new RuntimeException(s"Unrecognized orchestration event: ${orchestrationEvent.getClass.getName}"))
+      case aggregateProcessingEvent: AggregateProcessingEvent => Success(orchestrateProcessingEvent(aggregateProcessingEvent))
+      case _                                                  => Failure(throw new RuntimeException(s"Unrecognized orchestration event: ${orchestrationEvent.getClass.getName}"))
     }
   }
 
