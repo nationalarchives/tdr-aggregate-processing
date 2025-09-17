@@ -19,12 +19,14 @@ object Common {
     val AggregateProcessing: Value = Value("AGGREGATE_PROCESSING")
     val AssetProcessing: Value = Value("ASSET_PROCESSING")
     val Persistence: Value = Value("PERSISTENCE")
+    val Orchestration: Value = Value("ORCHESTRATION")
   }
 
   object ProcessErrorType extends Enumeration {
     type ProcessErrorType = Value
     val ClientSideMetadataError: Value = Value("CLIENT_SIDE_METADATA")
     val EncodingError: Value = Value("ENCODING")
+    val EventError: Value = Value("EVENT")
     val JsonError: Value = Value("JSON")
     val ObjectKeyParsingError: Value = Value("OBJECT_KEY")
     val S3Error: Value = Value("S3")

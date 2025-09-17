@@ -1,6 +1,7 @@
 package uk.gov.nationalarchives.aggregate.processing.modules
 
 import cats.effect.IO
+import cats.effect.unsafe.implicits.global
 import com.typesafe.scalalogging.Logger
 import graphql.codegen.types.ConsignmentStatusInput
 import org.mockito.ArgumentCaptor
@@ -27,7 +28,10 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
 
     val event = AggregateProcessingEvent(userId, consignmentId, processingErrors = false, suppliedMetadata = false)
 
-    new TransferOrchestration(mockGraphQlApi)(Logger(mockLogger)).orchestrate(event)
+    val result = new TransferOrchestration(mockGraphQlApi)(Logger(mockLogger)).orchestrate(event).unsafeRunSync()
+    result.consignmentId.get shouldBe consignmentId
+    result.success shouldBe true
+    result.error shouldBe None
 
     inputCaptor.getValue.consignmentId shouldBe consignmentId
     inputCaptor.getValue.statusType shouldBe "Upload"
@@ -48,9 +52,13 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
 
     val event = AggregateProcessingEvent(userId, consignmentId, processingErrors = true, suppliedMetadata = false)
 
-    new TransferOrchestration(mockGraphQlApi)(Logger(mockLogger)).orchestrate(event)
+    val result = new TransferOrchestration(mockGraphQlApi)(Logger(mockLogger)).orchestrate(event).unsafeRunSync()
+    result.consignmentId.get shouldBe consignmentId
+    result.success shouldBe true
+    result.error shouldBe None
+
     verify(mockLogger).error(
-      s"TransferError: consignmentId: $consignmentId, errorCode: ASSET_PROCESSING.CompletedWithIssues, errorMessage: One or more assets failed to process."
+      s"TransferError: consignmentId: Some($consignmentId), errorCode: AGGREGATE_PROCESSING.CompletedWithIssues, errorMessage: One or more assets failed to process."
     )
 
     input.getValue.consignmentId shouldBe consignmentId
@@ -59,18 +67,24 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     input.getValue.userIdOverride.get shouldBe userId
   }
 
-  "orchestrate" should "throw an error if the orchestration event is not of an expected class" in {
+  "orchestrate" should "return a non-successful result when the orchestration event is not of an expected class" in {
     case class SomeRandomClass()
     val mockLogger = mock[UnderlyingLogger]
     val mockGraphQlApi = mock[GraphQlApi]
 
+    when(mockLogger.isErrorEnabled()).thenReturn(true)
+
     val orchestrator = new TransferOrchestration(mockGraphQlApi)(Logger(mockLogger))
 
-    val exception = intercept[RuntimeException] {
-      orchestrator.orchestrate(SomeRandomClass())
-    }
+    val result = orchestrator.orchestrate(SomeRandomClass()).unsafeRunSync()
+    result.consignmentId shouldBe None
+    result.success shouldBe false
+    result.error.get.consignmentId shouldBe None
+    result.error.get.errorCode shouldBe "ORCHESTRATION.EVENT.INVALID"
+    result.error.get.errorMessage shouldBe "Unrecognized orchestration event: uk.gov.nationalarchives.aggregate.processing.modules.TransferOrchestrationSpec$SomeRandomClass$1"
 
-    exception.getMessage shouldEqual
-      "Unrecognized orchestration event: uk.gov.nationalarchives.aggregate.processing.modules.TransferOrchestrationSpec$SomeRandomClass$1"
+    verify(mockLogger).error(
+      s"TransferError: consignmentId: None, errorCode: ORCHESTRATION.EVENT.INVALID, errorMessage: Unrecognized orchestration event: uk.gov.nationalarchives.aggregate.processing.modules.TransferOrchestrationSpec$$SomeRandomClass$$1"
+    )
   }
 }

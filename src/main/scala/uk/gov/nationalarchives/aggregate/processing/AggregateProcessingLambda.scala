@@ -28,6 +28,7 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
   implicit val sharepointInputDecoder: Decoder[AggregateEvent] = deriveDecoder[AggregateEvent]
   private val assetProcessor = AssetProcessing()
   private val persistenceApi = GraphQlApi()
+  private val orchestrator = TransferOrchestration()
 
   override def handleRequest(event: SQSEvent, context: Context): Unit = {
     val sqsMessages: Seq[SQSMessage] = event.getRecords.asScala.toList
@@ -45,38 +46,28 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
     resultsIO.parSequence.unsafeRunSync()
   }
 
-  def processEvent(event: AggregateEvent): IO[TransferOrchestration.OrchestrationResult] = {
+  def processEvent(event: AggregateEvent): IO[OrchestrationResult] = {
     val sourceBucket = event.metadataSourceBucket
     val objectsPrefix = event.metadataSourceObjectPrefix
     val objectKeyPrefixDetails = Common.objectKeyParser(objectsPrefix)
     val consignmentId = objectKeyPrefixDetails.consignmentId
     val userId = objectKeyPrefixDetails.userId
-    logger.info(s"Processing assets with prefix $objectsPrefix")
-    val s3Objects = s3Utils.listAllObjectsWithPrefix(sourceBucket, objectsPrefix)
-    logger.info(s"Retrieved ${s3Objects.size} objects with prefix: $objectsPrefix")
-    val assetProcessingResults = s3Objects.map(o => assetProcessor.processAsset(sourceBucket, o.key()))
-    val clientSideMetadataInput = assetProcessingResults.flatMap(_.clientSideMetadataInput)
-    val assetProcessingErrors = assetProcessingResults.exists(_.processingErrors)
 
-    if (assetProcessingErrors) {
-      val orchestrationEvent = AggregateProcessingEvent(userId, consignmentId, processingErrors = true, suppliedMetadata = false)
-      for {
-        orchestrationResult <- sendOrchestrationEvent(orchestrationEvent)
-      } yield orchestrationResult
-    } else {
-      val input = AddFileAndMetadataInput(consignmentId, clientSideMetadataInput, None, Some(userId))
-      for {
-        _ <- persistenceApi.addClientSideMetadata(input)
-        suppliedMetadata = assetProcessingResults.exists(_.suppliedMetadata.nonEmpty)
-        orchestrationEvent = AggregateProcessingEvent(userId, consignmentId, processingErrors = false, suppliedMetadata = suppliedMetadata)
-        orchestrationResult <- sendOrchestrationEvent(orchestrationEvent)
-      } yield orchestrationResult
-    }
-  }
-
-  private def sendOrchestrationEvent(event: AggregateProcessingEvent): IO[OrchestrationResult] = {
-    // TODO: handle errors from orchestration gracefully
-    TransferOrchestration().orchestrate(event).get
+    for {
+      s3Objects <- IO(s3Utils.listAllObjectsWithPrefix(sourceBucket, objectsPrefix))
+      assetProcessingResults <- IO(s3Objects.map(o => assetProcessor.processAsset(sourceBucket, o.key())))
+      clientSideMetadataInput = assetProcessingResults.flatMap(_.clientSideMetadataInput)
+      assetProcessingErrors = assetProcessingResults.exists(_.processingErrors)
+      suppliedMetadata = assetProcessingResults.exists(_.suppliedMetadata.nonEmpty)
+      orchestrationEvent = AggregateProcessingEvent(userId, consignmentId, processingErrors = assetProcessingErrors, suppliedMetadata = suppliedMetadata)
+      _ <-
+        if (assetProcessingErrors) { IO(Nil) }
+        else {
+          val input = AddFileAndMetadataInput(consignmentId, clientSideMetadataInput, None, Some(userId))
+          persistenceApi.addClientSideMetadata(input)
+        }
+      orchestrationResult <- orchestrator.orchestrate(orchestrationEvent)
+    } yield orchestrationResult
   }
 
   private def parseSqsMessage(sqsMessage: SQSMessage): AggregateEvent = {

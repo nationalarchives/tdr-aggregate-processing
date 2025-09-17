@@ -4,22 +4,26 @@ import cats.effect.IO
 import com.typesafe.scalalogging.Logger
 import graphql.codegen.types.ConsignmentStatusInput
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ConsignmentStatusType
-import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.AssetProcessing
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorType.EventError
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorValue.Invalid
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.{AggregateProcessing, Orchestration}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.StateStatusValue.{Completed, CompletedWithIssues, ConsignmentStatusValue, Failed}
-import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling.BaseError
+import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling.{BaseError, handleError}
 import uk.gov.nationalarchives.aggregate.processing.modules.TransferOrchestration.{AggregateProcessingEvent, OrchestrationResult, TransferError}
 import uk.gov.nationalarchives.aggregate.processing.persistence.GraphQlApi
 import uk.gov.nationalarchives.aggregate.processing.persistence.GraphQlApi.{backend, keycloakDeployment}
 
 import java.util.UUID
-import scala.util.{Failure, Success, Try}
 
 class TransferOrchestration(graphQlApi: GraphQlApi)(implicit logger: Logger) {
 
-  def orchestrate[T <: Product](orchestrationEvent: T): Try[IO[OrchestrationResult]] = {
+  def orchestrate[T <: Product](orchestrationEvent: T): IO[OrchestrationResult] = {
     orchestrationEvent match {
-      case aggregateProcessingEvent: AggregateProcessingEvent => Success(orchestrateProcessingEvent(aggregateProcessingEvent))
-      case _                                                  => Failure(throw new RuntimeException(s"Unrecognized orchestration event: ${orchestrationEvent.getClass.getName}"))
+      case aggregateProcessingEvent: AggregateProcessingEvent => orchestrateProcessingEvent(aggregateProcessingEvent)
+      case _ =>
+        val error = TransferError(None, s"$Orchestration.$EventError.$Invalid", s"Unrecognized orchestration event: ${orchestrationEvent.getClass.getName}")
+        handleError(error, logger)
+        IO(OrchestrationResult(None, success = false, Some(error)))
     }
   }
 
@@ -30,7 +34,7 @@ class TransferOrchestration(graphQlApi: GraphQlApi)(implicit logger: Logger) {
     else Completed
 
     if (errors) {
-      val transferError = TransferError(consignmentId, s"$AssetProcessing.$CompletedWithIssues", "One or more assets failed to process.")
+      val transferError = TransferError(Some(consignmentId), s"$AggregateProcessing.$CompletedWithIssues", "One or more assets failed to process.")
       ErrorHandling.handleError(transferError, logger)
     } else {
       logger.info(s"Triggering file checks for consignment: $consignmentId")
@@ -43,8 +47,9 @@ class TransferOrchestration(graphQlApi: GraphQlApi)(implicit logger: Logger) {
 
     val statusInput = ConsignmentStatusInput(consignmentId, ConsignmentStatusType.Upload.toString, Some(consignmentStatusValue.toString), Some(event.userId))
     for {
-      _ <- graphQlApi.updateConsignmentStatus(statusInput)
-    } yield OrchestrationResult(consignmentId)
+      updateResult <- graphQlApi.updateConsignmentStatus(statusInput)
+      success = updateResult.nonEmpty
+    } yield OrchestrationResult(Some(consignmentId), success = success)
   }
 }
 
@@ -52,13 +57,13 @@ object TransferOrchestration {
   val logger = Logger[TransferOrchestration]
 
   case class AggregateProcessingEvent(userId: UUID, consignmentId: UUID, processingErrors: Boolean, suppliedMetadata: Boolean)
-  case class TransferError(consignmentId: UUID, errorCode: String, errorMessage: String) extends BaseError {
+  case class TransferError(consignmentId: Option[UUID], errorCode: String, errorMessage: String) extends BaseError {
     override def toString: String = {
       s"${this.simpleName}: consignmentId: $consignmentId, errorCode: $errorCode, errorMessage: $errorMessage"
     }
   }
 
-  case class OrchestrationResult(consignmentId: UUID)
+  case class OrchestrationResult(consignmentId: Option[UUID], success: Boolean, error: Option[TransferError] = None)
 
   def apply() = new TransferOrchestration(GraphQlApi())(logger)
 }
