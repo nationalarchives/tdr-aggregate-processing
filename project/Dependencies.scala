@@ -26,6 +26,7 @@ object Dependencies {
   lazy val scalaLogging = "com.typesafe.scala-logging" %% "scala-logging" % "3.9.5"
   lazy val scalaTest = "org.scalatest" %% "scalatest" % "3.2.19"
   lazy val ssmUtils = "uk.gov.nationalarchives" %% "ssm-utils" % "0.1.299"
+  lazy val stepFunctionUtils = "uk.gov.nationalarchives" %% "stepfunction-utils" % "0.1.299"
 
   lazy val typesafeConfig = "com.typesafe" % "config" % "1.4.4"
 
