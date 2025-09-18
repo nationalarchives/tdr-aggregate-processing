@@ -6,12 +6,13 @@ import com.typesafe.scalalogging.Logger
 import graphql.codegen.types.ConsignmentStatusInput
 import io.circe.Encoder
 import io.circe.generic.semiauto.deriveEncoder
-import uk.gov.nationalarchives.aggregate.processing.config.ApplicationConfig.getClientSecret
-import uk.gov.nationalarchives.aggregate.processing.modules.Common.{ConsignmentStatusType, ObjectKeyDetails}
-import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.AssetProcessing
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.ConsignmentStatusType
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorType.EventError
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorValue.Invalid
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.{AggregateProcessing, Orchestration}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.StateStatusValue.{Completed, CompletedWithIssues, ConsignmentStatusValue, Failed}
-import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling.BaseError
-import uk.gov.nationalarchives.aggregate.processing.modules.TransferOrchestration.{AssetProcessingEvent, BackendChecksStepFunctionInput, OrchestrationResult, TransferError}
+import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling.{BaseError, handleError}
+import uk.gov.nationalarchives.aggregate.processing.modules.TransferOrchestration.{AggregateProcessingEvent, BackendChecksStepFunctionInput, OrchestrationResult, TransferError}
 import uk.gov.nationalarchives.aggregate.processing.persistence.GraphQlApi
 import uk.gov.nationalarchives.aggregate.processing.persistence.GraphQlApi.{backend, keycloakDeployment}
 import uk.gov.nationalarchives.aws.utils.stepfunction.StepFunctionClients.sfnAsyncClient
@@ -35,8 +36,8 @@ class TransferOrchestration(graphQlApi: GraphQlApi, stepFunctionUtils: StepFunct
 
   private def orchestrateProcessingEvent(event: AggregateProcessingEvent): IO[OrchestrationResult] = {
     val errors = event.processingErrors
-    val consignmentId = event.objectKeyDetails.consignmentId
-    val userId = event.objectKeyDetails.userId
+    val consignmentId = event.consignmentId
+    val userId = event.userId
     val consignmentStatusValue: ConsignmentStatusValue = if (errors) { Failed }
     else Completed
 
@@ -68,8 +69,9 @@ object TransferOrchestration {
   trait StepFunctionInput {}
   case class BackendChecksStepFunctionInput(consignmentId: String, s3SourceBucketPrefix: String) extends StepFunctionInput
 
+  case class AggregateProcessingEvent(userId: UUID, consignmentId: UUID, processingErrors: Boolean, suppliedMetadata: Boolean)
+
   case class TransferError(consignmentId: Option[UUID], errorCode: String, errorMessage: String) extends BaseError {
-    case class TransferError(consignmentId: UUID, errorCode: String, errorMessage: String) extends BaseError {
     override def toString: String = {
       s"${this.simpleName}: consignmentId: $consignmentId, errorCode: $errorCode, errorMessage: $errorMessage"
     }
