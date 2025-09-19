@@ -40,24 +40,34 @@ class TransferOrchestration(graphQlApi: GraphQlApi, stepFunctionUtils: StepFunct
     val errors = event.processingErrors
     val consignmentId = event.consignmentId
     val userId = event.userId
-    val consignmentStatusValue: ConsignmentStatusValue = if (errors) { Failed }
-    else Completed
+    val consignmentStatusValue: ConsignmentStatusValue = if (errors) Failed else Completed
 
-    if (errors) {
-      val transferError = TransferError(Some(consignmentId), s"$AggregateProcessing.$CompletedWithIssues", "One or more assets failed to process.")
-      ErrorHandling.handleError(transferError, logger)
-    } else {
-      logger.info(s"Triggering file checks for consignment: $consignmentId")
-      val input = BackendChecksStepFunctionInput(consignmentId = consignmentId.toString, s3SourceBucketPrefix = s"$userId/$SharePoint/$consignmentId/$Records")
-      stepFunctionUtils.startExecution(stateMachineArn = config.getString("sfn.backendChecksArn"), input, name = Some(s"transfer_service_$consignmentId"))(encoder)
-      if (event.suppliedMetadata) {
-        // TODO: trigger draft metadata step function
-        logger.info(s"Triggering draft metadata validation for consignment: $consignmentId")
+    val triggerSfnEffect =
+      if (errors) {
+        val transferError = TransferError(Some(consignmentId), s"$AggregateProcessing.$CompletedWithIssues", "One or more assets failed to process.")
+        IO(ErrorHandling.handleError(transferError, logger))
+      } else {
+        logger.info(s"Triggering file checks for consignment: $consignmentId")
+        val input = BackendChecksStepFunctionInput(consignmentId.toString, s"$userId/$SharePoint/$consignmentId/$Records")
+        stepFunctionUtils
+          .startExecution(config.getString("sfn.backendChecksArn"), input, Some(s"transfer_service_$consignmentId"))(encoder)
+          .handleErrorWith { ex =>
+            IO(logger.error(ex.getMessage)) *> IO(
+              ErrorHandling.handleError(
+                TransferError(Some(consignmentId), s"$AggregateProcessing.$CompletedWithIssues", s"Step function error: ${ex.getMessage}"),
+                logger
+              )
+            )
+          }
       }
+    if (event.suppliedMetadata) {
+      // TODO: trigger draft metadata step function
+      logger.info(s"Triggering draft metadata validation for consignment: $consignmentId")
     }
 
     val statusInput = ConsignmentStatusInput(consignmentId, ConsignmentStatusType.Upload.toString, Some(consignmentStatusValue.toString), Some(event.userId))
     for {
+      _ <- triggerSfnEffect
       updateResult <- graphQlApi.updateConsignmentStatus(statusInput)
       success = updateResult.nonEmpty
     } yield OrchestrationResult(Some(consignmentId), success = success)

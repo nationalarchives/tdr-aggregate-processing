@@ -131,4 +131,53 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
       s"TransferError: consignmentId: None, errorCode: ORCHESTRATION.EVENT.INVALID, errorMessage: Unrecognized orchestration event: uk.gov.nationalarchives.aggregate.processing.modules.TransferOrchestrationSpec$$SomeRandomClass$$1"
     )
   }
+
+  "orchestrate" should "log an error when triggering the backend checks step function fails" in {
+    val mockLogger = mock[UnderlyingLogger]
+    val mockGraphQlApi = mock[GraphQlApi]
+    val consignmentId = UUID.randomUUID()
+    val userId = UUID.randomUUID()
+    val sfnUtils = mock[StepFunctionUtils]
+    val config = ConfigFactory.load()
+
+    val arnCaptor: ArgumentCaptor[String] =
+      ArgumentCaptor.forClass(classOf[String])
+    val sfnInputCaptor: ArgumentCaptor[BackendChecksStepFunctionInput] =
+      ArgumentCaptor.forClass(classOf[BackendChecksStepFunctionInput])
+    val nameCaptor: ArgumentCaptor[Option[String]] =
+      ArgumentCaptor.forClass(classOf[Option[String]])
+    val consignmentStatusInputCaptor: ArgumentCaptor[ConsignmentStatusInput] = ArgumentCaptor.forClass(classOf[ConsignmentStatusInput])
+
+    when(mockLogger.isErrorEnabled()).thenReturn(true)
+    when(mockGraphQlApi.updateConsignmentStatus(any[ConsignmentStatusInput])).thenReturn(IO(Some(1)))
+
+    when(
+      sfnUtils.startExecution(
+        any[String],
+        any[BackendChecksStepFunctionInput],
+        any[Option[String]]
+      )(any[Encoder[BackendChecksStepFunctionInput]])
+    ).thenReturn(IO.raiseError(new RuntimeException("Step function failed")))
+
+    val event = AggregateProcessingEvent(userId, consignmentId, processingErrors = false, suppliedMetadata = false)
+
+    new TransferOrchestration(mockGraphQlApi, sfnUtils, config)(Logger(mockLogger)).orchestrate(event).unsafeRunSync()
+
+    verify(sfnUtils).startExecution(
+      arnCaptor.capture(),
+      sfnInputCaptor.capture(),
+      nameCaptor.capture()
+    )(any[Encoder[BackendChecksStepFunctionInput]])
+
+    arnCaptor.getValue shouldBe config.getString("sfn.backendChecksArn")
+
+    sfnInputCaptor.getValue shouldBe BackendChecksStepFunctionInput(
+      consignmentId.toString,
+      s"$userId/sharepoint/$consignmentId/records"
+    )
+
+    verify(mockGraphQlApi).updateConsignmentStatus(consignmentStatusInputCaptor.capture())
+    nameCaptor.getValue shouldBe Some(s"transfer_service_$consignmentId")
+    verify(mockLogger).error(s"Step function failed")
+  }
 }
