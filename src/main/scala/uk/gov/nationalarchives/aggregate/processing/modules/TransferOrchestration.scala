@@ -6,7 +6,9 @@ import com.typesafe.scalalogging.Logger
 import graphql.codegen.types.ConsignmentStatusInput
 import io.circe.Encoder
 import io.circe.generic.semiauto.deriveEncoder
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.AssetSource.SharePoint
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ConsignmentStatusType
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.ObjectCategory.Records
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorType.EventError
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorValue.Invalid
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.{AggregateProcessing, Orchestration}
@@ -46,7 +48,7 @@ class TransferOrchestration(graphQlApi: GraphQlApi, stepFunctionUtils: StepFunct
       ErrorHandling.handleError(transferError, logger)
     } else {
       logger.info(s"Triggering file checks for consignment: $consignmentId")
-      val input = BackendChecksStepFunctionInput(consignmentId = consignmentId.toString, s3SourceBucketPrefix = s"$userId/sharepoint/$consignmentId/metadata")
+      val input = BackendChecksStepFunctionInput(consignmentId = consignmentId.toString, s3SourceBucketPrefix = s"$userId/$SharePoint/$consignmentId/$Records")
       stepFunctionUtils.startExecution(stateMachineArn = config.getString("sfn.backendChecksArn"), input, name = Some(s"transfer_service_$consignmentId"))(encoder)
       if (event.suppliedMetadata) {
         // TODO: trigger draft metadata step function

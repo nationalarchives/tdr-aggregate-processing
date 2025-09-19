@@ -64,9 +64,9 @@ class CommonSpec extends AnyFlatSpec {
 
   "ObjectCategory" should "contain the correct enums" in {
     val objectCategoryValue = Common.ObjectCategory
-    val expectedValues = List("metadata")
+    val expectedValues = List("metadata", "records")
 
-    objectCategoryValue.values.size shouldBe 1
+    objectCategoryValue.values.size shouldBe 2
     objectCategoryValue.values.map(_.toString).toList shouldEqual expectedValues
   }
 
