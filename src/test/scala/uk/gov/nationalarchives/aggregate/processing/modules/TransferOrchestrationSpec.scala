@@ -173,7 +173,7 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
 
     sfnInputCaptor.getValue shouldBe BackendChecksStepFunctionInput(
       consignmentId.toString,
-      s"$userId/sharepoint/$consignmentId/metadata"
+      s"$userId/sharepoint/$consignmentId/records"
     )
 
     verify(mockGraphQlApi).updateConsignmentStatus(consignmentStatusInputCaptor.capture())
