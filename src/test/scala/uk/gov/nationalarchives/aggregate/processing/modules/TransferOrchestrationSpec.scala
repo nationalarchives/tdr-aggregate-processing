@@ -59,7 +59,7 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     sfnArnCaptor.getValue shouldBe config.getString("sfn.backendChecksArn")
     sfnInputCaptor.getValue shouldBe BackendChecksStepFunctionInput(
       consignmentId.toString,
-      s"$userId/sharepoint/$consignmentId/metadata"
+      s"$userId/sharepoint/$consignmentId/records"
     )
     sfnNameCaptor.getValue shouldBe Some(s"transfer_service_$consignmentId")
   }
