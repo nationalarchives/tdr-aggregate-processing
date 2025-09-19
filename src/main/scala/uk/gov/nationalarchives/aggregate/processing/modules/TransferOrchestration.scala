@@ -40,7 +40,7 @@ class TransferOrchestration(graphQlApi: GraphQlApi, stepFunctionUtils: StepFunct
     val userId = event.userId
     val consignmentStatusValue: ConsignmentStatusValue = if (errors) Failed else Completed
 
-    val triggerSFNEffect =
+    val triggerSfnEffect =
       if (errors) {
         val transferError = TransferError(Some(consignmentId), s"$AggregateProcessing.$CompletedWithIssues", "One or more assets failed to process.")
         IO(ErrorHandling.handleError(transferError, logger))
@@ -52,8 +52,7 @@ class TransferOrchestration(graphQlApi: GraphQlApi, stepFunctionUtils: StepFunct
           .handleErrorWith { ex =>
             IO(logger.error(ex.getMessage)) *> IO(
               ErrorHandling.handleError(
-                TransferError(Some(consignmentId), s"$AggregateProcessing.$CompletedWithIssues", s"Step function error: ${ex.getMessage}"),
-                logger
+                TransferError(Some(consignmentId), s"$AggregateProcessing.$CompletedWithIssues", s"Step function error: ${ex.getMessage}"), logger
               )
             )
           }
@@ -65,7 +64,7 @@ class TransferOrchestration(graphQlApi: GraphQlApi, stepFunctionUtils: StepFunct
 
     val statusInput = ConsignmentStatusInput(consignmentId, ConsignmentStatusType.Upload.toString, Some(consignmentStatusValue.toString), Some(event.userId))
     for {
-      _ <- triggerSFNEffect
+      _ <- triggerSfnEffect
       updateResult <- graphQlApi.updateConsignmentStatus(statusInput)
       success = updateResult.nonEmpty
     } yield OrchestrationResult(Some(consignmentId), success = success)

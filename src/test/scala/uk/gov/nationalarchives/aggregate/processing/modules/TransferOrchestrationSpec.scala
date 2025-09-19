@@ -146,6 +146,7 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
       ArgumentCaptor.forClass(classOf[BackendChecksStepFunctionInput])
     val nameCaptor: ArgumentCaptor[Option[String]] =
       ArgumentCaptor.forClass(classOf[Option[String]])
+    val consignmentStatusInputCaptor: ArgumentCaptor[ConsignmentStatusInput] = ArgumentCaptor.forClass(classOf[ConsignmentStatusInput])
 
     when(mockLogger.isErrorEnabled()).thenReturn(true)
     when(mockGraphQlApi.updateConsignmentStatus(any[ConsignmentStatusInput])).thenReturn(IO(Some(1)))
@@ -175,6 +176,7 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
       s"$userId/sharepoint/$consignmentId/metadata"
     )
 
+    verify(mockGraphQlApi).updateConsignmentStatus(consignmentStatusInputCaptor.capture())
     nameCaptor.getValue shouldBe Some(s"transfer_service_$consignmentId")
     verify(mockLogger).error(s"Step function failed")
   }
