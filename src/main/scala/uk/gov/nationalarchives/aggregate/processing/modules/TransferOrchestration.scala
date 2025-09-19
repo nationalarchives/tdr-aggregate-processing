@@ -52,7 +52,8 @@ class TransferOrchestration(graphQlApi: GraphQlApi, stepFunctionUtils: StepFunct
           .handleErrorWith { ex =>
             IO(logger.error(ex.getMessage)) *> IO(
               ErrorHandling.handleError(
-                TransferError(Some(consignmentId), s"$AggregateProcessing.$CompletedWithIssues", s"Step function error: ${ex.getMessage}"), logger
+                TransferError(Some(consignmentId), s"$AggregateProcessing.$CompletedWithIssues", s"Step function error: ${ex.getMessage}"),
+                logger
               )
             )
           }
