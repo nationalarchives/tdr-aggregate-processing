@@ -58,6 +58,7 @@ object Common {
   object ObjectCategory extends Enumeration {
     type ObjectCategory = Value
     val Metadata: Value = Value("metadata")
+    val Records: Value = Value("records")
   }
 
   def objectKeyParser(objectKey: String): ObjectKeyDetails = {
