@@ -35,7 +35,9 @@ libraryDependencies ++= Seq(
 (Test / envVars) := Map("AWS_ACCESS_KEY_ID" -> "test", "AWS_SECRET_ACCESS_KEY" -> "test")
 
 (assembly / assemblyMergeStrategy) := {
-  case PathList("META-INF", xs@_*) => MergeStrategy.discard
-  case _ => MergeStrategy.first
+  case PathList("META-INF", "MANIFEST.MF")       => MergeStrategy.discard
+  case PathList("META-INF", "services", xs @ _*) => MergeStrategy.concat
+  case PathList("META-INF", xs @ _*)             => MergeStrategy.discard
+  case _                                         => MergeStrategy.first
 }
 (assembly / assemblyJarName) := "aggregate-processing.jar"
