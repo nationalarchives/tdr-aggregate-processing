@@ -1,33 +1,73 @@
 package uk.gov.nationalarchives.aggregate.processing
 
+import cats.effect.IO
+import cats.effect.IO._
+import cats.effect.unsafe.implicits.global
 import com.amazonaws.services.lambda.runtime.events.SQSEvent
 import com.amazonaws.services.lambda.runtime.events.SQSEvent.SQSMessage
 import com.amazonaws.services.lambda.runtime.{Context, RequestHandler}
+import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.scalalogging.Logger
+import graphql.codegen.types.AddFileAndMetadataInput
 import io.circe._
 import io.circe.generic.semiauto.deriveDecoder
 import io.circe.parser._
-import com.typesafe.scalalogging.Logger
-import uk.gov.nationalarchives.aggregate.processing.AggregateProcessingLambda.{AggregateEvent, logger, s3Utils}
+import uk.gov.nationalarchives.aggregate.processing.AggregateProcessingLambda._
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.AggregateProcessing
+import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling.{BaseError, handleError}
+import uk.gov.nationalarchives.aggregate.processing.modules.TransferOrchestration.{AggregateProcessingEvent, OrchestrationResult}
+import uk.gov.nationalarchives.aggregate.processing.modules.{AssetProcessing, Common, TransferOrchestration}
+import uk.gov.nationalarchives.aggregate.processing.persistence.GraphQlApi
+import uk.gov.nationalarchives.aggregate.processing.persistence.GraphQlApi.{backend, keycloakDeployment}
 import uk.gov.nationalarchives.aws.utils.s3.{S3Clients, S3Utils}
-import com.typesafe.config.{Config, ConfigFactory}
-import software.amazon.awssdk.services.s3.model.S3Object
 
+import java.util.UUID
 import scala.jdk.CollectionConverters.CollectionHasAsScala
 
 class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
   implicit val sharepointInputDecoder: Decoder[AggregateEvent] = deriveDecoder[AggregateEvent]
+  private val assetProcessor = AssetProcessing()
+  private val persistenceApi = GraphQlApi()
+  private val orchestrator = TransferOrchestration()
 
   override def handleRequest(event: SQSEvent, context: Context): Unit = {
     val sqsMessages: Seq[SQSMessage] = event.getRecords.asScala.toList
-    sqsMessages.foreach(m => process(m))
+    val events = sqsMessages.map(message => parseSqsMessage(message))
+
+    val resultsIO = events.map(event =>
+      processEvent(event).handleErrorWith(err => {
+        val details = Common.objectKeyParser(event.metadataSourceObjectPrefix)
+        val error = AggregateProcessingError(details.consignmentId, s"$AggregateProcessing", err.getMessage)
+        handleError(error, logger)
+        IO.unit
+      })
+    )
+
+    resultsIO.parSequence.unsafeRunSync()
   }
 
-  def process(sqsMessage: SQSMessage): List[S3Object] = {
-    val event = parseSqsMessage(sqsMessage)
-    logger.info(s"Processing assets with prefix ${event.metadataSourceObjectPrefix}")
-    val s3Objects = s3Utils.listAllObjectsWithPrefix(event.metadataSourceBucket, event.metadataSourceObjectPrefix)
-    logger.info(s"Retrieved ${s3Objects.size} objects with prefix: ${event.metadataSourceObjectPrefix}")
-    s3Objects
+  def processEvent(event: AggregateEvent): IO[OrchestrationResult] = {
+    val sourceBucket = event.metadataSourceBucket
+    val objectsPrefix = event.metadataSourceObjectPrefix
+    val objectKeyPrefixDetails = Common.objectKeyParser(objectsPrefix)
+    val consignmentId = objectKeyPrefixDetails.consignmentId
+    val userId = objectKeyPrefixDetails.userId
+
+    for {
+      s3Objects <- IO(s3Utils.listAllObjectsWithPrefix(sourceBucket, objectsPrefix))
+      assetProcessingResults <- IO(s3Objects.map(o => assetProcessor.processAsset(sourceBucket, o.key())))
+      clientSideMetadataInput = assetProcessingResults.flatMap(_.clientSideMetadataInput)
+      assetProcessingErrors = assetProcessingResults.exists(_.processingErrors)
+      suppliedMetadata = assetProcessingResults.exists(_.suppliedMetadata.nonEmpty)
+      orchestrationEvent = AggregateProcessingEvent(userId, consignmentId, processingErrors = assetProcessingErrors, suppliedMetadata = suppliedMetadata)
+      _ <-
+        if (assetProcessingErrors) { IO(Nil) }
+        else {
+          val input = AddFileAndMetadataInput(consignmentId, clientSideMetadataInput, None, Some(userId))
+          persistenceApi.addClientSideMetadata(input)
+        }
+      orchestrationResult <- orchestrator.orchestrate(orchestrationEvent)
+    } yield orchestrationResult
   }
 
   private def parseSqsMessage(sqsMessage: SQSMessage): AggregateEvent = {
@@ -48,5 +88,6 @@ object AggregateProcessingLambda {
   private val configFactory: Config = ConfigFactory.load()
   val s3Utils: S3Utils = S3Utils(S3Clients.s3Async(configFactory.getString("s3.endpoint")))
 
+  private case class AggregateProcessingError(consignmentId: UUID, errorCode: String, errorMessage: String) extends BaseError
   case class AggregateEvent(metadataSourceBucket: String, metadataSourceObjectPrefix: String)
 }
