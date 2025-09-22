@@ -36,7 +36,7 @@ object Model {
   case class ErrorState(consignmentId: UUID, transferProcess: TransferProcess, matchId: String) extends State
   case class PathState(consignmentId: UUID, path: String, assetIdentifier: String) extends State
   case class FileChecksState(consignmentId: UUID, fileIdentifier: String) extends State
-  case class AssetIdentifier(id: UUID)
+  case class AssetIdentifier(id: UUID) extends StateValue
   case class TransferState(consignmentId: UUID, transferState: TransferStateCategory, value: StateValue)
 
   trait StateFilter { }
