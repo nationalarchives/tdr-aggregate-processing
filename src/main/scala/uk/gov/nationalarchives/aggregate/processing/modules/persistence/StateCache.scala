@@ -1,34 +1,14 @@
 package uk.gov.nationalarchives.aggregate.processing.modules.persistence
 
-import com.google.gson.Gson
-import io.circe.{Json, ParsingFailure, parser}
+
 import redis.clients.jedis.UnifiedJedis
 import uk.gov.nationalarchives.aggregate.processing.modules.persistence.Model._
 import uk.gov.nationalarchives.aggregate.processing.modules.persistence.StateCache.cacheClient
 
-import java.util.UUID
-
 class StateCache {
-  private val gson = new Gson
-
-  implicit class JsonHelper(jsonBlob: AnyRef) {
-    def toJsonString: String = {
-      gson.toJson(jsonBlob)
-    }
-  }
-
-  def setPathState(pathState: PathState): Long = {
-    val key = s"${pathState.consignmentId}:${TransferStateCategory.pathsState}"
-    val value = pathState.path
-    setAdd(key, value)
-  }
-
-  def getPathState(consignmentId: UUID): Long = {
-    getSetCardinality(consignmentId.toString)
-  }
-
-  def getPaths(consignmentId: UUID): Set[String] = {
-
+  def setTransferState(state: TransferState): Long = {
+    val key = s"${state.consignmentId}:${state.transferState}"
+    setAdd(key, state.value.toString)
   }
 
   def setErrorState(errorState: ErrorState): Long = {
@@ -37,30 +17,34 @@ class StateCache {
     setAdd(key, value)
   }
 
-  private def setAdd(key: String, value: String): Long = {
-    cacheClient.sadd(key, value)
+  def getTransferState(transferStateFilter: TransferStateFilter): Map[String, Long] = {
+    val keyPrefix = s"${transferStateFilter.consignmentId}"
+    val filters: Set[String] = if (transferStateFilter.filter.nonEmpty) {
+      transferStateFilter.filter.map(_.toString)
+    } else TransferStateCategory.values.map(_.toString)
+    getState(keyPrefix, filters)
   }
 
-  def getErrorState(errorStateFilter: ErrorStateFilter): Map[TransferProcess.Value, Long] = {
+  def getErrorState(errorStateFilter: ErrorStateFilter): Map[String, Long] = {
     val keyPrefix = s"${errorStateFilter.consignmentId}:${TransferStateCategory.errorState}"
-    if (errorStateFilter.filter.isEmpty) {
-      TransferProcess.values.map(v =>
-        v -> getSetCardinality(s"$keyPrefix:${v.toString}")
-      ).toMap
-    } else {
-      errorStateFilter.filter.map(v => {
-        v -> getSetCardinality(s"$keyPrefix:${v.toString}")
-      }).toMap
-    }
+    val filters: Set[String] = if (errorStateFilter.filter.nonEmpty) {
+      errorStateFilter.filter.map(_.toString)
+    } else TransferProcess.values.map(_.toString)
+    getState(keyPrefix, filters)
+  }
+
+  private def getState(keyPrefix: String, filters: Set[String]): Map[String, Long] = {
+    filters.map(v => {
+      v -> getSetCardinality(s"$keyPrefix:$v")
+    }).toMap
   }
 
   private def getSetCardinality(key: String): Long = {
     cacheClient.scard(key)
   }
 
-  private def scanSet(key: String): Set[String] = {
-    cacheClient.scanIteration()
-    Set()
+  private def setAdd(key: String, value: String): Long = {
+    cacheClient.sadd(key, value)
   }
 }
 
