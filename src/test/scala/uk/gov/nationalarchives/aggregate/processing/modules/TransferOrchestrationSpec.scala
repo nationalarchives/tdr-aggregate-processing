@@ -72,7 +72,7 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     )
     sfnNameCaptor.getValue shouldBe Some(s"transfer_service_$consignmentId")
 
-    verify(notificationUtils).publishUploadEvent(any[NotificationUtils.UploadEvent]) //maybe check the arguments
+    verify(notificationUtils).publishUploadEvent(any[NotificationUtils.UploadEvent]) // maybe check the arguments
   }
 
   "orchestrate" should "log an error for asset processing event and update the consignment status correctly when asset processing contains errors" in {
