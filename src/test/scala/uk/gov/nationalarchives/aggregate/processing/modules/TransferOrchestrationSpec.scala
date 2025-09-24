@@ -4,6 +4,7 @@ import cats.effect.IO
 import cats.effect.unsafe.implicits.global
 import com.typesafe.config.ConfigFactory
 import com.typesafe.scalalogging.Logger
+import graphql.codegen.GetConsignmentDetailsForMetadataReview.getConsignmentDetailsForMetadataReview
 import graphql.codegen.types.ConsignmentStatusInput
 import io.circe.Encoder
 import org.mockito.ArgumentCaptor
@@ -42,6 +43,18 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     when(mockLogger.isInfoEnabled()).thenReturn(true)
     when(mockLogger.isErrorEnabled()).thenReturn(true)
     when(mockGraphQlApi.updateConsignmentStatus(any[ConsignmentStatusInput])).thenReturn(IO(Some(1)))
+    when(mockGraphQlApi.getConsignmentDetails(consignmentId)).thenReturn(
+      IO(
+        Some(
+          getConsignmentDetailsForMetadataReview.GetConsignment(
+            "ConsignmentRef",
+            Some("SeriesName"),
+            Some("TransferringBody"),
+            userId
+          )
+        )
+      )
+    )
     when(sfnUtils.startExecution(any[String], any[BackendChecksStepFunctionInput], any[Option[String]])(any[Encoder[BackendChecksStepFunctionInput]]))
       .thenReturn(IO.pure(StartExecutionResponse.builder.build))
     when(keycloakConfigurations.userDetails(userId.toString)).thenReturn(Future.successful(UserDetails("test@test.com")))
@@ -62,6 +75,8 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     consignmentStatusInputCaptor.getValue.statusType shouldBe "Upload"
     consignmentStatusInputCaptor.getValue.statusValue.get shouldBe "Completed"
     consignmentStatusInputCaptor.getValue.userIdOverride.get shouldBe userId
+
+    verify(mockGraphQlApi).getConsignmentDetails(consignmentId)
 
     verify(keycloakConfigurations).userDetails(userId.toString)
     verify(sfnUtils).startExecution(sfnArnCaptor.capture(), sfnInputCaptor.capture(), sfnNameCaptor.capture())(any[Encoder[BackendChecksStepFunctionInput]])
@@ -89,6 +104,18 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
 
     when(mockLogger.isErrorEnabled()).thenReturn(true)
     when(mockGraphQlApi.updateConsignmentStatus(any[ConsignmentStatusInput])).thenReturn(IO(Some(1)))
+    when(mockGraphQlApi.getConsignmentDetails(consignmentId)).thenReturn(
+      IO(
+        Some(
+          getConsignmentDetailsForMetadataReview.GetConsignment(
+            "ConsignmentRef",
+            Some("SeriesName"),
+            Some("TransferringBody"),
+            userId
+          )
+        )
+      )
+    )
     when(keycloakConfigurations.userDetails(userId.toString)).thenReturn(Future.successful(UserDetails("test@test.com")))
     when(notificationUtils.publishUploadEvent(any[NotificationUtils.UploadEvent])).thenReturn(IO.pure(PublishResponse.builder.build()))
 
@@ -115,6 +142,8 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     consignmentStatusInputCaptor.getValue.statusType shouldBe "Upload"
     consignmentStatusInputCaptor.getValue.statusValue.get shouldBe "Failed"
     consignmentStatusInputCaptor.getValue.userIdOverride.get shouldBe userId
+
+    verify(mockGraphQlApi).getConsignmentDetails(consignmentId)
   }
 
   "orchestrate" should "return a non-successful result when the orchestration event is not of an expected class" in {
@@ -170,6 +199,18 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
 
     when(mockLogger.isErrorEnabled()).thenReturn(true)
     when(mockGraphQlApi.updateConsignmentStatus(any[ConsignmentStatusInput])).thenReturn(IO(Some(1)))
+    when(mockGraphQlApi.getConsignmentDetails(consignmentId)).thenReturn(
+      IO(
+        Some(
+          getConsignmentDetailsForMetadataReview.GetConsignment(
+            "ConsignmentRef",
+            Some("SeriesName"),
+            Some("TransferringBody"),
+            userId
+          )
+        )
+      )
+    )
     when(keycloakConfigurations.userDetails(userId.toString)).thenReturn(Future.successful(UserDetails("test@test.com")))
 
     when(
@@ -201,6 +242,7 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     )
 
     verify(mockGraphQlApi).updateConsignmentStatus(consignmentStatusInputCaptor.capture())
+    verify(mockGraphQlApi).getConsignmentDetails(consignmentId)
     nameCaptor.getValue shouldBe Some(s"transfer_service_$consignmentId")
     verify(mockLogger).error(s"Step function failed")
   }

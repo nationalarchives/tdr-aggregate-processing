@@ -2,8 +2,11 @@ package uk.gov.nationalarchives.aggregate.processing
 
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock._
-import com.github.tomakehurst.wiremock.matching.ContentPattern
 import com.github.tomakehurst.wiremock.stubbing.StubMapping
+import graphql.codegen.GetConsignmentDetailsForMetadataReview.getConsignmentDetailsForMetadataReview
+import io.circe.Printer
+import io.circe.generic.auto._
+import io.circe.syntax._
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.time.{Millis, Seconds, Span}
@@ -88,6 +91,27 @@ class ExternalServiceSpec extends AnyFlatSpec with BeforeAndAfterEach with Befor
       .withRequestBody(containing("updateConsignmentStatus"))
       .willReturn(ok("""{"data": {"updateConsignmentStatus": 1}}""".stripMargin))
   )
+
+  def mockGraphQlGetConsignmentDetailsResponse: StubMapping = {
+    val data = Some(
+      getConsignmentDetailsForMetadataReview.Data(
+        Some(
+          getConsignmentDetailsForMetadataReview.GetConsignment(
+            "ConsignmentRef",
+            Some("SeriesName"),
+            Some("TransferringBody"),
+            UUID.randomUUID()
+          )
+        )
+      )
+    )
+    val dataString: String = data.asJson.printWith(Printer(dropNullValues = false, ""))
+    wiremockGraphqlServer.stubFor(
+      post(urlEqualTo(graphQlPath))
+        .withRequestBody(containing("getConsignmentDetailsForMetadataReview"))
+        .willReturn(ok(dataString))
+    )
+  }
 
   def mockGraphQlResponseError: StubMapping = wiremockGraphqlServer.stubFor(
     post(urlEqualTo(graphQlPath))

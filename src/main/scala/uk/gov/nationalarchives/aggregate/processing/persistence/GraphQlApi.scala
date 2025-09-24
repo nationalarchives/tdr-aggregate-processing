@@ -70,12 +70,12 @@ object GraphQlApi {
   private val keycloakUtils = new KeycloakUtils()
   private val updateConsignmentStatusClient = new GraphQLClient[ucs.Data, ucs.Variables](graphQlApiUrl)
   private val addFilesAndMetadataClient = new GraphQLClient[afm.Data, afm.Variables](graphQlApiUrl)
-  private val getConsignmentsForMetadataReviewClient = new GraphQLClient[gcdfmr.Data, gcdfmr.Variables](graphQlApiUrl)
+  private val getConsignmentDetailsClient = new GraphQLClient[gcdfmr.Data, gcdfmr.Variables](graphQlApiUrl)
 
   val logger = Logger[GraphQlApi]
 
   def apply()(implicit
       backend: SttpBackend[Identity, Any],
       keycloakDeployment: TdrKeycloakDeployment
-  ) = new GraphQlApi(keycloakUtils, updateConsignmentStatusClient, addFilesAndMetadataClient, getConsignmentsForMetadataReviewClient)(logger, keycloakDeployment, backend)
+  ) = new GraphQlApi(keycloakUtils, updateConsignmentStatusClient, addFilesAndMetadataClient, getConsignmentDetailsClient)(logger, keycloakDeployment, backend)
 }
