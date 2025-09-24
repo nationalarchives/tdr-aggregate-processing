@@ -2,6 +2,7 @@ package uk.gov.nationalarchives.aggregate.processing
 
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock._
+import com.github.tomakehurst.wiremock.matching.ContentPattern
 import com.github.tomakehurst.wiremock.stubbing.StubMapping
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.flatspec.AnyFlatSpec
@@ -17,6 +18,7 @@ class ExternalServiceSpec extends AnyFlatSpec with BeforeAndAfterEach with Befor
 
   val wiremockGraphqlServer = new WireMockServer(9001)
   val wiremockAuthServer = new WireMockServer(9002)
+  val wiremockSfnServer = new WireMockServer(9003)
   val wiremockSsmServer = new WireMockServer(9004)
   val wiremockS3 = new WireMockServer(8003)
 
@@ -51,6 +53,7 @@ class ExternalServiceSpec extends AnyFlatSpec with BeforeAndAfterEach with Befor
     wiremockAuthServer.start()
     wiremockGraphqlServer.start()
     wiremockS3.start()
+    wiremockSfnServer.start()
     wiremockSsmServer.start()
   }
 
@@ -58,6 +61,7 @@ class ExternalServiceSpec extends AnyFlatSpec with BeforeAndAfterEach with Befor
     wiremockAuthServer.stop()
     wiremockGraphqlServer.stop()
     wiremockS3.stop()
+    wiremockSfnServer.stop()
     wiremockSsmServer.stop()
   }
 
@@ -69,6 +73,7 @@ class ExternalServiceSpec extends AnyFlatSpec with BeforeAndAfterEach with Befor
     wiremockAuthServer.resetAll()
     wiremockGraphqlServer.resetAll()
     wiremockS3.resetAll()
+    wiremockSfnServer.resetAll()
     wiremockSsmServer.resetAll()
   }
 
@@ -123,12 +128,31 @@ class ExternalServiceSpec extends AnyFlatSpec with BeforeAndAfterEach with Befor
     )
   }
 
+  def mockS3ListBucketResponseEmpty(userId: UUID, consignmentId: UUID): StubMapping = {
+    val params = Map("list-type" -> equalTo("2"), "prefix" -> equalTo(s"$userId/sharepoint/$consignmentId/metadata")).asJava
+    val response = <ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+    </ListBucketResult>
+    wiremockS3.stubFor(
+      get(anyUrl())
+        .withQueryParams(params)
+        .willReturn(okXml(response.toString))
+    )
+  }
+
   def mockS3ListBucketResponseError(userId: UUID, consignmentId: UUID): StubMapping = {
     val params = Map("list-type" -> equalTo("2"), "prefix" -> equalTo(s"$userId/sharepoint/$consignmentId/metadata")).asJava
     wiremockS3.stubFor(
       get(anyUrl())
         .withQueryParams(params)
         .willReturn(aResponse().withStatus(500).withBody("Internal server error"))
+    )
+  }
+
+  def mockSfnResponseOk(): StubMapping = {
+    wiremockSfnServer.stubFor(
+      post(anyUrl())
+        .withRequestBody(containing("stateMachineArn"))
+        .willReturn(aResponse().withStatus(200))
     )
   }
 }
