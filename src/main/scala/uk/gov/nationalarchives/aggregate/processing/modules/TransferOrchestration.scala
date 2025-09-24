@@ -81,7 +81,7 @@ class TransferOrchestration(
       success = updateResult.nonEmpty
       result = OrchestrationResult(Some(consignmentId), success = success)
       getConsignmentDetails <- graphQlApi.getConsignmentDetails(consignmentId)
-      userEmail <- IO.fromFuture(IO(keycloakConfigurations.userDetails(userId.toString)))
+      userDetails <- IO.fromFuture(IO(keycloakConfigurations.userDetails(userId.toString)))
       _ <- notificationUtils.publishUploadEvent(
         UploadEvent(
           transferringBodyName = getConsignmentDetails.flatMap(_.transferringBodyName).get,
@@ -89,7 +89,7 @@ class TransferOrchestration(
           consignmentId = consignmentId.toString,
           status = consignmentStatusValue.toString,
           userId = event.userId.toString,
-          userEmail = userEmail.email
+          userEmail = userDetails.email
         )
       )
     } yield result

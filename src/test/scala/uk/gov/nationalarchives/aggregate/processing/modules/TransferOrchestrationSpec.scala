@@ -17,6 +17,7 @@ import software.amazon.awssdk.services.sns.model.PublishResponse
 import uk.gov.nationalarchives.aggregate.processing.ExternalServiceSpec
 import uk.gov.nationalarchives.aggregate.processing.modules.TransferOrchestration.{AggregateProcessingEvent, BackendChecksStepFunctionInput}
 import uk.gov.nationalarchives.aggregate.processing.persistence.GraphQlApi
+import uk.gov.nationalarchives.aggregate.processing.utilities.NotificationUtils.UploadEvent
 import uk.gov.nationalarchives.aggregate.processing.utilities.{KeycloakConfigurations, NotificationUtils}
 import uk.gov.nationalarchives.aws.utils.stepfunction.StepFunctionUtils
 import uk.gov.nationalarchives.tdr.keycloak.KeycloakUtils.UserDetails
@@ -25,11 +26,14 @@ import java.util.UUID
 import scala.concurrent.Future
 
 class TransferOrchestrationSpec extends ExternalServiceSpec {
-  "orchestrate" should "trigger backend processing and update the consignment status when asset processing event does not contain errors" in {
+  "orchestrate" should "trigger backend processing, update the consignment status and send an upload complete sns message when asset processing event does not contain errors" in {
     val mockLogger = mock[UnderlyingLogger]
     val mockGraphQlApi = mock[GraphQlApi]
     val consignmentId = UUID.randomUUID()
     val userId = UUID.randomUUID()
+    val userEmail = "test@test.com"
+    val transferringBody = "transferringBody"
+    val consignmentRef = "consignmentRef"
     val sfnUtils = mock[StepFunctionUtils]
     val notificationUtils = mock[NotificationUtils]
     val keycloakConfigurations = mock[KeycloakConfigurations]
@@ -39,6 +43,7 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     val sfnArnCaptor: ArgumentCaptor[String] = ArgumentCaptor.forClass(classOf[String])
     val sfnInputCaptor: ArgumentCaptor[BackendChecksStepFunctionInput] = ArgumentCaptor.forClass(classOf[BackendChecksStepFunctionInput])
     val sfnNameCaptor: ArgumentCaptor[Option[String]] = ArgumentCaptor.forClass(classOf[Option[String]])
+    val snsArgCaptor: ArgumentCaptor[UploadEvent] = ArgumentCaptor.forClass(classOf[UploadEvent])
 
     when(mockLogger.isInfoEnabled()).thenReturn(true)
     when(mockLogger.isErrorEnabled()).thenReturn(true)
@@ -47,9 +52,9 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
       IO(
         Some(
           getConsignmentDetailsForMetadataReview.GetConsignment(
-            "ConsignmentRef",
+            consignmentRef,
             Some("SeriesName"),
-            Some("TransferringBody"),
+            Some(transferringBody),
             userId
           )
         )
@@ -57,7 +62,7 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     )
     when(sfnUtils.startExecution(any[String], any[BackendChecksStepFunctionInput], any[Option[String]])(any[Encoder[BackendChecksStepFunctionInput]]))
       .thenReturn(IO.pure(StartExecutionResponse.builder.build))
-    when(keycloakConfigurations.userDetails(userId.toString)).thenReturn(Future.successful(UserDetails("test@test.com")))
+    when(keycloakConfigurations.userDetails(userId.toString)).thenReturn(Future.successful(UserDetails(userEmail)))
     when(notificationUtils.publishUploadEvent(any[NotificationUtils.UploadEvent])).thenReturn(IO.pure(PublishResponse.builder.build()))
 
     val event = AggregateProcessingEvent(userId, consignmentId, processingErrors = false, suppliedMetadata = false)
@@ -87,20 +92,30 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     )
     sfnNameCaptor.getValue shouldBe Some(s"transfer_service_$consignmentId")
 
-    verify(notificationUtils).publishUploadEvent(any[NotificationUtils.UploadEvent]) // maybe check the arguments
+    verify(notificationUtils).publishUploadEvent(snsArgCaptor.capture())
+    snsArgCaptor.getValue.userEmail shouldBe userEmail
+    snsArgCaptor.getValue.userId shouldBe userId.toString
+    snsArgCaptor.getValue.consignmentId shouldBe consignmentId.toString
+    snsArgCaptor.getValue.status shouldBe "Completed"
+    snsArgCaptor.getValue.transferringBodyName shouldBe transferringBody
+    snsArgCaptor.getValue.consignmentReference shouldBe consignmentRef
   }
 
-  "orchestrate" should "log an error for asset processing event and update the consignment status correctly when asset processing contains errors" in {
+  "orchestrate" should "log an error for asset processing event, update the consignment status correctly and send a upload failed sns message when asset processing contains errors" in {
     val mockLogger = mock[UnderlyingLogger]
     val mockGraphQlApi = mock[GraphQlApi]
     val consignmentId = UUID.randomUUID()
     val userId = UUID.randomUUID()
+    val userEmail = "test@test.com"
+    val transferringBody = "transferringBody"
+    val consignmentRef = "consignmentRef"
     val sfnUtils = mock[StepFunctionUtils]
     val notificationUtils = mock[NotificationUtils]
     val keycloakConfigurations = mock[KeycloakConfigurations]
     val config = ConfigFactory.load()
 
     val consignmentStatusInputCaptor: ArgumentCaptor[ConsignmentStatusInput] = ArgumentCaptor.forClass(classOf[ConsignmentStatusInput])
+    val snsArgCaptor: ArgumentCaptor[UploadEvent] = ArgumentCaptor.forClass(classOf[UploadEvent])
 
     when(mockLogger.isErrorEnabled()).thenReturn(true)
     when(mockGraphQlApi.updateConsignmentStatus(any[ConsignmentStatusInput])).thenReturn(IO(Some(1)))
@@ -108,15 +123,15 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
       IO(
         Some(
           getConsignmentDetailsForMetadataReview.GetConsignment(
-            "ConsignmentRef",
+            consignmentRef,
             Some("SeriesName"),
-            Some("TransferringBody"),
+            Some(transferringBody),
             userId
           )
         )
       )
     )
-    when(keycloakConfigurations.userDetails(userId.toString)).thenReturn(Future.successful(UserDetails("test@test.com")))
+    when(keycloakConfigurations.userDetails(userId.toString)).thenReturn(Future.successful(UserDetails(userEmail)))
     when(notificationUtils.publishUploadEvent(any[NotificationUtils.UploadEvent])).thenReturn(IO.pure(PublishResponse.builder.build()))
 
     val event = AggregateProcessingEvent(userId, consignmentId, processingErrors = true, suppliedMetadata = false)
@@ -144,6 +159,14 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     consignmentStatusInputCaptor.getValue.userIdOverride.get shouldBe userId
 
     verify(mockGraphQlApi).getConsignmentDetails(consignmentId)
+
+    verify(notificationUtils).publishUploadEvent(snsArgCaptor.capture())
+    snsArgCaptor.getValue.userEmail shouldBe userEmail
+    snsArgCaptor.getValue.userId shouldBe userId.toString
+    snsArgCaptor.getValue.consignmentId shouldBe consignmentId.toString
+    snsArgCaptor.getValue.status shouldBe "Failed"
+    snsArgCaptor.getValue.transferringBodyName shouldBe transferringBody
+    snsArgCaptor.getValue.consignmentReference shouldBe consignmentRef
   }
 
   "orchestrate" should "return a non-successful result when the orchestration event is not of an expected class" in {
@@ -184,6 +207,9 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     val mockGraphQlApi = mock[GraphQlApi]
     val consignmentId = UUID.randomUUID()
     val userId = UUID.randomUUID()
+    val userEmail = "test@test.com"
+    val transferringBody = "transferringBody"
+    val consignmentRef = "consignmentRef"
     val sfnUtils = mock[StepFunctionUtils]
     val notificationUtils = mock[NotificationUtils]
     val keycloakConfigurations = mock[KeycloakConfigurations]
@@ -203,15 +229,15 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
       IO(
         Some(
           getConsignmentDetailsForMetadataReview.GetConsignment(
-            "ConsignmentRef",
+            consignmentRef,
             Some("SeriesName"),
-            Some("TransferringBody"),
+            Some(transferringBody),
             userId
           )
         )
       )
     )
-    when(keycloakConfigurations.userDetails(userId.toString)).thenReturn(Future.successful(UserDetails("test@test.com")))
+    when(keycloakConfigurations.userDetails(userId.toString)).thenReturn(Future.successful(UserDetails(userEmail)))
 
     when(
       sfnUtils.startExecution(
