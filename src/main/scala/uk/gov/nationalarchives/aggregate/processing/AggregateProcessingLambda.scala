@@ -13,6 +13,8 @@ import io.circe._
 import io.circe.generic.semiauto.deriveDecoder
 import io.circe.parser._
 import uk.gov.nationalarchives.aggregate.processing.AggregateProcessingLambda._
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorType.S3Error
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorValue.ReadError
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.AggregateProcessing
 import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling.{BaseError, handleError}
 import uk.gov.nationalarchives.aggregate.processing.modules.TransferOrchestration.{AggregateProcessingEvent, OrchestrationResult}
@@ -52,22 +54,44 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
     val objectKeyPrefixDetails = Common.objectKeyParser(objectsPrefix)
     val consignmentId = objectKeyPrefixDetails.consignmentId
     val userId = objectKeyPrefixDetails.userId
-
+    logger.info(s"Starting processing consignment: $consignmentId")
     for {
       s3Objects <- IO(s3Utils.listAllObjectsWithPrefix(sourceBucket, objectsPrefix))
-      assetProcessingResults <- IO(s3Objects.map(o => assetProcessor.processAsset(sourceBucket, o.key())))
-      clientSideMetadataInput = assetProcessingResults.flatMap(_.clientSideMetadataInput)
+      objectKeys = s3Objects.map(_.key())
+      assetProcessingResult <-
+        if (objectKeys.isEmpty) {
+          val error = AggregateProcessingError(
+            consignmentId,
+            s"$AggregateProcessing.$S3Error.$ReadError",
+            s"No ${objectKeyPrefixDetails.category} objects found for consignment: $consignmentId"
+          )
+          handleError(error, logger)
+          IO(AssetProcessingResult(errors = true, suppliedMetadata = false))
+        } else processAssets(userId, consignmentId, sourceBucket, objectKeys)
+      orchestrationEvent = AggregateProcessingEvent(
+        userId,
+        consignmentId,
+        processingErrors = assetProcessingResult.errors,
+        suppliedMetadata = assetProcessingResult.suppliedMetadata
+      )
+      orchestrationResult <- orchestrator.orchestrate(orchestrationEvent)
+    } yield orchestrationResult
+  }
+
+  private def processAssets(userId: UUID, consignmentId: UUID, sourceBucket: String, objectKeys: List[String]): IO[AssetProcessingResult] = {
+    for {
+      assetProcessingResults <- IO(objectKeys.map(assetProcessor.processAsset(sourceBucket, _)))
       assetProcessingErrors = assetProcessingResults.exists(_.processingErrors)
       suppliedMetadata = assetProcessingResults.exists(_.suppliedMetadata.nonEmpty)
-      orchestrationEvent = AggregateProcessingEvent(userId, consignmentId, processingErrors = assetProcessingErrors, suppliedMetadata = suppliedMetadata)
       _ <-
-        if (assetProcessingErrors) { IO(Nil) }
-        else {
+        if (assetProcessingErrors) {
+          IO(Nil)
+        } else {
+          val clientSideMetadataInput = assetProcessingResults.flatMap(_.clientSideMetadataInput)
           val input = AddFileAndMetadataInput(consignmentId, clientSideMetadataInput, None, Some(userId))
           persistenceApi.addClientSideMetadata(input)
         }
-      orchestrationResult <- orchestrator.orchestrate(orchestrationEvent)
-    } yield orchestrationResult
+    } yield AssetProcessingResult(assetProcessingErrors, suppliedMetadata)
   }
 
   private def parseSqsMessage(sqsMessage: SQSMessage): AggregateEvent = {
@@ -88,6 +112,12 @@ object AggregateProcessingLambda {
   private val configFactory: Config = ConfigFactory.load()
   val s3Utils: S3Utils = S3Utils(S3Clients.s3Async(configFactory.getString("s3.endpoint")))
 
-  private case class AggregateProcessingError(consignmentId: UUID, errorCode: String, errorMessage: String) extends BaseError
+  private case class AggregateProcessingError(consignmentId: UUID, errorCode: String, errorMessage: String) extends BaseError {
+    override def toString: String = {
+      s"${this.simpleName}: consignmentId: $consignmentId, errorCode: $errorCode, errorMessage: $errorMessage"
+    }
+  }
+
+  private case class AssetProcessingResult(errors: Boolean, suppliedMetadata: Boolean)
   case class AggregateEvent(metadataSourceBucket: String, metadataSourceObjectPrefix: String)
 }

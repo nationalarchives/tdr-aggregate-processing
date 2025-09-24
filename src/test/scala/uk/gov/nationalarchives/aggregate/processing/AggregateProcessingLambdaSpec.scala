@@ -3,7 +3,7 @@ package uk.gov.nationalarchives.aggregate.processing
 import com.amazonaws.services.lambda.runtime.Context
 import com.amazonaws.services.lambda.runtime.events.SQSEvent
 import com.amazonaws.services.lambda.runtime.events.SQSEvent.SQSMessage
-import com.github.tomakehurst.wiremock.client.WireMock.{anyUrl, exactly, getRequestedFor, postRequestedFor}
+import com.github.tomakehurst.wiremock.client.WireMock._
 import org.mockito.MockitoSugar.mock
 import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper
 import uk.gov.nationalarchives.aggregate.processing.modules.Common
@@ -29,6 +29,7 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec {
     authOkJson()
     mockS3GetObjectStream(userId, consignmentId.toString, matchId)
     mockS3ListBucketResponse(userId, consignmentId, List(matchId))
+    mockSfnResponseOk()
     mockGraphQlAddFilesAndMetadataResponse
     mockGraphQlUpdateConsignmentStatusResponse
     val mockContext = mock[Context]
@@ -54,8 +55,56 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec {
         .withUrl(s"/$userId/$source/$consignmentId/$category/$matchId.metadata")
     )
 
+    wiremockSfnServer.verify(
+      exactly(2),
+      postRequestedFor(anyUrl())
+        .withRequestBody(containing(s"transfer_service_$consignmentId"))
+    )
+
     wiremockGraphqlServer.verify(
       exactly(4),
+      postRequestedFor(anyUrl())
+        .withUrl("/graphql")
+    )
+  }
+
+  "handleRequest" should "process request correctly when no objects are found for supplied object prefix" in {
+    authOkJson()
+    mockS3GetObjectStream(userId, consignmentId.toString, matchId)
+    mockS3ListBucketResponseEmpty(userId, consignmentId)
+    mockSfnResponseOk()
+    mockGraphQlAddFilesAndMetadataResponse
+    mockGraphQlUpdateConsignmentStatusResponse
+    val mockContext = mock[Context]
+
+    val message1 = new SQSMessage()
+    message1.setBody(validMessageBody)
+
+    val messages: java.util.List[SQSMessage] = List(message1).asJava
+    val sqsEvent = new SQSEvent()
+    sqsEvent.setRecords(messages)
+    new AggregateProcessingLambda().handleRequest(sqsEvent, mockContext)
+
+    wiremockS3.verify(
+      exactly(1),
+      getRequestedFor(anyUrl())
+        .withUrl(s"/?list-type=2&max-keys=1000&prefix=$userId%2F$source%2F$consignmentId%2F$category")
+    )
+
+    wiremockS3.verify(
+      exactly(0),
+      getRequestedFor(anyUrl())
+        .withUrl(s"/$userId/$source/$consignmentId/$category/$matchId.metadata")
+    )
+
+    wiremockSfnServer.verify(
+      exactly(0),
+      postRequestedFor(anyUrl())
+        .withRequestBody(containing(s"transfer_service_$consignmentId"))
+    )
+
+    wiremockGraphqlServer.verify(
+      exactly(1),
       postRequestedFor(anyUrl())
         .withUrl("/graphql")
     )
@@ -84,6 +133,12 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec {
       exactly(0),
       getRequestedFor(anyUrl())
         .withUrl(s"/$userId/$source/$consignmentId/$category/$matchId.metadata")
+    )
+
+    wiremockSfnServer.verify(
+      exactly(0),
+      postRequestedFor(anyUrl())
+        .withRequestBody(containing(s"transfer_service_$consignmentId"))
     )
 
     wiremockGraphqlServer.verify(
@@ -120,6 +175,12 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec {
       exactly(0),
       getRequestedFor(anyUrl())
         .withUrl(s"/$userId/$source/$consignmentId/$category/$matchId.metadata")
+    )
+
+    wiremockSfnServer.verify(
+      exactly(0),
+      postRequestedFor(anyUrl())
+        .withRequestBody(containing(s"transfer_service_$consignmentId"))
     )
 
     wiremockGraphqlServer.verify(
