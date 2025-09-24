@@ -12,7 +12,10 @@ import software.amazon.awssdk.services.s3.S3AsyncClient
 import software.amazon.awssdk.services.s3.model.{GetObjectRequest, GetObjectResponse}
 import software.amazon.awssdk.utils.CompletableFutureUtils.failedFuture
 import uk.gov.nationalarchives.aggregate.processing.ExternalServiceSpec
-import uk.gov.nationalarchives.aggregate.processing.modules.AssetProcessing.AssetProcessingResult
+import uk.gov.nationalarchives.aggregate.processing.modules.AssetProcessing.{AssetProcessingResult, RequiredSharePointMetadata}
+import uk.gov.nationalarchives.aggregate.processing.modules.AtomicAssetProcessor.AtomicAssetProcessingEvent
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.AssetSource
+import uk.gov.nationalarchives.aggregate.processing.modules.persistence.StateCache
 import uk.gov.nationalarchives.aws.utils.s3.S3Utils
 
 import java.io.ByteArrayInputStream
@@ -31,6 +34,17 @@ class AssetProcessingSpec extends ExternalServiceSpec {
       "matchId": "$matchId",
       "transferId": "$consignmentId"
     }""".stripMargin
+
+  "x" should "y" in {
+    val cid = UUID.fromString("7e0ed6b7-82a3-4480-aa2d-826f6133e6f0")
+    val mockLogger = mock[UnderlyingLogger]
+
+    val sharePointMetadata = RequiredSharePointMetadata(
+      matchId, cid, "2025-07-03T09:19:47Z", "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2", 12L,
+      "/sites/Retail/Shared Documents/file1.txt", "file1.txt")
+    val event = AtomicAssetProcessingEvent(AssetSource.SharePoint, cid, UUID.fromString(matchId), sharePointMetadata)
+    new AtomicAssetProcessor(StateCache.apply())(Logger(mockLogger)).process(event)
+  }
 
   "processAsset" should "return asset processing result and not log errors when metadata json is valid" in {
     val mockLogger = mock[UnderlyingLogger]

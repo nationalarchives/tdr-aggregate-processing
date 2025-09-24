@@ -2,10 +2,24 @@ package uk.gov.nationalarchives.aggregate.processing.modules.persistence
 
 
 import redis.clients.jedis.UnifiedJedis
+import uk.gov.nationalarchives.aggregate.processing.modules.persistence.Model.TransferStateCategory.pathsState
 import uk.gov.nationalarchives.aggregate.processing.modules.persistence.Model._
 import uk.gov.nationalarchives.aggregate.processing.modules.persistence.StateCache.cacheClient
 
 class StateCache {
+  def createAssetStates(assetState: AssetState): List[CreateAssetStatesResult] = {
+
+    val states: Map[String, String] = Map.apply(
+      s"${assetState.consignmentId}:$pathsState" -> assetState.clientSideOriginalPath
+    )
+
+    states.map(e => {
+      val result = setAdd(e._1, e._2)
+      CreateAssetStatesResult(e._1, result)
+    }).toList
+  }
+
+
   def setTransferState(state: TransferState): Long = {
     val key = s"${state.consignmentId}:${state.transferState}"
     setAdd(key, state.value.toString)
@@ -50,4 +64,6 @@ class StateCache {
 
 object StateCache {
   val cacheClient = new UnifiedJedis("redis://localhost:6379")
+
+  def apply() = new StateCache
 }

@@ -16,6 +16,7 @@ object ApplicationConfig {
   val graphQlApiUrl: String = configFactory.getString("graphQlApi.url")
   val graphqlApiRequestTimeOut: FiniteDuration = 180.seconds
   val s3Endpoint: String = configFactory.getString("s3.endpoint")
+  val atomicProcessing = configFactory.getString("featureAccessBlocks.atomicProcessing")
   val timeToLiveSecs: Int = 60
 
   def getClientSecret(secretPath: String = authClientSecretPath): String = {

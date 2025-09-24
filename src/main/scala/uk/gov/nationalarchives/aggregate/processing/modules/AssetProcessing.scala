@@ -6,6 +6,7 @@ import graphql.codegen.types.ClientSideMetadataInput
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
 import io.circe.{Decoder, Encoder, Json, parser}
 import uk.gov.nationalarchives.aggregate.processing.modules.AssetProcessing._
+import uk.gov.nationalarchives.aggregate.processing.modules.AtomicAssetProcessor.AtomicAssetProcessingEvent
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.AssetSource.AssetSource
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ObjectType
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ObjectType.ObjectType
@@ -110,11 +111,19 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
 
             val input = ClientSideMetadataInput(metadata.FileRef, metadata.SHA256ClientSideChecksum, dateLastModified, metadata.Length, metadata.matchId)
             logger.info(s"Asset metadata successfully processed for: $objectKey")
-            updateTransferState(event.consignmentId, UUID.randomUUID())
+            atomicProcessing(event, metadata)
             AssetProcessingResult(Some(matchId), processingErrors = false, Some(input), suppliedMetadata)
           }
         }
       )
+  }
+
+  private def atomicProcessing(event: AssetProcessingEvent, sharePointMetadata: RequiredSharePointMetadata) = {
+    val atomicProcessing = configFactory.getBoolean("featureAccessBlocks.atomicProcessing")
+    if (atomicProcessing) {
+      val atomicEvent  = AtomicAssetProcessingEvent(event.source, event.consignmentId, event.userId, sharePointMetadata)
+      AtomicAssetProcessor.apply().process(atomicEvent)
+    }
   }
 
   private def toSuppliedMetadata(metadataJson: Json): List[SuppliedMetadata] = {

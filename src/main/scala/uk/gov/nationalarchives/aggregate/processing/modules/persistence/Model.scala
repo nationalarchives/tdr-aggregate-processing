@@ -38,6 +38,7 @@ object Model {
   case class FileChecksState(consignmentId: UUID, fileIdentifier: String) extends State
   case class AssetIdentifier(id: UUID) extends StateValue
   case class TransferState(consignmentId: UUID, transferState: TransferStateCategory, value: StateValue)
+  case class AssetState(consignmentId: UUID, matchId: String, clientSideOriginalPath: String, assetId: UUID, fileIds: Set[UUID]) extends State
 
   trait StateFilter { }
 
@@ -47,4 +48,6 @@ object Model {
   trait JsonData { }
 
   case class AssetData(matchId: String, assetId: Option[UUID], category: AssetDataCategory, input: Json) extends JsonData
+
+  case class CreateAssetStatesResult(stateKey: String, result: Long)
 }

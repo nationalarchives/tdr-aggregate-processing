@@ -3,10 +3,8 @@ package uk.gov.nationalarchives.aggregate.processing.modules.persistence
 import com.google.gson.Gson
 import io.circe.{Json, ParsingFailure, parser}
 import redis.clients.jedis.UnifiedJedis
-import uk.gov.nationalarchives.aggregate.processing.modules.persistence.DataCache.cacheClient
 import uk.gov.nationalarchives.aggregate.processing.modules.persistence.DataPersistence.dataPersistenceClient
 import uk.gov.nationalarchives.aggregate.processing.modules.persistence.Model.{AssetData, DataCategory, PathState, TransferStateCategory}
-import uk.gov.nationalarchives.aggregate.processing.modules.persistence.StateCache.cacheClient
 
 import java.util.UUID
 
