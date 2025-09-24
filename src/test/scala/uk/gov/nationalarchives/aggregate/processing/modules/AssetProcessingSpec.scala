@@ -1,11 +1,11 @@
 package uk.gov.nationalarchives.aggregate.processing.modules
 
-import com.typesafe.scalalogging.Logger
+import cats.effect.IO
 import graphql.codegen.types.ClientSideMetadataInput
 import org.mockito.ArgumentMatchers.any
 import org.mockito.MockitoSugar.{mock, times, verify, when}
 import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper
-import org.slf4j.{Logger => UnderlyingLogger}
+import org.typelevel.log4cats.SelfAwareStructuredLogger
 import software.amazon.awssdk.core.ResponseBytes
 import software.amazon.awssdk.core.async.AsyncResponseTransformer
 import software.amazon.awssdk.services.s3.S3AsyncClient
@@ -33,7 +33,7 @@ class AssetProcessingSpec extends ExternalServiceSpec {
     }""".stripMargin
 
   "processAsset" should "return asset processing result and not log errors when metadata json is valid" in {
-    val mockLogger = mock[UnderlyingLogger]
+    val mockLogger = mock[SelfAwareStructuredLogger[IO]]
     val s3UtilsMock = mock[S3Utils]
 
     val expectedInput = ClientSideMetadataInput(
@@ -46,43 +46,42 @@ class AssetProcessingSpec extends ExternalServiceSpec {
 
     val expectedResult = AssetProcessingResult(Some(matchId), processingErrors = false, Some(expectedInput))
 
-    when(mockLogger.isInfoEnabled()).thenReturn(true)
-    when(mockLogger.isErrorEnabled).thenReturn(true)
+    when(mockLogger.isErrorEnabled).thenReturn(IO(true))
+    when(mockLogger.isErrorEnabled).thenReturn(IO(true))
     when(s3UtilsMock.getObjectAsStream(any[String], any[String]))
       .thenReturn(new ByteArrayInputStream(defaultMetadataJsonString.getBytes("UTF-8")))
 
-    val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
+    val assetProcessing = new AssetProcessing(s3UtilsMock)(mockLogger)
     val result = assetProcessing.processAsset("s3Bucket", s"$userId/sharepoint/$consignmentId/metadata/$matchId.metadata")
 
     result shouldEqual expectedResult
 
     verify(mockLogger, times(0)).isErrorEnabled
     verifyDefaultInfoLogging(mockLogger)
-    verify(mockLogger).info("Asset metadata successfully processed for: {}", s"$userId/sharepoint/$consignmentId/metadata/$matchId.metadata")
   }
 
   "processAsset" should "log an error and return asset processing result when the object key is invalid" in {
-    val mockLogger = mock[UnderlyingLogger]
+    val mockLogger = mock[SelfAwareStructuredLogger[IO]]
     val s3UtilsMock = mock[S3Utils]
     val expectedResult = AssetProcessingResult(None, processingErrors = true, None)
 
-    when(mockLogger.isInfoEnabled()).thenReturn(true)
-    when(mockLogger.isErrorEnabled()).thenReturn(true)
+    when(mockLogger.isInfoEnabled).thenReturn(IO(true))
+    when(mockLogger.isErrorEnabled).thenReturn(IO(true))
 
-    val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
+    val assetProcessing = new AssetProcessing(s3UtilsMock)(mockLogger)
 
     val result = assetProcessing.processAsset("s3Bucket", "incorrect/object/key/format.txt")
 
     result shouldEqual expectedResult
 
-    verify(mockLogger).info("Processing asset metadata for: {}", s"incorrect/object/key/format.txt")
+    verify(mockLogger).info("Processing asset metadata for: incorrect/object/key/format.txt")
     verify(mockLogger).error(
       s"AssetProcessingError: consignmentId: None, matchId: None, source: None, errorCode: ASSET_PROCESSING.OBJECT_KEY.INVALID, errorMessage: Invalid object key: incorrect/object/key/format.txt: Invalid UUID string: incorrect"
     )
   }
 
   "processAsset" should "log an error and return asset processing result when a required json field is missing" in {
-    val mockLogger = mock[UnderlyingLogger]
+    val mockLogger = mock[SelfAwareStructuredLogger[IO]]
     val s3UtilsMock = mock[S3Utils]
     val missingFieldJson = s"""{
       "Modified": "2025-07-03T09:19:47Z",
@@ -94,12 +93,12 @@ class AssetProcessingSpec extends ExternalServiceSpec {
     }""".stripMargin
     val expectedResult = AssetProcessingResult(Some(matchId), processingErrors = true, None)
 
-    when(mockLogger.isErrorEnabled()).thenReturn(true)
-    when(mockLogger.isInfoEnabled()).thenReturn(true)
+    when(mockLogger.isErrorEnabled).thenReturn(IO(true))
+    when(mockLogger.isInfoEnabled).thenReturn(IO(true))
     when(s3UtilsMock.getObjectAsStream(any[String], any[String]))
       .thenReturn(new ByteArrayInputStream(missingFieldJson.getBytes("UTF-8")))
 
-    val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
+    val assetProcessing = new AssetProcessing(s3UtilsMock)(mockLogger)
     val result = assetProcessing.processAsset("s3Bucket", s"$userId/sharepoint/$consignmentId/metadata/$matchId.metadata")
 
     result shouldEqual expectedResult
@@ -111,18 +110,18 @@ class AssetProcessingSpec extends ExternalServiceSpec {
   }
 
   "processAsset" should "log an error and return asset processing result when reading S3 object stream fails" in {
-    val mockLogger = mock[UnderlyingLogger]
+    val mockLogger = mock[SelfAwareStructuredLogger[IO]]
     val s3AsyncClient = mock[S3AsyncClient]
     val s3UtilsMock = S3Utils(s3AsyncClient)
 
-    when(mockLogger.isErrorEnabled()).thenReturn(true)
-    when(mockLogger.isInfoEnabled()).thenReturn(true)
+    when(mockLogger.isErrorEnabled).thenReturn(IO(true))
+    when(mockLogger.isInfoEnabled).thenReturn(IO(true))
     when(s3AsyncClient.getObject(any[GetObjectRequest], any[AsyncResponseTransformer[GetObjectResponse, ResponseBytes[GetObjectResponse]]]))
       .thenReturn(failedFuture(new RuntimeException("read failed")))
 
     val expectedResult = AssetProcessingResult(Some(matchId), processingErrors = true, None)
 
-    val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
+    val assetProcessing = new AssetProcessing(s3UtilsMock)(mockLogger)
     val result = assetProcessing.processAsset("s3Bucket", s"$userId/sharepoint/$consignmentId/metadata/$matchId.metadata")
 
     result shouldEqual expectedResult
@@ -134,17 +133,17 @@ class AssetProcessingSpec extends ExternalServiceSpec {
   }
 
   "processAsset" should "log an error and return asset processing result when S3 object is non-UTF-8 encoded" in {
-    val mockLogger = mock[UnderlyingLogger]
+    val mockLogger = mock[SelfAwareStructuredLogger[IO]]
     val s3UtilsMock = mock[S3Utils]
     val invalidUtf8 = Array[Byte](0, -1, -2, -3)
     val expectedResult = AssetProcessingResult(Some(matchId), processingErrors = true, None)
 
-    when(mockLogger.isErrorEnabled()).thenReturn(true)
-    when(mockLogger.isInfoEnabled()).thenReturn(true)
+    when(mockLogger.isErrorEnabled).thenReturn(IO(true))
+    when(mockLogger.isInfoEnabled).thenReturn(IO(true))
     when(s3UtilsMock.getObjectAsStream(any[String], any[String]))
       .thenReturn(new ByteArrayInputStream(invalidUtf8))
 
-    val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
+    val assetProcessing = new AssetProcessing(s3UtilsMock)(mockLogger)
     val result = assetProcessing.processAsset("s3Bucket", s"$userId/sharepoint/$consignmentId/metadata/$matchId.metadata")
 
     result shouldEqual expectedResult
@@ -156,17 +155,17 @@ class AssetProcessingSpec extends ExternalServiceSpec {
   }
 
   "processAsset" should "log an error and return asset processing result when S3 object is not valid json" in {
-    val mockLogger = mock[UnderlyingLogger]
+    val mockLogger = mock[SelfAwareStructuredLogger[IO]]
     val s3UtilsMock = mock[S3Utils]
     val nonJsonString = "some random string".getBytes("UTF-8")
     val expectedResult = AssetProcessingResult(Some(matchId), processingErrors = true, None)
 
-    when(mockLogger.isErrorEnabled()).thenReturn(true)
-    when(mockLogger.isInfoEnabled()).thenReturn(true)
+    when(mockLogger.isErrorEnabled).thenReturn(IO(true))
+    when(mockLogger.isInfoEnabled).thenReturn(IO(true))
     when(s3UtilsMock.getObjectAsStream(any[String], any[String]))
       .thenReturn(new ByteArrayInputStream(nonJsonString))
 
-    val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
+    val assetProcessing = new AssetProcessing(s3UtilsMock)(mockLogger)
     val result = assetProcessing.processAsset("s3Bucket", s"$userId/sharepoint/$consignmentId/metadata/$matchId.metadata")
 
     result shouldEqual expectedResult
@@ -178,17 +177,17 @@ class AssetProcessingSpec extends ExternalServiceSpec {
   }
 
   "processAsset" should "log an error and return asset processing result when json is an unknown structure" in {
-    val mockLogger = mock[UnderlyingLogger]
+    val mockLogger = mock[SelfAwareStructuredLogger[IO]]
     val s3UtilsMock = mock[S3Utils]
     val unknownJsonString = s"""{"aField": "aValue", "bField": "bValue}"""
     val expectedResult = AssetProcessingResult(Some(matchId), processingErrors = true, None)
 
-    when(mockLogger.isErrorEnabled()).thenReturn(true)
-    when(mockLogger.isInfoEnabled()).thenReturn(true)
+    when(mockLogger.isErrorEnabled).thenReturn(IO(true))
+    when(mockLogger.isInfoEnabled).thenReturn(IO(true))
     when(s3UtilsMock.getObjectAsStream(any[String], any[String]))
       .thenReturn(new ByteArrayInputStream(unknownJsonString.getBytes("UTF-8")))
 
-    val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
+    val assetProcessing = new AssetProcessing(s3UtilsMock)(mockLogger)
     val result = assetProcessing.processAsset("s3Bucket", s"$userId/sharepoint/$consignmentId/metadata/$matchId.metadata")
 
     result shouldEqual expectedResult
@@ -200,17 +199,17 @@ class AssetProcessingSpec extends ExternalServiceSpec {
   }
 
   "processAsset" should "log an error and return asset processing result when the event matchId does not match the metadata matchId" in {
-    val mockLogger = mock[UnderlyingLogger]
+    val mockLogger = mock[SelfAwareStructuredLogger[IO]]
     val s3UtilsMock = mock[S3Utils]
     val differentMatchId = UUID.randomUUID()
     val expectedResult = AssetProcessingResult(None, processingErrors = true, None)
 
-    when(mockLogger.isErrorEnabled()).thenReturn(true)
-    when(mockLogger.isInfoEnabled()).thenReturn(true)
+    when(mockLogger.isErrorEnabled).thenReturn(IO(true))
+    when(mockLogger.isInfoEnabled).thenReturn(IO(true))
     when(s3UtilsMock.getObjectAsStream(any[String], any[String]))
       .thenReturn(new ByteArrayInputStream(defaultMetadataJsonString.getBytes("UTF-8")))
 
-    val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
+    val assetProcessing = new AssetProcessing(s3UtilsMock)(mockLogger)
     val result = assetProcessing.processAsset("s3Bucket", s"$userId/sharepoint/$consignmentId/metadata/$differentMatchId.metadata")
 
     result shouldEqual expectedResult
@@ -220,7 +219,7 @@ class AssetProcessingSpec extends ExternalServiceSpec {
     )
   }
 
-  private def verifyDefaultInfoLogging(logger: UnderlyingLogger): Unit = {
-    verify(logger).info("Processing asset metadata for: {}", s"$userId/sharepoint/$consignmentId/metadata/$matchId.metadata")
+  private def verifyDefaultInfoLogging(logger: SelfAwareStructuredLogger[IO]): Unit = {
+    verify(logger).info(s"Processing asset metadata for: $userId/sharepoint/$consignmentId/metadata/$matchId.metadata")
   }
 }

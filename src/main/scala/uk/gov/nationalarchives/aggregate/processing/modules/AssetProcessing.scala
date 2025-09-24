@@ -1,10 +1,12 @@
 package uk.gov.nationalarchives.aggregate.processing.modules
 
+import cats.effect.IO
 import com.typesafe.config.{Config, ConfigFactory}
-import com.typesafe.scalalogging.Logger
 import graphql.codegen.types.ClientSideMetadataInput
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
 import io.circe.{Decoder, Encoder, Json, parser}
+import org.typelevel.log4cats.SelfAwareStructuredLogger
+import org.typelevel.log4cats.slf4j.Slf4jLogger
 import uk.gov.nationalarchives.aggregate.processing.modules.AssetProcessing._
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.AssetSource.AssetSource
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ObjectType
@@ -22,7 +24,7 @@ import java.time.Instant
 import java.util.UUID
 import scala.util.{Failure, Success, Try}
 
-class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
+class AssetProcessing(s3Utils: S3Utils)(implicit logger: SelfAwareStructuredLogger[IO]) {
   implicit class StringTimeConversions(sc: StringContext) {
     def t(args: Any*): Timestamp =
       Timestamp.from(Instant.parse(sc.s(args: _*)))
@@ -159,7 +161,7 @@ object AssetProcessing {
     }
   }
 
-  val logger: Logger = Logger[AssetProcessing]
+  val logger: SelfAwareStructuredLogger[IO] = Slf4jLogger.getLogger[IO]
 
   private val configFactory: Config = ConfigFactory.load()
   val s3Utils: S3Utils = S3Utils(S3Clients.s3Async(configFactory.getString("s3.endpoint")))

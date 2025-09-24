@@ -2,10 +2,11 @@ package uk.gov.nationalarchives.aggregate.processing.modules
 
 import cats.effect.IO
 import com.typesafe.config.{Config, ConfigFactory}
-import com.typesafe.scalalogging.Logger
 import graphql.codegen.types.ConsignmentStatusInput
 import io.circe.Encoder
 import io.circe.generic.semiauto.deriveEncoder
+import org.typelevel.log4cats.SelfAwareStructuredLogger
+import org.typelevel.log4cats.slf4j.Slf4jLogger
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.AssetSource.SharePoint
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ConsignmentStatusType
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ObjectCategory.Records
@@ -22,7 +23,7 @@ import uk.gov.nationalarchives.aws.utils.stepfunction.StepFunctionUtils
 
 import java.util.UUID
 
-class TransferOrchestration(graphQlApi: GraphQlApi, stepFunctionUtils: StepFunctionUtils, config: Config)(implicit logger: Logger) {
+class TransferOrchestration(graphQlApi: GraphQlApi, stepFunctionUtils: StepFunctionUtils, config: Config)(implicit logger: SelfAwareStructuredLogger[IO]) {
 
   implicit val encoder: Encoder[BackendChecksStepFunctionInput] = deriveEncoder[BackendChecksStepFunctionInput]
 
@@ -76,7 +77,7 @@ class TransferOrchestration(graphQlApi: GraphQlApi, stepFunctionUtils: StepFunct
 
 object TransferOrchestration {
   val config: Config = ConfigFactory.load()
-  val logger = Logger[TransferOrchestration]
+  val logger: SelfAwareStructuredLogger[IO] = Slf4jLogger.getLogger[IO]
 
   trait StepFunctionInput {}
   case class BackendChecksStepFunctionInput(consignmentId: String, s3SourceBucketPrefix: String) extends StepFunctionInput
