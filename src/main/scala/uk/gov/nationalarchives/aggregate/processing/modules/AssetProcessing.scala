@@ -14,7 +14,6 @@ import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorT
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorValue.{Invalid, ReadError}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.{AssetProcessing => ptAp}
 import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling.BaseError
-import uk.gov.nationalarchives.aggregate.processing.modules.persistence.Model.{AssetIdentifier, ErrorState, TransferState, TransferStateCategory}
 import uk.gov.nationalarchives.aggregate.processing.modules.persistence.StateCache
 import uk.gov.nationalarchives.aggregate.processing.utilities.UTF8ValidationHandler
 import uk.gov.nationalarchives.aws.utils.s3.{S3Clients, S3Utils}
@@ -131,11 +130,11 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
     Nil
   }
 
-  private def updateTransferState(consignmentId: UUID, assetId: UUID): Long = {
-    logger.info(s"Updating consignment $consignmentId state for: ${TransferStateCategory.assetState}")
-    val state = TransferState(consignmentId, TransferStateCategory.assetState, AssetIdentifier(assetId))
-    stateCache.setTransferState(state)
-  }
+//  private def updateTransferState(consignmentId: UUID, assetId: UUID): Long = {
+//    logger.info(s"Updating consignment $consignmentId state for: ${TransferStateCategory.assetState}")
+//    val state = TransferState(consignmentId, TransferStateCategory.assetState, AssetIdentifier(assetId))
+//    stateCache.setTransferState(state)
+//  }
 
   private def generateErrorMessage(event: AssetProcessingEvent, errorCode: String, errorMessage: String): AssetProcessingError = {
     AssetProcessingError(

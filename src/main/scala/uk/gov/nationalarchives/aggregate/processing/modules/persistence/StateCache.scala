@@ -2,33 +2,37 @@ package uk.gov.nationalarchives.aggregate.processing.modules.persistence
 
 
 import redis.clients.jedis.UnifiedJedis
-import uk.gov.nationalarchives.aggregate.processing.modules.persistence.Model.TransferStateCategory.pathsState
+import uk.gov.nationalarchives.aggregate.processing.modules.persistence.DataPersistence.dataPersistenceClient
+import uk.gov.nationalarchives.aggregate.processing.modules.persistence.Model.TransferStateCategory.{matchIdToFileIdState, pathToAssetState}
 import uk.gov.nationalarchives.aggregate.processing.modules.persistence.Model._
 import uk.gov.nationalarchives.aggregate.processing.modules.persistence.StateCache.cacheClient
 
+import java.util.UUID
+
 class StateCache {
-  def createAssetStates(assetState: AssetState): List[CreateAssetStatesResult] = {
 
-    val states: Map[String, String] = Map.apply(
-      s"${assetState.consignmentId}:$pathsState" -> assetState.clientSideOriginalPath
-    )
-
-    states.map(e => {
-      val result = setAdd(e._1, e._2)
-      CreateAssetStatesResult(e._1, result)
-    }).toList
+  def createTransferState(state: TransferState): Long = {
+    val key = s"${state.consignmentId}:${state.transferState.toString}"
+    setAdd(key, state.value)
   }
 
-
-  def setTransferState(state: TransferState): Long = {
-    val key = s"${state.consignmentId}:${state.transferState}"
-    setAdd(key, state.value.toString)
+  def createMatchIdToFileIdState(state: MatchIdToFileIdState): Long = {
+    val key = s"${state.consignmentId}:$matchIdToFileIdState"
+    val field = state.matchId
+    val value = state.fileId
+    hSetNx(key, field, value.toString)
   }
 
-  def setErrorState(errorState: ErrorState): Long = {
-    val key = s"${errorState.consignmentId}:${TransferStateCategory.errorState}:${errorState.transferProcess}"
-    val value = errorState.matchId
-    setAdd(key, value)
+  def createPathToAssetState(state: PathToAssetIdState): Long = {
+    val key = s"${state.consignmentId}:$pathToAssetState"
+    val field = state.path
+    val value = state.assetIdentifier
+    hSetNx(key, field, value)
+  }
+
+  def getAssetIdentifierByPath(consignmentId: UUID, path: String): String = {
+    val key = s"$consignmentId:$pathToAssetState"
+    hGet(key, path)
   }
 
   def getTransferState(transferStateFilter: TransferStateFilter): Map[String, Long] = {
@@ -59,6 +63,14 @@ class StateCache {
 
   private def setAdd(key: String, value: String): Long = {
     cacheClient.sadd(key, value)
+  }
+
+  private def hSetNx(key: String, field: String, value: String): Long = {
+    cacheClient.hsetnx(key, field, value)
+  }
+
+  private def hGet(key: String, field: String): String = {
+    cacheClient.hget(key, field)
   }
 }
 

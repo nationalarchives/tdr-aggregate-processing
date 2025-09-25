@@ -1,17 +1,15 @@
 package uk.gov.nationalarchives.aggregate.processing.modules.persistence
 
 import io.circe.Json
+import redis.clients.jedis.json.Path2
+import uk.gov.nationalarchives.aggregate.processing.modules.persistence.Model.DataCategory.DataCategory
 import uk.gov.nationalarchives.aggregate.processing.modules.persistence.Model.TransferProcess.TransferProcess
-import uk.gov.nationalarchives.aggregate.processing.modules.persistence.Model.DataCategory
-import uk.gov.nationalarchives.aggregate.processing.modules.persistence.Model.DataCategory.AssetDataCategory
 import uk.gov.nationalarchives.aggregate.processing.modules.persistence.Model.TransferStateCategory.TransferStateCategory
 
 import java.util.UUID
 
 object Model {
-
   trait Filter extends Enumeration { }
-  trait State { }
 
   object TransferProcess extends Filter {
     type TransferProcess = Value
@@ -20,34 +18,30 @@ object Model {
 
   object TransferStateCategory extends Filter {
     type TransferStateCategory = Value
-    val assetState: Value = Value("assets")
     val errorState: Value = Value("errors")
-    val fileChecksState: Value = Value("fileChecks")
+    val matchIdToFileIdState: Value = Value("matchIdToFileId")
     val pathsState: Value = Value("paths")
+    val objectsState: Value = Value("objects")
+    val pathToAssetState: Value = Value("pathToAsset")
   }
 
   object DataCategory extends Filter {
-    type AssetDataCategory = Value
-    type ConsignmentDataCategory = Value
-    val errorData: Value = Value("error")
+    type DataCategory = Value
+    val assetMetadata: Value = Value("assetMetadata")
+    val filePathErrorData: Value = Value("filePath")
+    val matchIdErrorData: Value = Value("matchId")
   }
 
-  trait StateValue {}
-  case class ErrorState(consignmentId: UUID, transferProcess: TransferProcess, matchId: String) extends State
-  case class PathState(consignmentId: UUID, path: String, assetIdentifier: String) extends State
-  case class FileChecksState(consignmentId: UUID, fileIdentifier: String) extends State
-  case class AssetIdentifier(id: UUID) extends StateValue
-  case class TransferState(consignmentId: UUID, transferState: TransferStateCategory, value: StateValue)
-  case class AssetState(consignmentId: UUID, matchId: String, clientSideOriginalPath: String, assetId: UUID, fileIds: Set[UUID]) extends State
+  trait State { }
+  case class PathToAssetIdState(consignmentId: UUID, path: String, assetIdentifier: String) extends State
+  case class MatchIdToFileIdState(consignmentId: UUID, matchId: String, fileId: UUID) extends State
+  case class TransferState(consignmentId: UUID, transferState: TransferStateCategory, value: String) extends State
 
   trait StateFilter { }
-
   case class ErrorStateFilter(consignmentId: UUID, filter: Set[TransferProcess]) extends StateFilter
   case class TransferStateFilter(consignmentId: UUID, filter: Set[TransferStateCategory]) extends StateFilter
 
   trait JsonData { }
-
-  case class AssetData(matchId: String, assetId: Option[UUID], category: AssetDataCategory, input: Json) extends JsonData
-
-  case class CreateAssetStatesResult(stateKey: String, result: Long)
+  case class AssetData(consignmentId: UUID, assetId: UUID, category: DataCategory, input: Json, pathTo: Option[Path2] = None) extends JsonData
+  case class ErrorData(consignmentId: UUID, objectIdentifier: String, DataCategory: DataCategory, input: Json, pathTo: Option[Path2] = None)
 }

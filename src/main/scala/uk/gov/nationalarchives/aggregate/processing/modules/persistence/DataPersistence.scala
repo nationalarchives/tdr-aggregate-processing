@@ -3,12 +3,12 @@ package uk.gov.nationalarchives.aggregate.processing.modules.persistence
 import com.google.gson.Gson
 import io.circe.{Json, ParsingFailure, parser}
 import redis.clients.jedis.UnifiedJedis
+import redis.clients.jedis.json.Path2
 import uk.gov.nationalarchives.aggregate.processing.modules.persistence.DataPersistence.dataPersistenceClient
-import uk.gov.nationalarchives.aggregate.processing.modules.persistence.Model.{AssetData, DataCategory, PathState, TransferStateCategory}
+import uk.gov.nationalarchives.aggregate.processing.modules.persistence.Model.TransferStateCategory.errorState
+import uk.gov.nationalarchives.aggregate.processing.modules.persistence.Model.{AssetData, ErrorData}
 
-import java.util.UUID
-
-class DataPersistence {
+class DataPersistence(client: UnifiedJedis) {
   implicit class JsonHelper(jsonBlob: AnyRef) {
     private val gson = new Gson
 
@@ -17,40 +17,31 @@ class DataPersistence {
     }
   }
 
-  def setPathToAssetData(pathState: PathState): Long = {
-    val key = s"${pathState.consignmentId}:${TransferStateCategory.pathsState}"
-    val field = pathState.path
-    val value = pathState.assetIdentifier
-    hSet(key, field, value)
-  }
-
-  def getAssetIdentifierByPath(consignmentId: UUID, path: String): String = {
-    val key = s"$consignmentId:${TransferStateCategory.pathsState}"
-    hGet(key, path)
-  }
-
-  def setAssetData(data: AssetData): Unit = {
-    val assetIdentifier =  if (data.assetId.nonEmpty) {
-      data.assetId.get.toString
-    } else data.matchId
-
-    val key = s"$assetIdentifier:${DataCategory.errorData.toString}"
+  def setErrorData(data: ErrorData): Unit = {
+    val consignmentId = data.consignmentId
+    val identifier = data.objectIdentifier
+    val key = s"$consignmentId:$errorState:${data.DataCategory.toString}:$identifier"
     dataPersistenceClient.jsonSet(key, data.input)
   }
 
-  def getAssetData(key: String): Either[ParsingFailure, Json] = {
-    parser.parse(dataPersistenceClient.jsonGet(key).toJsonString)
+  def setAssetData(data: AssetData): Unit = {
+    val consignmentId = data.consignmentId
+    val assetIdentifier = data.assetId
+    val dataCategory = data.category.toString
+    val pathTo = data.pathTo.getOrElse(Path2.ROOT_PATH)
+
+    val key = s"$consignmentId:$dataCategory:$assetIdentifier"
+    dataPersistenceClient.jsonSet(key, pathTo, data.input)
   }
 
-  private def hSet(key: String, field: String, value: String): Long = {
-    dataPersistenceClient.hset(key, field, value)
-  }
-
-  private def hGet(key: String, field: String): String = {
-    dataPersistenceClient.hget(key, field)
+  def getData(key: String, pathTo: Option[Path2] = None): Either[ParsingFailure, Json] = {
+    val path = pathTo.getOrElse(Path2.ROOT_PATH)
+    parser.parse(dataPersistenceClient.jsonGet(key, path).toJsonString)
   }
 }
 
 object DataPersistence {
-  val dataPersistenceClient = new UnifiedJedis("redis://localhost:6379")
+  val dataPersistenceClient: UnifiedJedis = new UnifiedJedis("redis://localhost:6379")
+
+  def apply() = new DataPersistence(dataPersistenceClient)
 }
