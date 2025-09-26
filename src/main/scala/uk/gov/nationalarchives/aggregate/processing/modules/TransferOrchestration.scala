@@ -26,11 +26,11 @@ import java.util.UUID
 import scala.concurrent.ExecutionContext.Implicits.global
 
 class TransferOrchestration(
-                             graphQlApi: GraphQlApi,
-                             stepFunctionUtils: StepFunctionUtils,
-                             notificationUtils: NotificationsClient,
-                             keycloakConfigurations: KeycloakClient,
-                             config: Config
+    graphQlApi: GraphQlApi,
+    stepFunctionUtils: StepFunctionUtils,
+    notificationUtils: NotificationsClient,
+    keycloakConfigurations: KeycloakClient,
+    config: Config
 )(implicit logger: Logger) {
 
   implicit val encoder: Encoder[BackendChecksStepFunctionInput] = deriveEncoder[BackendChecksStepFunctionInput]
