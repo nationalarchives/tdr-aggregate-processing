@@ -7,19 +7,19 @@ import uk.gov.nationalarchives.tdr.keycloak.{KeycloakUtils, TdrKeycloakDeploymen
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class KeycloakConfigurations(config: Config)(implicit val executionContext: ExecutionContext) {
+class KeycloakClient(keycloakUtils: KeycloakUtils, config: Config)(implicit val executionContext: ExecutionContext) {
   implicit val backend: SttpBackend[Identity, Any] = HttpURLConnectionBackend()
   val authUrl: String = config.getString("auth.url")
-  val secret: String = config.getString("read.auth.secret.path")
+  val secret: String = config.getString("auth.keycloakCloakClientSecretPath")
 
   def userDetails(userId: String): Future[UserDetails] = {
     implicit val tdrKeycloakDeployment: TdrKeycloakDeployment =
       TdrKeycloakDeployment(authUrl, "tdr", 3600)
-    KeycloakUtils().userDetails(userId, "tdr-user-read", secret)
+    keycloakUtils.userDetails(userId, "tdr-user-read", secret)
   }
 }
 
-object KeycloakConfigurations {
+object KeycloakClient {
 
-  def apply(config: Config)(implicit executionContext: ExecutionContext): KeycloakConfigurations = new KeycloakConfigurations(config)
+  def apply(config: Config)(implicit executionContext: ExecutionContext): KeycloakClient = new KeycloakClient(KeycloakUtils(), config)
 }

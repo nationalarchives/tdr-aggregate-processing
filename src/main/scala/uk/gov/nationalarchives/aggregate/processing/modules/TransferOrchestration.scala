@@ -14,11 +14,11 @@ import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorV
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.{AggregateProcessing, Orchestration}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.StateStatusValue.{Completed, CompletedWithIssues, ConsignmentStatusValue, Failed}
 import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling.{BaseError, handleError}
-import uk.gov.nationalarchives.aggregate.processing.utilities.NotificationUtils.UploadEvent
+import uk.gov.nationalarchives.aggregate.processing.utilities.NotificationsClient.UploadEvent
 import uk.gov.nationalarchives.aggregate.processing.modules.TransferOrchestration.{AggregateProcessingEvent, BackendChecksStepFunctionInput, OrchestrationResult, TransferError}
 import uk.gov.nationalarchives.aggregate.processing.persistence.GraphQlApi
 import uk.gov.nationalarchives.aggregate.processing.persistence.GraphQlApi.{backend, keycloakDeployment}
-import uk.gov.nationalarchives.aggregate.processing.utilities.{KeycloakConfigurations, NotificationUtils}
+import uk.gov.nationalarchives.aggregate.processing.utilities.{KeycloakClient, NotificationsClient}
 import uk.gov.nationalarchives.aws.utils.stepfunction.StepFunctionClients.sfnAsyncClient
 import uk.gov.nationalarchives.aws.utils.stepfunction.StepFunctionUtils
 
@@ -26,11 +26,11 @@ import java.util.UUID
 import scala.concurrent.ExecutionContext.Implicits.global
 
 class TransferOrchestration(
-    graphQlApi: GraphQlApi,
-    stepFunctionUtils: StepFunctionUtils,
-    notificationUtils: NotificationUtils,
-    keycloakConfigurations: KeycloakConfigurations,
-    config: Config
+                             graphQlApi: GraphQlApi,
+                             stepFunctionUtils: StepFunctionUtils,
+                             notificationUtils: NotificationsClient,
+                             keycloakConfigurations: KeycloakClient,
+                             config: Config
 )(implicit logger: Logger) {
 
   implicit val encoder: Encoder[BackendChecksStepFunctionInput] = deriveEncoder[BackendChecksStepFunctionInput]
@@ -114,8 +114,8 @@ object TransferOrchestration {
   case class OrchestrationResult(consignmentId: Option[UUID], success: Boolean, error: Option[TransferError] = None)
 
   val stepFunctionUtils = StepFunctionUtils(sfnAsyncClient(config.getString("sfn.endpoint")))
-  val notificationUtils = NotificationUtils(config)
-  val keycloakConfigurations = KeycloakConfigurations(config)
+  val notificationUtils = NotificationsClient(config)
+  val keycloakConfigurations = KeycloakClient(config)
 
   def apply() = new TransferOrchestration(GraphQlApi(), stepFunctionUtils, notificationUtils, keycloakConfigurations, config)(logger)
 }
