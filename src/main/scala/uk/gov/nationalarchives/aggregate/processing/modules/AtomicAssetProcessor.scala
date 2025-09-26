@@ -5,13 +5,14 @@ import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
 import io.circe.syntax.EncoderOps
 import io.circe.{Decoder, Encoder, Json, JsonObject}
 import uk.gov.nationalarchives.aggregate.processing.modules.AssetProcessing.{AssetProcessingError, RequiredSharePointMetadata}
-import uk.gov.nationalarchives.aggregate.processing.modules.AtomicAssetProcessor.{AtomicAssetProcessingEvent, PotentialNode}
+import uk.gov.nationalarchives.aggregate.processing.modules.AtomicAssetProcessor.{AtomicAssetProcessingEvent, TreeNode, schemaConfig}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.AssetSource.AssetSource
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType
 import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling.handleError
 import uk.gov.nationalarchives.aggregate.processing.modules.persistence.Model.DataCategory.{assetMetadata, filePathErrorData}
-import uk.gov.nationalarchives.aggregate.processing.modules.persistence.Model.{AssetData, DataCategory, ErrorData, MatchIdToFileIdState, PathToAssetIdState, TransferState, TransferStateCategory}
+import uk.gov.nationalarchives.aggregate.processing.modules.persistence.Model._
 import uk.gov.nationalarchives.aggregate.processing.modules.persistence.{DataPersistence, StateCache}
+import uk.gov.nationalarchives.tdr.schemautils.ConfigUtils
 
 import java.io.{File => JIOFile}
 import java.util.UUID
@@ -23,16 +24,50 @@ class AtomicAssetProcessor(stateCache: StateCache, dataPersistence: DataPersiste
   implicit val errorDecoder: Decoder[AssetProcessingError] = deriveDecoder[AssetProcessingError]
   implicit val errorEncoder: Encoder[AssetProcessingError] = deriveEncoder[AssetProcessingError]
 
+  private val sharePointMapper = schemaConfig.inputToPropertyMapper("sharePointTag")
+  private val defaultPropertyValues = schemaConfig.getPropertiesWithDefaultValue
+
+  private def convertToBaseMetadata(sourceJson: Json) = {
+    sourceJson.asObject.get.toMap.map(fv => {
+      val originalField = fv._1
+      val field = sharePointMapper(originalField)
+      field -> fv._2
+    }).asJson
+  }
+
+  private def createFolderAsset(node: TreeNode): JsonObject = {
+    addNodeDetails(node, None, JsonObject.apply(
+      ("file_path", s"${node.path}".asJson)
+    ))
+  }
+
+  private def addNodeDetails(node: TreeNode, fileId: Option[UUID], sourceJson: JsonObject): JsonObject = {
+    val result = sourceJson
+      .add("UUID", s"${node.assetId}".asJson)
+      .add("file_type", s"${node.nodeType}".asJson)
+    if (fileId.nonEmpty) {
+      result.add("file_ids", s"[${fileId.get}]".asJson)
+    } else result
+  }
+
+  private def enrichMetadata(node: TreeNode, fileId: Some[UUID], sourceJson: JsonObject): JsonObject = {
+    val interimJson = addNodeDetails(node, fileId, sourceJson)
+    val e = defaultPropertyValues.map(kv => {
+      (kv._1, kv._2.asJson)
+    })
+    (interimJson.toMap ++ e).asJson.asObject.get
+  }
+
   def process(event: AtomicAssetProcessingEvent): Unit = {
     val consignmentId = event.consignmentId
     val matchId = event.matchId
-    val objectState = TransferState(consignmentId, TransferStateCategory.objectsState, matchId.toString)
+    val objectState = TransferState(consignmentId, TransferStateCategory.uploadedObjectsState, matchId)
     val objectStateResult = stateCache.createTransferState(objectState)
     if (objectStateResult == 0) {
-      val error = AssetProcessingError(Some(consignmentId.toString), Some(matchId.toString), Some(event.source.toString),
+      val error = AssetProcessingError(Some(consignmentId.toString), Some(matchId), Some(event.source.toString),
         s"${ProcessType.AssetProcessing}.MatchId.Duplicate", s"Duplicate match id found for consignment: $consignmentId")
       handleError(error, logger)
-      dataPersistence.setErrorData(ErrorData(consignmentId, matchId.toString, DataCategory.matchIdErrorData, error.asJson))
+      dataPersistence.setErrorData(ErrorData(consignmentId, matchId, DataCategory.matchIdErrorData, error.asJson))
     } else {
       createAssets(event)
     }
@@ -40,49 +75,45 @@ class AtomicAssetProcessor(stateCache: StateCache, dataPersistence: DataPersiste
 
   private def createAssets(event: AtomicAssetProcessingEvent): Unit = {
     val consignmentId = event.consignmentId
-    val originalFilePath = event.assetMetadata.FileRef
-    val potentialNodes = generatePotentialNodes(event.matchId.toString, consignmentId, originalFilePath)
-    potentialNodes.foreach(pn => {
-      val nodeType = pn.nodeType
-      val pathToAssetIdState = PathToAssetIdState(consignmentId, pn.path, pn.nodeId.toString)
+    val matchId = event.matchId.toString
+    val jsonMetadata = convertToBaseMetadata(event.assetMetadata).asObject.get
+    val originalFilePath = jsonMetadata("file_path").get.asString.get
+    val treeNodes = generateTreeNodes(matchId, consignmentId, originalFilePath)
+    treeNodes.foreach(treeNode => {
+      val assetId = treeNode.assetId
+      val nodeType = treeNode.nodeType
+      val pathToAssetIdState = PathToAssetIdState(consignmentId, treeNode.path, assetId.toString)
       stateCache.createPathToAssetState(pathToAssetIdState)
-      val parentPath = pn.parentPath
+      val parentPath = treeNode.parentPath
       val parentId: Option[String] =
         if (parentPath.isEmpty) { None } else Some(stateCache.getAssetIdentifierByPath(consignmentId, parentPath.get))
 
       val assetJsonObject: JsonObject = if (nodeType == "File") {
-        val fileJsonObject: JsonObject = event.assetMetadata.asJson.asObject.get
         val fileId = UUID.randomUUID()
-        val matchIdToFileIdState = MatchIdToFileIdState(consignmentId, event.matchId.toString, fileId)
+        val matchIdToFileIdState = MatchIdToFileIdState(consignmentId, matchId, fileId)
         stateCache.createMatchIdToFileIdState(matchIdToFileIdState)
-        val enrichedObject = fileJsonObject
-          .add("uuid", s"${pn.nodeId}".asJson)
-          .add("fileIds", s"[$fileId]".asJson)
-          .add("FileType", s"${pn.nodeType}".asJson)
-        enrichedObject
+        enrichMetadata(treeNode, Some(fileId), jsonMetadata)
       } else {
-        JsonObject.apply(
-          ("uuid", s"${pn.nodeId}".asJson),
-          ("FileType", s"${pn.nodeType}".asJson),
-          ("FilePath", s"${pn.path}".asJson))
+        createFolderAsset(treeNode)
       }
 
       val enrichedJson = if (parentId.isEmpty) { assetJsonObject.toJson } else
-        assetJsonObject.add("ParentId", s"${parentId.get}".asJson).toJson
+        assetJsonObject.add("parent_id", s"${parentId.get}".asJson).toJson
 
-      dataPersistence.setAssetData(AssetData(consignmentId, pn.nodeId, assetMetadata, enrichedJson))
+      dataPersistence.setAssetData(AssetData(consignmentId, assetId, assetMetadata, enrichedJson))
     })
   }
 
-  private def generatePotentialNodes(matchId: String, consignmentId: UUID, path: String): List[PotentialNode] = {
+  private def generateTreeNodes(matchId: String, consignmentId: UUID, path: String): List[TreeNode] = {
     @tailrec
-    def innerFunction(originalPath: String, typeIdentifier: String, nodes: List[PotentialNode]): List[PotentialNode] = {
+    def innerFunction(originalPath: String, typeIdentifier: String, nodes: List[TreeNode]): List[TreeNode] = {
       val jioFile = new JIOFile(originalPath)
       val parentPath = Option(jioFile.getParent)
       val stateResult = stateCache.createTransferState(TransferState(consignmentId, TransferStateCategory.pathsState, originalPath))
       stateResult match {
         case 0 if typeIdentifier == "File" =>
-          val error = AssetProcessingError(Some(consignmentId.toString), Some(matchId), Some("sharePoint"), "", s"Duplicate file path in consignment: $originalPath")
+          val error = AssetProcessingError(
+            Some(consignmentId.toString), Some(matchId), Some("sharePoint"), "", s"Duplicate file path in consignment: $originalPath")
           handleError(error, logger)
           dataPersistence.setErrorData(ErrorData(consignmentId, matchId, filePathErrorData, error.asJson))
           nodes
@@ -91,7 +122,7 @@ class AtomicAssetProcessor(stateCache: StateCache, dataPersistence: DataPersiste
           val nodeId = UUID.randomUUID()
           val pathToAssetIdState = PathToAssetIdState(consignmentId, originalPath, nodeId.toString)
           stateCache.createPathToAssetState(pathToAssetIdState)
-          val node = PotentialNode(nodeId, originalPath, typeIdentifier, parentPath)
+          val node = TreeNode(nodeId, originalPath, typeIdentifier, parentPath)
           val nextList = nodes :+ node
           if (parentPath.nonEmpty) {
             innerFunction(parentPath.get, "Folder", nextList)
@@ -110,9 +141,10 @@ object AtomicAssetProcessor {
   val logger: Logger = Logger[AssetProcessing]
   private val stateCache: StateCache = StateCache.apply()
   private val dataPersistence = DataPersistence.apply()
+  private val schemaConfig = ConfigUtils.loadConfiguration
 
-  case class AtomicAssetProcessingEvent(source: AssetSource, consignmentId: UUID, matchId: UUID, assetMetadata: RequiredSharePointMetadata)
-  case class PotentialNode(nodeId: UUID, path: String, nodeType: String, parentPath: Option[String])
+  case class AtomicAssetProcessingEvent(source: AssetSource, consignmentId: UUID, matchId: String, assetMetadata: Json)
+  case class TreeNode(assetId: UUID, path: String, nodeType: String, parentPath: Option[String])
 
   def apply() = new AtomicAssetProcessor(stateCache, dataPersistence)(logger)
 }

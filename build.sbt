@@ -26,6 +26,7 @@ libraryDependencies ++= Seq(
   s3Utils,
   scalaLogging,
   scalaTest % Test,
+  schemaConfig,
   ssmUtils,
   stepFunctionUtils,
   typesafeConfig,

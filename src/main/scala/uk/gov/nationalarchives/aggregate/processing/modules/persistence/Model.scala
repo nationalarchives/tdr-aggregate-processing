@@ -21,7 +21,7 @@ object Model {
     val errorState: Value = Value("errors")
     val matchIdToFileIdState: Value = Value("matchIdToFileId")
     val pathsState: Value = Value("paths")
-    val objectsState: Value = Value("objects")
+    val uploadedObjectsState: Value = Value("uploadedObjects")
     val pathToAssetState: Value = Value("pathToAsset")
   }
 

@@ -6,7 +6,6 @@ import graphql.codegen.types.ClientSideMetadataInput
 import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
 import io.circe.{Decoder, Encoder, Json, parser}
 import uk.gov.nationalarchives.aggregate.processing.modules.AssetProcessing._
-import uk.gov.nationalarchives.aggregate.processing.modules.AtomicAssetProcessor.AtomicAssetProcessingEvent
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.AssetSource.AssetSource
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ObjectType
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ObjectType.ObjectType
@@ -14,7 +13,6 @@ import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorT
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorValue.{Invalid, ReadError}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.{AssetProcessing => ptAp}
 import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling.BaseError
-import uk.gov.nationalarchives.aggregate.processing.modules.persistence.StateCache
 import uk.gov.nationalarchives.aggregate.processing.utilities.UTF8ValidationHandler
 import uk.gov.nationalarchives.aws.utils.s3.{S3Clients, S3Utils}
 import uk.gov.nationalarchives.utf8.validator.Utf8Validator
@@ -25,7 +23,6 @@ import java.util.UUID
 import scala.util.{Failure, Success, Try}
 
 class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
-  private val stateCache = new StateCache()
   implicit class StringTimeConversions(sc: StringContext) {
     def t(args: Any*): Timestamp =
       Timestamp.from(Instant.parse(sc.s(args: _*)))
@@ -110,31 +107,16 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
 
             val input = ClientSideMetadataInput(metadata.FileRef, metadata.SHA256ClientSideChecksum, dateLastModified, metadata.Length, metadata.matchId)
             logger.info(s"Asset metadata successfully processed for: $objectKey")
-            atomicProcessing(event, metadata)
             AssetProcessingResult(Some(matchId), processingErrors = false, Some(input), suppliedMetadata)
           }
         }
       )
   }
 
-  private def atomicProcessing(event: AssetProcessingEvent, sharePointMetadata: RequiredSharePointMetadata) = {
-    val atomicProcessing = configFactory.getBoolean("featureAccessBlocks.atomicProcessing")
-    if (atomicProcessing) {
-      val atomicEvent  = AtomicAssetProcessingEvent(event.source, event.consignmentId, event.userId, sharePointMetadata)
-      AtomicAssetProcessor.apply().process(atomicEvent)
-    }
-  }
-
   private def toSuppliedMetadata(metadataJson: Json): List[SuppliedMetadata] = {
     // TODO: check for any supplied metadata fields
     Nil
   }
-
-//  private def updateTransferState(consignmentId: UUID, assetId: UUID): Long = {
-//    logger.info(s"Updating consignment $consignmentId state for: ${TransferStateCategory.assetState}")
-//    val state = TransferState(consignmentId, TransferStateCategory.assetState, AssetIdentifier(assetId))
-//    stateCache.setTransferState(state)
-//  }
 
   private def generateErrorMessage(event: AssetProcessingEvent, errorCode: String, errorMessage: String): AssetProcessingError = {
     AssetProcessingError(

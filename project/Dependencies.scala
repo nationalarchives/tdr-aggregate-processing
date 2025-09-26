@@ -30,6 +30,7 @@ object Dependencies {
   lazy val s3Utils = "uk.gov.nationalarchives" %% "s3-utils" % "0.1.305"
   lazy val scalaLogging = "com.typesafe.scala-logging" %% "scala-logging" % "3.9.6"
   lazy val scalaTest = "org.scalatest" %% "scalatest" % "3.2.19"
+  lazy val schemaConfig = "uk.gov.nationalarchives" %% "da-metadata-schema"% "0.0.92"
   lazy val ssmUtils = "uk.gov.nationalarchives" %% "ssm-utils" % "0.1.305"
   lazy val stepFunctionUtils = "uk.gov.nationalarchives" %% "stepfunction-utils" % "0.1.305"
 
