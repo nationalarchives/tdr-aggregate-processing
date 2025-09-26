@@ -32,6 +32,7 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec {
     mockSfnResponseOk()
     mockGraphQlAddFilesAndMetadataResponse
     mockGraphQlUpdateConsignmentStatusResponse
+    mockGraphQlGetConsignmentDetailsResponse
     val mockContext = mock[Context]
 
     val message1 = new SQSMessage()
@@ -62,7 +63,7 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec {
     )
 
     wiremockGraphqlServer.verify(
-      exactly(4),
+      exactly(6),
       postRequestedFor(anyUrl())
         .withUrl("/graphql")
     )
@@ -75,6 +76,7 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec {
     mockSfnResponseOk()
     mockGraphQlAddFilesAndMetadataResponse
     mockGraphQlUpdateConsignmentStatusResponse
+    mockGraphQlGetConsignmentDetailsResponse
     val mockContext = mock[Context]
 
     val message1 = new SQSMessage()
@@ -104,7 +106,7 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec {
     )
 
     wiremockGraphqlServer.verify(
-      exactly(1),
+      exactly(2),
       postRequestedFor(anyUrl())
         .withUrl("/graphql")
     )

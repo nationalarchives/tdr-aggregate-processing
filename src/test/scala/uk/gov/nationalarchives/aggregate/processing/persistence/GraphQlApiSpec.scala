@@ -5,6 +5,7 @@ import com.nimbusds.oauth2.sdk.token.BearerAccessToken
 import com.typesafe.scalalogging.Logger
 import graphql.codegen.AddFilesAndMetadata.{addFilesAndMetadata => afm}
 import graphql.codegen.UpdateConsignmentStatus.{updateConsignmentStatus => ucs}
+import graphql.codegen.GetConsignmentDetailsForMetadataReview.{getConsignmentDetailsForMetadataReview => gcdfmr}
 import graphql.codegen.types.{AddFileAndMetadataInput, ClientSideMetadataInput, ConsignmentStatusInput}
 import org.mockito.ArgumentCaptor
 import org.mockito.ArgumentMatchers.any
@@ -30,12 +31,13 @@ class GraphQlApiSpec extends ExternalServiceSpec {
 
   private val updateConsignmentStatusClient = mock[GraphQLClient[ucs.Data, ucs.Variables]]
   private val addFilesAndMetadataClient = mock[GraphQLClient[afm.Data, afm.Variables]]
+  private val getConsignmentDetailsClient = mock[GraphQLClient[gcdfmr.Data, gcdfmr.Variables]]
 
   "addClientSideMetadata" should "add client side metadata with the given arguments" in {
     val mockLogger = mock[UnderlyingLogger]
     val mockApiResponse = List[afm.AddFilesAndMetadata]()
 
-    val api = new GraphQlApi(keycloak, updateConsignmentStatusClient, addFilesAndMetadataClient)(Logger(mockLogger), tdrKeycloakDeployment, backend)
+    val api = new GraphQlApi(keycloak, updateConsignmentStatusClient, addFilesAndMetadataClient, getConsignmentDetailsClient)(Logger(mockLogger), tdrKeycloakDeployment, backend)
     val consignmentId = UUID.randomUUID()
     val overrideUserId = UUID.randomUUID()
     val inputVariablesCaptor: ArgumentCaptor[Option[afm.Variables]] = ArgumentCaptor.forClass(classOf[Option[afm.Variables]])
@@ -81,7 +83,7 @@ class GraphQlApiSpec extends ExternalServiceSpec {
 
     val input = AddFileAndMetadataInput(consignmentId, Nil, None, Some(overrideUserId))
 
-    val api = new GraphQlApi(keycloak, updateConsignmentStatusClient, addFilesAndMetadataClient)(Logger(mockLogger), tdrKeycloakDeployment, backend)
+    val api = new GraphQlApi(keycloak, updateConsignmentStatusClient, addFilesAndMetadataClient, getConsignmentDetailsClient)(Logger(mockLogger), tdrKeycloakDeployment, backend)
 
     val exception = intercept[RuntimeException] {
       api.addClientSideMetadata(input).unsafeRunSync()
@@ -94,7 +96,7 @@ class GraphQlApiSpec extends ExternalServiceSpec {
   "updateConsignmentStatus" should "update the consignment status with the given arguments" in {
     val mockLogger = mock[UnderlyingLogger]
 
-    val api = new GraphQlApi(keycloak, updateConsignmentStatusClient, addFilesAndMetadataClient)(Logger(mockLogger), tdrKeycloakDeployment, backend)
+    val api = new GraphQlApi(keycloak, updateConsignmentStatusClient, addFilesAndMetadataClient, getConsignmentDetailsClient)(Logger(mockLogger), tdrKeycloakDeployment, backend)
     val consignmentId = UUID.randomUUID()
     val overrideUserId = UUID.randomUUID()
     val inputVariablesCaptor: ArgumentCaptor[Option[ucs.Variables]] = ArgumentCaptor.forClass(classOf[Option[ucs.Variables]])
@@ -135,7 +137,7 @@ class GraphQlApiSpec extends ExternalServiceSpec {
       .when(updateConsignmentStatusClient)
       .getResult[Identity](any[BearerAccessToken], any[Document], any[Option[ucs.Variables]])(any[SttpBackend[Identity, Any]], any[ClassTag[Identity[_]]])
 
-    val api = new GraphQlApi(keycloak, updateConsignmentStatusClient, addFilesAndMetadataClient)(Logger(mockLogger), tdrKeycloakDeployment, backend)
+    val api = new GraphQlApi(keycloak, updateConsignmentStatusClient, addFilesAndMetadataClient, getConsignmentDetailsClient)(Logger(mockLogger), tdrKeycloakDeployment, backend)
 
     val exception = intercept[RuntimeException] {
       api.updateConsignmentStatus(ConsignmentStatusInput(consignmentId, "Upload", Some("Completed"), Some(overrideUserId))).unsafeRunSync()
@@ -143,5 +145,60 @@ class GraphQlApiSpec extends ExternalServiceSpec {
 
     verify(mockLogger).info(s"Updating consignment status: Upload for consignment: $consignmentId")
     exception.getMessage shouldBe s"Unable to update consignment status: $consignmentId"
+  }
+
+  "getConsignmentDetails" should "return details for a consignment given a consignment id" in {
+    val mockLogger = mock[UnderlyingLogger]
+
+    val api = new GraphQlApi(keycloak, updateConsignmentStatusClient, addFilesAndMetadataClient, getConsignmentDetailsClient)(Logger(mockLogger), tdrKeycloakDeployment, backend)
+    val consignmentId = UUID.randomUUID()
+    val overrideUserId = UUID.randomUUID()
+    val inputVariablesCaptor: ArgumentCaptor[Option[gcdfmr.Variables]] = ArgumentCaptor.forClass(classOf[Option[gcdfmr.Variables]])
+
+    when(mockLogger.isInfoEnabled()).thenReturn(true)
+
+    doAnswer(() => Future(new BearerAccessToken("token")))
+      .when(keycloak)
+      .serviceAccountToken[Identity](any[String], any[String])(any[SttpBackend[Identity, Any]], any[ClassTag[Identity[_]]], any[TdrKeycloakDeployment])
+
+    doAnswer(() =>
+      Future(GraphQlResponse[gcdfmr.Data](Option(gcdfmr.Data(Some(gcdfmr.GetConsignment("consignmentRef", Some("seriesName"), Some("transferringBody"), overrideUserId)))), Nil))
+    )
+      .when(getConsignmentDetailsClient)
+      .getResult[Identity](any[BearerAccessToken], any[Document], inputVariablesCaptor.capture())(any[SttpBackend[Identity, Any]], any[ClassTag[Identity[_]]])
+
+    api.getConsignmentDetails(consignmentId).unsafeRunSync()
+    val inputArgs = inputVariablesCaptor.getValue.get.consignmentId
+    inputArgs shouldBe consignmentId
+
+    verify(mockLogger).info(s"Getting consignment details for consignment: {}", consignmentId)
+    verify(mockLogger, times(0)).isErrorEnabled
+  }
+
+  "getConsignmentDetails" should "throw an error when getting consignment fails" in {
+    val mockLogger = mock[UnderlyingLogger]
+
+    val api = new GraphQlApi(keycloak, updateConsignmentStatusClient, addFilesAndMetadataClient, getConsignmentDetailsClient)(Logger(mockLogger), tdrKeycloakDeployment, backend)
+    val consignmentId = UUID.randomUUID()
+    val inputVariablesCaptor: ArgumentCaptor[Option[gcdfmr.Variables]] = ArgumentCaptor.forClass(classOf[Option[gcdfmr.Variables]])
+
+    when(mockLogger.isInfoEnabled()).thenReturn(true)
+
+    doAnswer(() => Future(new BearerAccessToken("token")))
+      .when(keycloak)
+      .serviceAccountToken[Identity](any[String], any[String])(any[SttpBackend[Identity, Any]], any[ClassTag[Identity[_]]], any[TdrKeycloakDeployment])
+
+    doAnswer(() => Future(GraphQlResponse[gcdfmr.Data](None, Nil)))
+      .when(getConsignmentDetailsClient)
+      .getResult[Identity](any[BearerAccessToken], any[Document], inputVariablesCaptor.capture())(any[SttpBackend[Identity, Any]], any[ClassTag[Identity[_]]])
+
+    val exception = intercept[RuntimeException] {
+      api.getConsignmentDetails(consignmentId).unsafeRunSync()
+    }
+    val inputArgs = inputVariablesCaptor.getValue.get.consignmentId
+    inputArgs shouldBe consignmentId
+
+    verify(mockLogger).info(s"Getting consignment details for consignment: {}", consignmentId)
+    exception.getMessage shouldBe s"Unable to get consignment details for consignment: $consignmentId"
   }
 }

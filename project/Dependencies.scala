@@ -3,6 +3,7 @@ import sbt.*
 object Dependencies {
   private val circeVersion = "0.14.14"
   private val mockitoScalaVersion = "2.0.0"
+  private val awsUtilsVersion = "0.1.302"
 
   lazy val authUtils = "uk.gov.nationalarchives" %% "tdr-auth-utils" % "0.0.258"
   lazy val awsLambdaCore = "com.amazonaws" % "aws-lambda-java-core" % "1.4.0"
@@ -22,11 +23,12 @@ object Dependencies {
   lazy val mockitoScala = "org.mockito" %% "mockito-scala" % mockitoScalaVersion
   lazy val mockitoScalaTest = "org.mockito" %% "mockito-scala-scalatest" % mockitoScalaVersion
 
-  lazy val s3Utils = "uk.gov.nationalarchives" %% "s3-utils" % "0.1.299"
+  lazy val s3Utils = "uk.gov.nationalarchives" %% "s3-utils" % awsUtilsVersion
   lazy val scalaLogging = "com.typesafe.scala-logging" %% "scala-logging" % "3.9.5"
   lazy val scalaTest = "org.scalatest" %% "scalatest" % "3.2.19"
-  lazy val ssmUtils = "uk.gov.nationalarchives" %% "ssm-utils" % "0.1.299"
-  lazy val stepFunctionUtils = "uk.gov.nationalarchives" %% "stepfunction-utils" % "0.1.299"
+  lazy val snsUtils =  "uk.gov.nationalarchives" %% "sns-utils" % awsUtilsVersion
+  lazy val ssmUtils = "uk.gov.nationalarchives" %% "ssm-utils" % awsUtilsVersion
+  lazy val stepFunctionUtils = "uk.gov.nationalarchives" %% "stepfunction-utils" % awsUtilsVersion
 
   lazy val typesafeConfig = "com.typesafe" % "config" % "1.4.4"
 
