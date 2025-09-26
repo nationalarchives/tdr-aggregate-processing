@@ -22,6 +22,7 @@ libraryDependencies ++= Seq(
   logstash,
   mockitoScala % Test,
   mockitoScalaTest % Test,
+  parallelCollections % Test,
   s3Utils,
   scalaLogging,
   scalaTest % Test,

@@ -25,13 +25,15 @@ object Dependencies {
   lazy val mockitoScala = "org.mockito" %% "mockito-scala" % mockitoScalaVersion
   lazy val mockitoScalaTest = "org.mockito" %% "mockito-scala-scalatest" % mockitoScalaVersion
 
-  lazy val s3Utils = "uk.gov.nationalarchives" %% "s3-utils" % "0.1.299"
-  lazy val scalaLogging = "com.typesafe.scala-logging" %% "scala-logging" % "3.9.5"
-  lazy val scalaTest = "org.scalatest" %% "scalatest" % "3.2.19"
-  lazy val ssmUtils = "uk.gov.nationalarchives" %% "ssm-utils" % "0.1.299"
-  lazy val stepFunctionUtils = "uk.gov.nationalarchives" %% "stepfunction-utils" % "0.1.299"
+  lazy val parallelCollections = "org.scala-lang.modules" %% "scala-parallel-collections" % "1.2.0"
 
-  lazy val typesafeConfig = "com.typesafe" % "config" % "1.4.4"
+  lazy val s3Utils = "uk.gov.nationalarchives" %% "s3-utils" % "0.1.305"
+  lazy val scalaLogging = "com.typesafe.scala-logging" %% "scala-logging" % "3.9.6"
+  lazy val scalaTest = "org.scalatest" %% "scalatest" % "3.2.19"
+  lazy val ssmUtils = "uk.gov.nationalarchives" %% "ssm-utils" % "0.1.305"
+  lazy val stepFunctionUtils = "uk.gov.nationalarchives" %% "stepfunction-utils" % "0.1.305"
+
+  lazy val typesafeConfig = "com.typesafe" % "config" % "1.4.5"
 
   lazy val utf8Validator = "uk.gov.nationalarchives" % "utf8-validator" % "1.2"
 

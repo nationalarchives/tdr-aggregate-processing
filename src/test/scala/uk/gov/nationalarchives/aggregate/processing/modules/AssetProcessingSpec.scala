@@ -17,6 +17,7 @@ import uk.gov.nationalarchives.aggregate.processing.modules.AtomicAssetProcessor
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.AssetSource
 import uk.gov.nationalarchives.aggregate.processing.modules.persistence.{DataPersistence, StateCache}
 import uk.gov.nationalarchives.aws.utils.s3.S3Utils
+import scala.collection.parallel.CollectionConverters._
 
 import java.io.ByteArrayInputStream
 import java.util.UUID
@@ -36,28 +37,19 @@ class AssetProcessingSpec extends ExternalServiceSpec {
     }""".stripMargin
 
   "x" should "y" in {
-    val cid = UUID.fromString("7e0ed6b7-82a3-4480-aa2d-826f6133e6f0")
     val mockLogger = mock[UnderlyingLogger]
-    val matchId1 = UUID.randomUUID().toString
-    val matchId2 = UUID.randomUUID().toString
-    val matchId3 = UUID.randomUUID().toString
+    val cid = UUID.fromString("7e0ed6b7-82a3-4480-aa2d-826f6133e6f0")
+    val numberOfEvents = 500000
 
-    val sharePointMetadata1 = RequiredSharePointMetadata(
-      matchId1, cid, "2025-07-03T09:19:47Z", "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2", 12L,
-      "/sites/Retail/Shared Documents/file1.txt", "file1.txt")
-    val sharePointMetadata2 = RequiredSharePointMetadata(
-      matchId2, cid, "2025-07-03T09:19:47Z", "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2", 12L,
-      "/sites/Retail/file2.txt", "file2.txt")
-    val sharePointMetadata3 = RequiredSharePointMetadata(
-      matchId3, cid, "2025-07-03T09:19:47Z", "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2", 12L,
-      "/sites/Retail/Shared Documents/file3.txt", "file3.txt")
-    val event1 = AtomicAssetProcessingEvent(AssetSource.SharePoint, cid, UUID.fromString(matchId1), sharePointMetadata1)
-    val event2 = AtomicAssetProcessingEvent(AssetSource.SharePoint, cid, UUID.fromString(matchId2), sharePointMetadata2)
-    val event3 = AtomicAssetProcessingEvent(AssetSource.SharePoint, cid, UUID.fromString(matchId3), sharePointMetadata3)
-
-    val events = List(event2, event1, event3)
-
-    events.foreach(new AtomicAssetProcessor(StateCache.apply(), DataPersistence.apply())(Logger(mockLogger)).process(_))
+    (1 to numberOfEvents).map {i =>
+      val matchId = UUID.randomUUID()
+      val fileName = s"file$i.txt"
+      val filePath = s"/sites/Retail/Shared Documents/$fileName"
+      val sharePointMetadata = RequiredSharePointMetadata(
+        matchId.toString, cid, "2025-07-03T09:19:47Z", "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2",
+        12L, filePath, fileName)
+      AtomicAssetProcessingEvent(AssetSource.SharePoint, cid, matchId, sharePointMetadata)
+    }.toList.par.foreach(new AtomicAssetProcessor(StateCache.apply(), DataPersistence.apply())(Logger(mockLogger)).process(_))
   }
 
   "processAsset" should "return asset processing result and not log errors when metadata json is valid" in {
