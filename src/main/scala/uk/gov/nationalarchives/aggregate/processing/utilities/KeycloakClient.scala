@@ -10,7 +10,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class KeycloakClient(keycloakUtils: KeycloakUtils, config: Config)(implicit val executionContext: ExecutionContext) {
   implicit val backend: SttpBackend[Identity, Any] = HttpURLConnectionBackend()
   val authUrl: String = config.getString("auth.url")
-  val secret: String = config.getString("auth.keycloakCloakClientSecretPath")
+  val secret: String = config.getString("auth.keycloakReadClientSecretPath")
 
   def userDetails(userId: String): Future[UserDetails] = {
     implicit val tdrKeycloakDeployment: TdrKeycloakDeployment =

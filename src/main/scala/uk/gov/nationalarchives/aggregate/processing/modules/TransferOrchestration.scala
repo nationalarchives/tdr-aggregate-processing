@@ -114,8 +114,8 @@ object TransferOrchestration {
   case class OrchestrationResult(consignmentId: Option[UUID], success: Boolean, error: Option[TransferError] = None)
 
   val stepFunctionUtils = StepFunctionUtils(sfnAsyncClient(config.getString("sfn.endpoint")))
-  val notificationUtils = NotificationsClient(config)
-  val keycloakConfigurations = KeycloakClient(config)
+  val notificationsClient = NotificationsClient(config)
+  val keycloakClient = KeycloakClient(config)
 
-  def apply() = new TransferOrchestration(GraphQlApi(), stepFunctionUtils, notificationUtils, keycloakConfigurations, config)(logger)
+  def apply() = new TransferOrchestration(GraphQlApi(), stepFunctionUtils, notificationsClient, keycloakClient, config)(logger)
 }

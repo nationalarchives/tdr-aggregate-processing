@@ -2,9 +2,10 @@ package uk.gov.nationalarchives.aggregate.processing.utilities
 
 import cats.effect.unsafe.implicits.global
 import com.typesafe.config.ConfigFactory
+import io.circe.generic.auto._
+import io.circe.syntax.EncoderOps
 import org.mockito.ArgumentMatchers._
-import org.mockito.ArgumentMatchersSugar.eqTo
-import org.mockito.MockitoSugar
+import org.mockito.{ArgumentCaptor, MockitoSugar}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
 import software.amazon.awssdk.services.sns.model.PublishResponse
@@ -22,10 +23,13 @@ class NotificationsClientSpec extends AnyFlatSpec with Matchers with MockitoSuga
     when(snsUtils.publish(any[String], any[String])).thenReturn(publishResponse)
 
     val client = new NotificationsClient(snsUtils, config)
-    val result = client.publishUploadEvent(uploadEvent).unsafeRunSync()
+    client.publishUploadEvent(uploadEvent).unsafeRunSync()
 
-    result shouldBe publishResponse
-    verify(snsUtils).publish(any[String], eqTo(topicArn))
+    val messageCaptor = ArgumentCaptor.forClass(classOf[String])
+    val topicCaptor = ArgumentCaptor.forClass(classOf[String])
+    verify(snsUtils).publish(messageCaptor.capture(), topicCaptor.capture())
+    messageCaptor.getValue shouldBe uploadEvent.asJson.toString()
+    topicCaptor.getValue shouldBe topicArn
   }
 
   "publishUploadEvent" should "fail when snsUtils.publish throws an exception" in {
