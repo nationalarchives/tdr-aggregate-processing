@@ -24,7 +24,7 @@ object Common {
 
   object ProcessErrorType extends Enumeration {
     type ProcessErrorType = Value
-    val ClientSideMetadataError: Value = Value("CLIENT_SIDE_METADATA")
+    val ClientDataLoadError: Value = Value("CLIENT_DATA_LOAD")
     val EncodingError: Value = Value("ENCODING")
     val EventError: Value = Value("EVENT")
     val JsonError: Value = Value("JSON")
@@ -34,6 +34,7 @@ object Common {
 
   object ProcessErrorValue extends Enumeration {
     type ProcessErrorValue = Value
+    val Failure: Value = Value("FAILURE")
     val Invalid: Value = Value("INVALID")
     val ReadError: Value = Value("READ_ERROR")
   }
