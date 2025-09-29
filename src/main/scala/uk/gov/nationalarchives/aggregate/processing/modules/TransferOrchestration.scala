@@ -14,15 +14,24 @@ import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorV
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.{AggregateProcessing, Orchestration}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.StateStatusValue.{Completed, CompletedWithIssues, ConsignmentStatusValue, Failed}
 import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling.{BaseError, handleError}
+import uk.gov.nationalarchives.aggregate.processing.utilities.NotificationsClient.UploadEvent
 import uk.gov.nationalarchives.aggregate.processing.modules.TransferOrchestration.{AggregateProcessingEvent, BackendChecksStepFunctionInput, OrchestrationResult, TransferError}
 import uk.gov.nationalarchives.aggregate.processing.persistence.GraphQlApi
 import uk.gov.nationalarchives.aggregate.processing.persistence.GraphQlApi.{backend, keycloakDeployment}
+import uk.gov.nationalarchives.aggregate.processing.utilities.{KeycloakClient, NotificationsClient}
 import uk.gov.nationalarchives.aws.utils.stepfunction.StepFunctionClients.sfnAsyncClient
 import uk.gov.nationalarchives.aws.utils.stepfunction.StepFunctionUtils
 
 import java.util.UUID
+import scala.concurrent.ExecutionContext.Implicits.global
 
-class TransferOrchestration(graphQlApi: GraphQlApi, stepFunctionUtils: StepFunctionUtils, config: Config)(implicit logger: Logger) {
+class TransferOrchestration(
+    graphQlApi: GraphQlApi,
+    stepFunctionUtils: StepFunctionUtils,
+    notificationUtils: NotificationsClient,
+    keycloakConfigurations: KeycloakClient,
+    config: Config
+)(implicit logger: Logger) {
 
   implicit val encoder: Encoder[BackendChecksStepFunctionInput] = deriveEncoder[BackendChecksStepFunctionInput]
 
@@ -70,7 +79,20 @@ class TransferOrchestration(graphQlApi: GraphQlApi, stepFunctionUtils: StepFunct
       _ <- triggerSfnEffect
       updateResult <- graphQlApi.updateConsignmentStatus(statusInput)
       success = updateResult.nonEmpty
-    } yield OrchestrationResult(Some(consignmentId), success = success)
+      result = OrchestrationResult(Some(consignmentId), success = success)
+      getConsignmentDetails <- graphQlApi.getConsignmentDetails(consignmentId)
+      userDetails <- IO.fromFuture(IO(keycloakConfigurations.userDetails(userId.toString)))
+      _ <- notificationUtils.publishUploadEvent(
+        UploadEvent(
+          transferringBodyName = getConsignmentDetails.flatMap(_.transferringBodyName).get,
+          consignmentReference = getConsignmentDetails.map(_.consignmentReference).get,
+          consignmentId = consignmentId.toString,
+          status = consignmentStatusValue.toString,
+          userId = event.userId.toString,
+          userEmail = userDetails.email
+        )
+      )
+    } yield result
   }
 }
 
@@ -92,6 +114,8 @@ object TransferOrchestration {
   case class OrchestrationResult(consignmentId: Option[UUID], success: Boolean, error: Option[TransferError] = None)
 
   val stepFunctionUtils = StepFunctionUtils(sfnAsyncClient(config.getString("sfn.endpoint")))
+  val notificationsClient = NotificationsClient(config)
+  val keycloakClient = KeycloakClient(config)
 
-  def apply() = new TransferOrchestration(GraphQlApi(), stepFunctionUtils, config)(logger)
+  def apply() = new TransferOrchestration(GraphQlApi(), stepFunctionUtils, notificationsClient, keycloakClient, config)(logger)
 }
