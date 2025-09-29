@@ -13,8 +13,9 @@ import io.circe._
 import io.circe.generic.semiauto.deriveDecoder
 import io.circe.parser._
 import uk.gov.nationalarchives.aggregate.processing.AggregateProcessingLambda._
-import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorType.S3Error
-import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorValue.ReadError
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.ObjectCategory.ObjectCategory
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorType.{ClientDataLoadError, S3Error}
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorValue.{Failure, ReadError}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.AggregateProcessing
 import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling.{BaseError, handleError}
 import uk.gov.nationalarchives.aggregate.processing.modules.TransferOrchestration.{AggregateProcessingEvent, OrchestrationResult}
@@ -31,6 +32,7 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
   private val assetProcessor = AssetProcessing()
   private val persistenceApi = GraphQlApi()
   private val orchestrator = TransferOrchestration()
+  private lazy val errorProcessingResult = AssetProcessingResult(errors = true, suppliedMetadata = false)
 
   override def handleRequest(event: SQSEvent, context: Context): Unit = {
     val sqsMessages: Seq[SQSMessage] = event.getRecords.asScala.toList
@@ -54,20 +56,20 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
     val objectKeyPrefixDetails = Common.objectKeyParser(objectsPrefix)
     val consignmentId = objectKeyPrefixDetails.consignmentId
     val userId = objectKeyPrefixDetails.userId
+    val dataLoadErrors = event.dataLoadErrors
     logger.info(s"Starting processing consignment: $consignmentId")
     for {
       s3Objects <- IO(s3Utils.listAllObjectsWithPrefix(sourceBucket, objectsPrefix))
       objectKeys = s3Objects.map(_.key())
-      assetProcessingResult <-
-        if (objectKeys.isEmpty) {
-          val error = AggregateProcessingError(
-            consignmentId,
-            s"$AggregateProcessing.$S3Error.$ReadError",
-            s"No ${objectKeyPrefixDetails.category} objects found for consignment: $consignmentId"
-          )
-          handleError(error, logger)
-          IO(AssetProcessingResult(errors = true, suppliedMetadata = false))
-        } else processAssets(userId, consignmentId, sourceBucket, objectKeys)
+      assetProcessingResult <- dataLoadErrors match {
+        case _ if dataLoadErrors =>
+          handleError(dataLoadError(consignmentId), logger)
+          IO(errorProcessingResult)
+        case _ if objectKeys.isEmpty =>
+          handleError(noObjectsError(consignmentId, objectKeyPrefixDetails.category), logger)
+          IO(errorProcessingResult)
+        case _ => processAssets(userId, consignmentId, sourceBucket, objectKeys)
+      }
       orchestrationEvent = AggregateProcessingEvent(
         userId,
         consignmentId,
@@ -77,6 +79,12 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
       orchestrationResult <- orchestrator.orchestrate(orchestrationEvent)
     } yield orchestrationResult
   }
+
+  private def dataLoadError(consignmentId: UUID) =
+    AggregateProcessingError(consignmentId, s"$AggregateProcessing.$ClientDataLoadError.$Failure", s"Client data load errors for consignment: $consignmentId")
+
+  private def noObjectsError(consignmentId: UUID, objectCategory: ObjectCategory) =
+    AggregateProcessingError(consignmentId, s"$AggregateProcessing.$S3Error.$ReadError", s"No $objectCategory objects found for consignment: $consignmentId")
 
   private def processAssets(userId: UUID, consignmentId: UUID, sourceBucket: String, objectKeys: List[String]): IO[AssetProcessingResult] = {
     for {
@@ -119,5 +127,5 @@ object AggregateProcessingLambda {
   }
 
   private case class AssetProcessingResult(errors: Boolean, suppliedMetadata: Boolean)
-  case class AggregateEvent(metadataSourceBucket: String, metadataSourceObjectPrefix: String)
+  case class AggregateEvent(metadataSourceBucket: String, metadataSourceObjectPrefix: String, dataLoadErrors: Boolean)
 }

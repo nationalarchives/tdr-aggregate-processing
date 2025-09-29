@@ -21,7 +21,8 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec {
     s"""
     {
       "metadataSourceBucket": "source-bucket",
-      "metadataSourceObjectPrefix": "$userId/$source/$consignmentId/$category"
+      "metadataSourceObjectPrefix": "$userId/$source/$consignmentId/$category",
+      "dataLoadErrors": false
     }
     """.stripMargin
 
@@ -63,6 +64,57 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec {
 
     wiremockGraphqlServer.verify(
       exactly(4),
+      postRequestedFor(anyUrl())
+        .withUrl("/graphql")
+    )
+  }
+
+  "handleRequest" should "process request correctly where client side data load errors are present" in {
+    authOkJson()
+    mockS3GetObjectStream(userId, consignmentId.toString, matchId)
+    mockS3ListBucketResponse(userId, consignmentId, List(matchId))
+    mockSfnResponseOk()
+    mockGraphQlAddFilesAndMetadataResponse
+    mockGraphQlUpdateConsignmentStatusResponse
+    val mockContext = mock[Context]
+
+    val dataLoadErrorsMessageBody: String =
+      s"""
+    {
+      "metadataSourceBucket": "source-bucket",
+      "metadataSourceObjectPrefix": "$userId/$source/$consignmentId/$category",
+      "dataLoadErrors": true
+    }
+    """.stripMargin
+
+    val message = new SQSMessage()
+    message.setBody(dataLoadErrorsMessageBody)
+
+    val messages: java.util.List[SQSMessage] = List(message).asJava
+    val sqsEvent = new SQSEvent()
+    sqsEvent.setRecords(messages)
+    new AggregateProcessingLambda().handleRequest(sqsEvent, mockContext)
+
+    wiremockS3.verify(
+      exactly(1),
+      getRequestedFor(anyUrl())
+        .withUrl(s"/?list-type=2&max-keys=1000&prefix=$userId%2F$source%2F$consignmentId%2F$category")
+    )
+
+    wiremockS3.verify(
+      exactly(0),
+      getRequestedFor(anyUrl())
+        .withUrl(s"/$userId/$source/$consignmentId/$category/$matchId.metadata")
+    )
+
+    wiremockSfnServer.verify(
+      exactly(0),
+      postRequestedFor(anyUrl())
+        .withRequestBody(containing(s"transfer_service_$consignmentId"))
+    )
+
+    wiremockGraphqlServer.verify(
+      exactly(1),
       postRequestedFor(anyUrl())
         .withUrl("/graphql")
     )
