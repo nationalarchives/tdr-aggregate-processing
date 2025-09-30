@@ -4,7 +4,7 @@ import cats.effect.IO
 import cats.effect.unsafe.implicits.global
 import com.typesafe.config.ConfigFactory
 import com.typesafe.scalalogging.Logger
-import graphql.codegen.GetConsignmentDetailsForMetadataReview.getConsignmentDetailsForMetadataReview
+import graphql.codegen.GetConsignment.getConsignment
 import graphql.codegen.types.ConsignmentStatusInput
 import io.circe.Encoder
 import org.mockito.ArgumentCaptor
@@ -33,11 +33,15 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
   val consignmentRef = "consignmentRef"
   val consignmentDetailsResponseStub = IO(
     Some(
-      getConsignmentDetailsForMetadataReview.GetConsignment(
+      getConsignment.GetConsignment(
+        userId,
+        None,
+        None,
         consignmentRef,
-        Some("SeriesName"),
+        None,
+        None,
         Some(transferringBody),
-        userId
+        Nil
       )
     )
   )

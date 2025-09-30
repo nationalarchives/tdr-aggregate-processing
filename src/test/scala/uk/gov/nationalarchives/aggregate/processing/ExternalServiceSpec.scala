@@ -3,7 +3,7 @@ package uk.gov.nationalarchives.aggregate.processing
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.stubbing.StubMapping
-import graphql.codegen.GetConsignmentDetailsForMetadataReview.getConsignmentDetailsForMetadataReview
+import graphql.codegen.GetConsignment.getConsignment
 import io.circe.Printer
 import io.circe.generic.auto._
 import io.circe.syntax._
@@ -92,15 +92,19 @@ class ExternalServiceSpec extends AnyFlatSpec with BeforeAndAfterEach with Befor
       .willReturn(ok("""{"data": {"updateConsignmentStatus": 1}}""".stripMargin))
   )
 
-  def mockGraphQlGetConsignmentDetailsResponse: StubMapping = {
+  def mockGraphQlGetConsignmentResponse: StubMapping = {
     val data = Some(
-      getConsignmentDetailsForMetadataReview.Data(
+      getConsignment.Data(
         Some(
-          getConsignmentDetailsForMetadataReview.GetConsignment(
+          getConsignment.GetConsignment(
+            UUID.randomUUID(),
+            None,
+            None,
             "ConsignmentRef",
-            Some("SeriesName"),
+            None,
+            None,
             Some("TransferringBody"),
-            UUID.randomUUID()
+            Nil
           )
         )
       )
@@ -108,7 +112,7 @@ class ExternalServiceSpec extends AnyFlatSpec with BeforeAndAfterEach with Befor
     val dataString: String = data.asJson.printWith(Printer(dropNullValues = false, ""))
     wiremockGraphqlServer.stubFor(
       post(urlEqualTo(graphQlPath))
-        .withRequestBody(containing("getConsignmentDetailsForMetadataReview"))
+        .withRequestBody(containing("getConsignment"))
         .willReturn(ok(dataString))
     )
   }

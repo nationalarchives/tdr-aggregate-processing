@@ -5,19 +5,19 @@ import org.mockito.ArgumentMatchers.any
 import org.mockito.ArgumentMatchersSugar.eqTo
 import org.mockito.Mockito._
 import org.mockito.MockitoSugar.mock
-import org.scalatest.concurrent.ScalaFutures
-import org.scalatest.flatspec.AnyFlatSpec
-import org.scalatest.matchers.should.Matchers
+import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper
+import uk.gov.nationalarchives.aggregate.processing.ExternalServiceSpec
 import uk.gov.nationalarchives.tdr.keycloak.KeycloakUtils
 import uk.gov.nationalarchives.tdr.keycloak.KeycloakUtils.UserDetails
 
 import java.util.UUID
 import scala.concurrent.{ExecutionContext, Future}
 
-class KeycloakClientSpec extends AnyFlatSpec with Matchers with ScalaFutures {
+class KeycloakClientSpec extends ExternalServiceSpec {
   implicit val ec: ExecutionContext = ExecutionContext.global
 
   "KeycloakClient" should "return user details from KeycloakUtils" in {
+    setupSsmServer()
     val userId = UUID.randomUUID().toString
     val config = ConfigFactory.load()
     val keycloakUtils = mock[KeycloakUtils]
@@ -32,6 +32,7 @@ class KeycloakClientSpec extends AnyFlatSpec with Matchers with ScalaFutures {
   }
 
   "KeycloakClient" should "fail when KeycloakUtils returns a failed Future" in {
+    setupSsmServer()
     val userId = UUID.randomUUID().toString
     val config = ConfigFactory.load()
     val keycloakUtils = mock[KeycloakUtils]
