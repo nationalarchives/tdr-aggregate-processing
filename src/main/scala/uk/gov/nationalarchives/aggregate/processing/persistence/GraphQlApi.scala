@@ -17,10 +17,10 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 class GraphQlApi(
-                  keycloak: KeycloakUtils,
-                  updateConsignmentStatusClient: GraphQLClient[ucs.Data, ucs.Variables],
-                  addFilesAndMetadataClient: GraphQLClient[afm.Data, afm.Variables],
-                  getConsignmentClient: GraphQLClient[gc.Data, gc.Variables]
+    keycloak: KeycloakUtils,
+    updateConsignmentStatusClient: GraphQLClient[ucs.Data, ucs.Variables],
+    addFilesAndMetadataClient: GraphQLClient[afm.Data, afm.Variables],
+    getConsignmentClient: GraphQLClient[gc.Data, gc.Variables]
 )(implicit
     logger: Logger,
     keycloakDeployment: TdrKeycloakDeployment,

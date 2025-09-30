@@ -162,8 +162,7 @@ class GraphQlApiSpec extends ExternalServiceSpec {
       .serviceAccountToken[Identity](any[String], any[String])(any[SttpBackend[Identity, Any]], any[ClassTag[Identity[_]]], any[TdrKeycloakDeployment])
 
     doAnswer(() =>
-      Future(GraphQlResponse[gc.Data](Option(gc.Data(Some(gc.GetConsignment(overrideUserId, None, None,
-        "consignmentRef", None, None, Some("transferringBody"), Nil)))), Nil))
+      Future(GraphQlResponse[gc.Data](Option(gc.Data(Some(gc.GetConsignment(overrideUserId, None, None, "consignmentRef", None, None, Some("transferringBody"), Nil)))), Nil))
     )
       .when(getConsignmentClient)
       .getResult[Identity](any[BearerAccessToken], any[Document], inputVariablesCaptor.capture())(any[SttpBackend[Identity, Any]], any[ClassTag[Identity[_]]])
