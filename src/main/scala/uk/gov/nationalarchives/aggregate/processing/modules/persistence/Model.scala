@@ -23,6 +23,7 @@ object Model {
     val pathsState: Value = Value("paths")
     val uploadedObjectsState: Value = Value("uploadedObjects")
     val pathToAssetState: Value = Value("pathToAsset")
+    val pathToReferenceState: Value = Value("pathToReference")
   }
 
   object DataCategory extends Filter {
@@ -30,10 +31,12 @@ object Model {
     val assetMetadata: Value = Value("assetMetadata")
     val filePathErrorData: Value = Value("filePath")
     val matchIdErrorData: Value = Value("matchId")
+    val referenceErrorData: Value = Value("reference")
   }
 
   trait State { }
   case class PathToAssetIdState(consignmentId: UUID, path: String, assetIdentifier: String) extends State
+  case class PathToReferenceState(consignmentId: UUID, path: String, reference: String) extends State
   case class MatchIdToFileIdState(consignmentId: UUID, matchId: String, fileId: UUID) extends State
   case class TransferState(consignmentId: UUID, transferState: TransferStateCategory, value: String) extends State
 

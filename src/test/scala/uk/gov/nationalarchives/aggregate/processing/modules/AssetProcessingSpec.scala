@@ -2,9 +2,6 @@ package uk.gov.nationalarchives.aggregate.processing.modules
 
 import com.typesafe.scalalogging.Logger
 import graphql.codegen.types.ClientSideMetadataInput
-import io.circe.generic.semiauto.{deriveDecoder, deriveEncoder}
-import io.circe.syntax.EncoderOps
-import io.circe.{Decoder, Encoder}
 import org.mockito.ArgumentMatchers.any
 import org.mockito.MockitoSugar.{mock, times, verify, when}
 import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper
@@ -15,20 +12,13 @@ import software.amazon.awssdk.services.s3.S3AsyncClient
 import software.amazon.awssdk.services.s3.model.{GetObjectRequest, GetObjectResponse}
 import software.amazon.awssdk.utils.CompletableFutureUtils.failedFuture
 import uk.gov.nationalarchives.aggregate.processing.ExternalServiceSpec
-import uk.gov.nationalarchives.aggregate.processing.modules.AssetProcessing.{AssetProcessingResult, RequiredSharePointMetadata}
-import uk.gov.nationalarchives.aggregate.processing.modules.AtomicAssetProcessor.AtomicAssetProcessingEvent
-import uk.gov.nationalarchives.aggregate.processing.modules.Common.AssetSource
-import uk.gov.nationalarchives.aggregate.processing.modules.persistence.{DataPersistence, StateCache}
+import uk.gov.nationalarchives.aggregate.processing.modules.AssetProcessing.AssetProcessingResult
 import uk.gov.nationalarchives.aws.utils.s3.S3Utils
 
-import scala.collection.parallel.CollectionConverters._
 import java.io.ByteArrayInputStream
 import java.util.UUID
 
 class AssetProcessingSpec extends ExternalServiceSpec {
-  implicit val sharePointDecoder: Decoder[RequiredSharePointMetadata] = deriveDecoder[RequiredSharePointMetadata]
-  implicit val sharePointEncoder: Encoder[RequiredSharePointMetadata] = deriveEncoder[RequiredSharePointMetadata]
-
   private val userId = UUID.randomUUID()
   private val consignmentId = UUID.randomUUID()
   private val matchId = UUID.randomUUID().toString
@@ -41,26 +31,6 @@ class AssetProcessingSpec extends ExternalServiceSpec {
       "matchId": "$matchId",
       "transferId": "$consignmentId"
     }""".stripMargin
-
-  "x" should "y" in {
-    val mockLogger = mock[UnderlyingLogger]
-    val cid1 = UUID.fromString("7e0ed6b7-82a3-4480-aa2d-826f6133e6f0")
-    val cid2 = UUID.fromString("f0df28af-c141-4ad2-b3f2-3e0f4265468b")
-    //Tried up to 500000 - success
-    val numberOfEvents = 3
-
-    List(cid1, cid2).flatMap(cid => {
-      (1 to numberOfEvents).map {i =>
-        val matchId = UUID.randomUUID()
-        val fileName = s"file$i.txt"
-        val filePath = s"/sites/Retail/Shared Documents/$fileName"
-        val sharePointMetadata = RequiredSharePointMetadata(
-          matchId.toString, cid, "2025-07-03T09:19:47Z", "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2",
-          12L, filePath, fileName).asJson
-        AtomicAssetProcessingEvent(AssetSource.SharePoint, cid, matchId.toString, sharePointMetadata)
-      }.toList
-    }).par.foreach(new AtomicAssetProcessor(StateCache.apply(), DataPersistence.apply())(Logger(mockLogger)).process(_))
-  }
 
   "processAsset" should "return asset processing result and not log errors when metadata json is valid" in {
     val mockLogger = mock[UnderlyingLogger]
