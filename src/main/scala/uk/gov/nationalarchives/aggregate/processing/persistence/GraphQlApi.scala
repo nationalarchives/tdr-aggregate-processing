@@ -4,9 +4,9 @@ import cats.effect.IO
 import cats.implicits.catsSyntaxOptionId
 import com.typesafe.scalalogging.Logger
 import graphql.codegen.AddFilesAndMetadata.{addFilesAndMetadata => afm}
+import graphql.codegen.GetConsignment.{getConsignment => gc}
 import graphql.codegen.UpdateConsignmentStatus.{updateConsignmentStatus => ucs}
 import graphql.codegen.types.{AddFileAndMetadataInput, ConsignmentStatusInput}
-import graphql.codegen.GetConsignmentDetailsForMetadataReview.{getConsignmentDetailsForMetadataReview => gcdfmr}
 import sttp.client3.{HttpURLConnectionBackend, Identity, SttpBackend, SttpBackendOptions}
 import uk.gov.nationalarchives.aggregate.processing.config.ApplicationConfig._
 import uk.gov.nationalarchives.tdr.GraphQLClient
@@ -17,10 +17,10 @@ import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.Future
 
 class GraphQlApi(
-    keycloak: KeycloakUtils,
-    updateConsignmentStatusClient: GraphQLClient[ucs.Data, ucs.Variables],
-    addFilesAndMetadataClient: GraphQLClient[afm.Data, afm.Variables],
-    getConsignmentDetailsClient: GraphQLClient[gcdfmr.Data, gcdfmr.Variables]
+                  keycloak: KeycloakUtils,
+                  updateConsignmentStatusClient: GraphQLClient[ucs.Data, ucs.Variables],
+                  addFilesAndMetadataClient: GraphQLClient[afm.Data, afm.Variables],
+                  getConsignmentClient: GraphQLClient[gc.Data, gc.Variables]
 )(implicit
     logger: Logger,
     keycloakDeployment: TdrKeycloakDeployment,
@@ -54,11 +54,11 @@ class GraphQlApi(
     } yield data.addFilesAndMetadata
   }
 
-  def getConsignmentDetails(consignmentId: UUID): IO[Option[gcdfmr.GetConsignment]] = {
+  def getConsignmentDetails(consignmentId: UUID): IO[Option[gc.GetConsignment]] = {
     logger.info(s"Getting consignment details for consignment: $consignmentId")
     for {
       token <- keycloak.serviceAccountToken(authClientId, clientSecret).toIO
-      result <- getConsignmentDetailsClient.getResult(token, gcdfmr.document, gcdfmr.Variables(consignmentId).some).toIO
+      result <- getConsignmentClient.getResult(token, gc.document, gc.Variables(consignmentId).some).toIO
       data <- IO.fromOption(result.data)(throw new RuntimeException(s"Unable to get consignment details for consignment: $consignmentId"))
     } yield data.getConsignment
   }
@@ -70,12 +70,12 @@ object GraphQlApi {
   private val keycloakUtils = new KeycloakUtils()
   private val updateConsignmentStatusClient = new GraphQLClient[ucs.Data, ucs.Variables](graphQlApiUrl)
   private val addFilesAndMetadataClient = new GraphQLClient[afm.Data, afm.Variables](graphQlApiUrl)
-  private val getConsignmentDetailsClient = new GraphQLClient[gcdfmr.Data, gcdfmr.Variables](graphQlApiUrl)
+  private val getConsignmentClient = new GraphQLClient[gc.Data, gc.Variables](graphQlApiUrl)
 
   val logger = Logger[GraphQlApi]
 
   def apply()(implicit
       backend: SttpBackend[Identity, Any],
       keycloakDeployment: TdrKeycloakDeployment
-  ) = new GraphQlApi(keycloakUtils, updateConsignmentStatusClient, addFilesAndMetadataClient, getConsignmentDetailsClient)(logger, keycloakDeployment, backend)
+  ) = new GraphQlApi(keycloakUtils, updateConsignmentStatusClient, addFilesAndMetadataClient, getConsignmentClient)(logger, keycloakDeployment, backend)
 }
