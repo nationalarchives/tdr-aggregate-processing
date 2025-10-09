@@ -89,7 +89,9 @@ class TransferOrchestration(
           consignmentId = consignmentId.toString,
           status = consignmentStatusValue.toString,
           userId = event.userId.toString,
-          userEmail = userDetails.email
+          userEmail = userDetails.email,
+          uploadSource = SharePoint.toString,
+          environment = config.getString("environment")
         )
       )
     } yield result
