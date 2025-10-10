@@ -37,7 +37,7 @@ class AssetProcessingSpec extends ExternalServiceSpec {
     val s3UtilsMock = mock[S3Utils]
 
     val expectedInput = ClientSideMetadataInput(
-      "/sites/Retail/Shared Documents/file1.txt",
+      "Retail/Shared Documents/file1.txt",
       "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2",
       1751534387000L,
       12L,

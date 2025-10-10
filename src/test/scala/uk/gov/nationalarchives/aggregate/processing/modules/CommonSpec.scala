@@ -24,17 +24,17 @@ class CommonSpec extends AnyFlatSpec {
 
   "ProcessErrorType" should "contain the correct enums" in {
     val processErrorType = Common.ProcessErrorType
-    val expectedValues = List("CLIENT_DATA_LOAD", "ENCODING", "EVENT", "JSON", "OBJECT_KEY", "S3")
+    val expectedValues = List("CLIENT_DATA_LOAD", "ENCODING", "EVENT", "JSON", "MATCH_ID", "OBJECT_KEY", "S3")
 
-    processErrorType.values.size shouldBe 6
+    processErrorType.values.size shouldBe 7
     processErrorType.values.map(_.toString).toList shouldEqual expectedValues
   }
 
   "ProcessErrorValue" should "contain the correct enums" in {
     val processErrorValue = Common.ProcessErrorValue
-    val expectedValues = List("FAILURE", "INVALID", "READ_ERROR")
+    val expectedValues = List("FAILURE", "INVALID", "MISMATCH", "READ_ERROR")
 
-    processErrorValue.values.size shouldBe 3
+    processErrorValue.values.size shouldBe 4
     processErrorValue.values.map(_.toString).toList shouldEqual expectedValues
   }
 
