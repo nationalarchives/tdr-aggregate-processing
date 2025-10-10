@@ -26,6 +26,7 @@ import java.util.UUID
 import scala.concurrent.Future
 
 class TransferOrchestrationSpec extends ExternalServiceSpec {
+  val eventSource = "eventSource"
   val consignmentId: UUID = UUID.randomUUID()
   val userId: UUID = UUID.randomUUID()
   val userEmail = "test@test.com"
@@ -69,7 +70,7 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     when(keycloakConfigurations.userDetails(userId.toString)).thenReturn(Future.successful(UserDetails(userEmail)))
     when(notificationUtils.publishUploadEvent(any[NotificationsClient.UploadEvent])).thenReturn(IO.pure(PublishResponse.builder.build()))
 
-    val event = AggregateProcessingEvent(userId, consignmentId, processingErrors = false, suppliedMetadata = false)
+    val event = AggregateProcessingEvent(eventSource, userId, consignmentId, processingErrors = false, suppliedMetadata = false)
 
     val result = new TransferOrchestration(mockGraphQlApi, sfnUtils, notificationUtils, keycloakConfigurations, config)(Logger(mockLogger)).orchestrate(event).unsafeRunSync()
     result.consignmentId.get shouldBe consignmentId
@@ -103,6 +104,7 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     snsArgCaptor.getValue.status shouldBe "Completed"
     snsArgCaptor.getValue.transferringBodyName shouldBe transferringBody
     snsArgCaptor.getValue.consignmentReference shouldBe consignmentRef
+    snsArgCaptor.getValue.uploadSource shouldBe eventSource
   }
 
   "orchestrate" should "log an error for asset processing event, update the consignment status correctly and send a upload failed sns message when asset processing contains errors" in {
@@ -122,7 +124,7 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     when(keycloakConfigurations.userDetails(userId.toString)).thenReturn(Future.successful(UserDetails(userEmail)))
     when(notificationUtils.publishUploadEvent(any[NotificationsClient.UploadEvent])).thenReturn(IO.pure(PublishResponse.builder.build()))
 
-    val event = AggregateProcessingEvent(userId, consignmentId, processingErrors = true, suppliedMetadata = false)
+    val event = AggregateProcessingEvent(eventSource, userId, consignmentId, processingErrors = true, suppliedMetadata = false)
 
     val result = new TransferOrchestration(mockGraphQlApi, sfnUtils, notificationUtils, keycloakConfigurations, config)(Logger(mockLogger)).orchestrate(event).unsafeRunSync()
     result.consignmentId.get shouldBe consignmentId
@@ -155,6 +157,7 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     snsArgCaptor.getValue.status shouldBe "Failed"
     snsArgCaptor.getValue.transferringBodyName shouldBe transferringBody
     snsArgCaptor.getValue.consignmentReference shouldBe consignmentRef
+    snsArgCaptor.getValue.uploadSource shouldBe eventSource
   }
 
   "orchestrate" should "return a non-successful result when the orchestration event is not of an expected class" in {
@@ -221,7 +224,7 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
 
     when(notificationUtils.publishUploadEvent(any[NotificationsClient.UploadEvent])).thenReturn(IO.pure(PublishResponse.builder.build()))
 
-    val event = AggregateProcessingEvent(userId, consignmentId, processingErrors = false, suppliedMetadata = false)
+    val event = AggregateProcessingEvent(eventSource, userId, consignmentId, processingErrors = false, suppliedMetadata = false)
 
     new TransferOrchestration(mockGraphQlApi, sfnUtils, notificationUtils, keycloakConfigurations, config)(Logger(mockLogger)).orchestrate(event).unsafeRunSync()
 

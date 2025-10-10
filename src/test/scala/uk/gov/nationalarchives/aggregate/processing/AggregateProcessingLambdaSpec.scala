@@ -20,6 +20,7 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec {
   private val validMessageBody: String =
     s"""
     {
+      "eventSource": "event-source",
       "metadataSourceBucket": "source-bucket",
       "metadataSourceObjectPrefix": "$userId/$source/$consignmentId/$category",
       "dataLoadErrors": false
@@ -82,6 +83,7 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec {
     val dataLoadErrorsMessageBody: String =
       s"""
     {
+      "eventSource": "event-source",
       "metadataSourceBucket": "source-bucket",
       "metadataSourceObjectPrefix": "$userId/$source/$consignmentId/$category",
       "dataLoadErrors": true
@@ -217,7 +219,7 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec {
     val exception = intercept[IllegalArgumentException] {
       new AggregateProcessingLambda().handleRequest(invalidEvent, mockContext)
     }
-    exception.getMessage shouldBe "Invalid event: DecodingFailure at .metadataSourceBucket: Missing required field"
+    exception.getMessage shouldBe "Invalid event: DecodingFailure at .eventSource: Missing required field"
 
     wiremockS3.verify(
       exactly(0),

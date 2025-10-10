@@ -51,6 +51,7 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
   }
 
   def processEvent(event: AggregateEvent): IO[OrchestrationResult] = {
+    val eventSource = event.eventSource
     val sourceBucket = event.metadataSourceBucket
     val objectsPrefix = event.metadataSourceObjectPrefix
     val objectKeyPrefixDetails = Common.objectKeyParser(objectsPrefix)
@@ -71,6 +72,7 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
         case _ => processAssets(userId, consignmentId, sourceBucket, objectKeys)
       }
       orchestrationEvent = AggregateProcessingEvent(
+        eventSource,
         userId,
         consignmentId,
         processingErrors = assetProcessingResult.errors,
@@ -127,5 +129,5 @@ object AggregateProcessingLambda {
   }
 
   private case class AssetProcessingResult(errors: Boolean, suppliedMetadata: Boolean)
-  case class AggregateEvent(metadataSourceBucket: String, metadataSourceObjectPrefix: String, dataLoadErrors: Boolean)
+  case class AggregateEvent(eventSource: String, metadataSourceBucket: String, metadataSourceObjectPrefix: String, dataLoadErrors: Boolean)
 }

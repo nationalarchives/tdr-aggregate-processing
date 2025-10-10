@@ -4,7 +4,7 @@ import cats.effect.unsafe.implicits.global
 import uk.gov.nationalarchives.aggregate.processing.AggregateProcessingLambda.AggregateEvent
 
 object AggregateProcessingLambdaRunner extends App {
-  val event = AggregateEvent("placeholder", "placeholder", dataLoadErrors = false)
+  val event = AggregateEvent("eventSource", "metadataSourceBucket", "metadataSourceObjectPrefix", dataLoadErrors = false)
 
   new AggregateProcessingLambda().processEvent(event).unsafeRunSync()
 }

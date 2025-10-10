@@ -90,7 +90,7 @@ class TransferOrchestration(
           status = consignmentStatusValue.toString,
           userId = event.userId.toString,
           userEmail = userDetails.email,
-          uploadSource = SharePoint.toString,
+          uploadSource = event.eventSource,
           environment = config.getString("environment")
         )
       )
@@ -105,7 +105,7 @@ object TransferOrchestration {
   trait StepFunctionInput {}
   case class BackendChecksStepFunctionInput(consignmentId: String, s3SourceBucketPrefix: String) extends StepFunctionInput
 
-  case class AggregateProcessingEvent(userId: UUID, consignmentId: UUID, processingErrors: Boolean, suppliedMetadata: Boolean)
+  case class AggregateProcessingEvent(eventSource: String, userId: UUID, consignmentId: UUID, processingErrors: Boolean, suppliedMetadata: Boolean)
 
   case class TransferError(consignmentId: Option[UUID], errorCode: String, errorMessage: String) extends BaseError {
     override def toString: String = {
