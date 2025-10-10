@@ -105,8 +105,7 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
           } else {
             val dateLastModified = t"${metadata.Modified}".getTime
             val sharePointLocation = sharePointLocationPathToFilePath(metadata.FileRef)
-            val input = ClientSideMetadataInput(sharePointLocation.filePath,
-              metadata.SHA256ClientSideChecksum, dateLastModified, metadata.Length, metadata.matchId)
+            val input = ClientSideMetadataInput(sharePointLocation.filePath, metadata.SHA256ClientSideChecksum, dateLastModified, metadata.Length, metadata.matchId)
             logger.info(s"Asset metadata successfully processed for: $objectKey")
             AssetProcessingResult(Some(matchId), processingErrors = false, Some(input), suppliedMetadata)
           }
