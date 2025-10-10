@@ -6,7 +6,7 @@ import com.typesafe.scalalogging.Logger
 import graphql.codegen.types.ConsignmentStatusInput
 import io.circe.Encoder
 import io.circe.generic.semiauto.deriveEncoder
-import uk.gov.nationalarchives.aggregate.processing.modules.Common.AssetSource.SharePoint
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.AssetSource.{AssetSource, SharePoint}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ConsignmentStatusType
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ObjectCategory.Records
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorType.EventError
@@ -90,7 +90,7 @@ class TransferOrchestration(
           status = consignmentStatusValue.toString,
           userId = event.userId.toString,
           userEmail = userDetails.email,
-          uploadSource = event.eventSource,
+          uploadSource = event.eventSource.toString,
           environment = config.getString("environment")
         )
       )
@@ -105,7 +105,7 @@ object TransferOrchestration {
   trait StepFunctionInput {}
   case class BackendChecksStepFunctionInput(consignmentId: String, s3SourceBucketPrefix: String) extends StepFunctionInput
 
-  case class AggregateProcessingEvent(eventSource: String, userId: UUID, consignmentId: UUID, processingErrors: Boolean, suppliedMetadata: Boolean)
+  case class AggregateProcessingEvent(eventSource: AssetSource, userId: UUID, consignmentId: UUID, processingErrors: Boolean, suppliedMetadata: Boolean)
 
   case class TransferError(consignmentId: Option[UUID], errorCode: String, errorMessage: String) extends BaseError {
     override def toString: String = {

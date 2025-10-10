@@ -51,13 +51,13 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
   }
 
   def processEvent(event: AggregateEvent): IO[OrchestrationResult] = {
-    val eventSource = event.eventSource
     val sourceBucket = event.metadataSourceBucket
     val objectsPrefix = event.metadataSourceObjectPrefix
     val objectKeyPrefixDetails = Common.objectKeyParser(objectsPrefix)
     val consignmentId = objectKeyPrefixDetails.consignmentId
     val userId = objectKeyPrefixDetails.userId
     val dataLoadErrors = event.dataLoadErrors
+    val eventSource = objectKeyPrefixDetails.assetSource
     logger.info(s"Starting processing consignment: $consignmentId")
     for {
       s3Objects <- IO(s3Utils.listAllObjectsWithPrefix(sourceBucket, objectsPrefix))
@@ -129,5 +129,5 @@ object AggregateProcessingLambda {
   }
 
   private case class AssetProcessingResult(errors: Boolean, suppliedMetadata: Boolean)
-  case class AggregateEvent(eventSource: String, metadataSourceBucket: String, metadataSourceObjectPrefix: String, dataLoadErrors: Boolean)
+  case class AggregateEvent(metadataSourceBucket: String, metadataSourceObjectPrefix: String, dataLoadErrors: Boolean)
 }

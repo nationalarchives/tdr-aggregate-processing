@@ -15,6 +15,7 @@ import org.slf4j.{Logger => UnderlyingLogger}
 import software.amazon.awssdk.services.sfn.model.StartExecutionResponse
 import software.amazon.awssdk.services.sns.model.PublishResponse
 import uk.gov.nationalarchives.aggregate.processing.ExternalServiceSpec
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.AssetSource._
 import uk.gov.nationalarchives.aggregate.processing.modules.TransferOrchestration.{AggregateProcessingEvent, BackendChecksStepFunctionInput}
 import uk.gov.nationalarchives.aggregate.processing.persistence.GraphQlApi
 import uk.gov.nationalarchives.aggregate.processing.utilities.NotificationsClient.UploadEvent
@@ -26,7 +27,7 @@ import java.util.UUID
 import scala.concurrent.Future
 
 class TransferOrchestrationSpec extends ExternalServiceSpec {
-  val eventSource = "eventSource"
+  val eventSource: Value = SharePoint
   val consignmentId: UUID = UUID.randomUUID()
   val userId: UUID = UUID.randomUUID()
   val userEmail = "test@test.com"
@@ -104,7 +105,7 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     snsArgCaptor.getValue.status shouldBe "Completed"
     snsArgCaptor.getValue.transferringBodyName shouldBe transferringBody
     snsArgCaptor.getValue.consignmentReference shouldBe consignmentRef
-    snsArgCaptor.getValue.uploadSource shouldBe eventSource
+    snsArgCaptor.getValue.uploadSource shouldBe eventSource.toString
   }
 
   "orchestrate" should "log an error for asset processing event, update the consignment status correctly and send a upload failed sns message when asset processing contains errors" in {
@@ -157,7 +158,7 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     snsArgCaptor.getValue.status shouldBe "Failed"
     snsArgCaptor.getValue.transferringBodyName shouldBe transferringBody
     snsArgCaptor.getValue.consignmentReference shouldBe consignmentRef
-    snsArgCaptor.getValue.uploadSource shouldBe eventSource
+    snsArgCaptor.getValue.uploadSource shouldBe eventSource.toString
   }
 
   "orchestrate" should "return a non-successful result when the orchestration event is not of an expected class" in {
