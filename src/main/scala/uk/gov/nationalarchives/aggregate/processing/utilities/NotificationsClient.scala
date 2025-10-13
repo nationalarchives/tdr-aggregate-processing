@@ -25,6 +25,8 @@ object NotificationsClient {
       consignmentId: String,
       status: String,
       userId: String,
-      userEmail: String
+      userEmail: String,
+      assetSource: String,
+      environment: String
   )
 }
