@@ -26,7 +26,7 @@ object NotificationsClient {
       status: String,
       userId: String,
       userEmail: String,
-      uploadSource: String,
+      assetSource: String,
       environment: String
   )
 }

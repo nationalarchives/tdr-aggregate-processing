@@ -57,7 +57,7 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
     val consignmentId = objectKeyPrefixDetails.consignmentId
     val userId = objectKeyPrefixDetails.userId
     val dataLoadErrors = event.dataLoadErrors
-    val eventSource = objectKeyPrefixDetails.assetSource
+    val assetSource = objectKeyPrefixDetails.assetSource
     logger.info(s"Starting processing consignment: $consignmentId")
     for {
       s3Objects <- IO(s3Utils.listAllObjectsWithPrefix(sourceBucket, objectsPrefix))
@@ -72,7 +72,7 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
         case _ => processAssets(userId, consignmentId, sourceBucket, objectKeys)
       }
       orchestrationEvent = AggregateProcessingEvent(
-        eventSource,
+        assetSource,
         userId,
         consignmentId,
         processingErrors = assetProcessingResult.errors,
