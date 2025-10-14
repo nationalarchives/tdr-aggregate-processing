@@ -122,11 +122,19 @@ class ExternalServiceSpec extends AnyFlatSpec with BeforeAndAfterEach with Befor
       .willReturn(aResponse().withStatus(500).withBody("internal server error"))
   )
 
-  def mockS3GetObjectStream(userId: UUID, consignmentId: String, matchId: String): StubMapping = {
+  def mockS3GetObjectStream(key: String, consignmentId: String, matchId: String): StubMapping = {
     val bytes = defaultMetadataJsonString(matchId, consignmentId).getBytes("UTF-8")
     wiremockS3.stubFor(
-      get(anyUrl())
+      get(urlEqualTo(s"/$key"))
         .willReturn(aResponse().withStatus(200).withBody(bytes))
+    )
+  }
+
+  def mockS3GetObjectTagging(key: String): StubMapping = {
+    val response = <Tagging><TagSet/></Tagging>
+    wiremockS3.stubFor(
+      get(urlEqualTo(s"/$key?tagging"))
+        .willReturn(okXml(response.toString()))
     )
   }
 
