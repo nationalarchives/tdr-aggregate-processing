@@ -9,8 +9,8 @@ import uk.gov.nationalarchives.aggregate.processing.modules.AssetProcessing._
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.AssetSource.AssetSource
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ObjectType
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ObjectType.ObjectType
-import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorType.{EncodingError, JsonError, ObjectKeyParsingError, S3Error => s3e}
-import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorValue.{Invalid, ReadError}
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorType.{EncodingError, JsonError, MatchIdError, ObjectKeyParsingError, S3Error => s3e}
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorValue.{Invalid, Mismatch, ReadError}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.{AssetProcessing => ptAp}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.StateStatusValue.{Completed, CompletedWithIssues}
 import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling.BaseError
@@ -106,14 +106,14 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
               Some(event.consignmentId.toString),
               None,
               Some(event.source.toString),
-              s"$ptAp.MATCH_ID.MISMATCH",
+              s"$ptAp.$MatchIdError.$Mismatch",
               s"Mismatched match ids: ${event.matchId} and ${metadata.matchId}"
             )
             handleProcessError(error, s3Bucket, objectKey)
           } else {
             val dateLastModified = t"${metadata.Modified}".getTime
-
-            val input = ClientSideMetadataInput(metadata.FileRef, metadata.SHA256ClientSideChecksum, dateLastModified, metadata.Length, metadata.matchId)
+            val sharePointLocation = sharePointLocationPathToFilePath(metadata.FileRef)
+            val input = ClientSideMetadataInput(sharePointLocation.filePath, metadata.SHA256ClientSideChecksum, dateLastModified, metadata.Length, metadata.matchId)
             logger.info(s"Asset metadata successfully processed for: $objectKey")
             val completedTags = Map(ptAp.toString -> Completed.toString)
             s3Utils.addObjectTags(event.s3SourceBucket, event.objectKey, completedTags)
@@ -121,6 +121,11 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
           }
         }
       )
+  }
+
+  private def sharePointLocationPathToFilePath(locationPath: String): SharePointLocationPath = {
+    val pathComponents = locationPath.split("/")
+    SharePointLocationPath(pathComponents(1), pathComponents(2), pathComponents(3), pathComponents.slice(2, pathComponents.length).mkString("/"))
   }
 
   private def toSuppliedMetadata(metadataJson: Json): List[SuppliedMetadata] = {
@@ -168,6 +173,7 @@ object AssetProcessing {
       s"${this.simpleName}: consignmentId: $consignmentId, matchId: $matchId, source: $source, errorCode: $errorCode, errorMessage: $errorMsg"
     }
   }
+  case class SharePointLocationPath(root: String, site: String, library: String, filePath: String)
 
   val logger: Logger = Logger[AssetProcessing]
 
