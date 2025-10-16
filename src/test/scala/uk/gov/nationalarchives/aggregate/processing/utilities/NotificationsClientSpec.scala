@@ -17,7 +17,7 @@ class NotificationsClientSpec extends AnyFlatSpec with Matchers with MockitoSuga
     val snsUtils = mock[SNSUtils]
     val config = ConfigFactory.load()
     val topicArn = config.getString("sns.notificationsTopicArn")
-    val uploadEvent = NotificationsClient.UploadEvent("body", "ref", "consignmentId", "status", "userId", "userEmail")
+    val uploadEvent = NotificationsClient.UploadEvent("body", "ref", "consignmentId", "status", "userId", "userEmail", "assetSource", "environment")
     val publishResponse = PublishResponse.builder().messageId("123").build()
 
     when(snsUtils.publish(any[String], any[String])).thenReturn(publishResponse)
@@ -35,7 +35,7 @@ class NotificationsClientSpec extends AnyFlatSpec with Matchers with MockitoSuga
   "publishUploadEvent" should "fail when snsUtils.publish throws an exception" in {
     val snsUtils = mock[SNSUtils]
     val config = ConfigFactory.load()
-    val uploadEvent = NotificationsClient.UploadEvent("body", "ref", "consignmentId", "status", "userId", "userEmail")
+    val uploadEvent = NotificationsClient.UploadEvent("body", "ref", "consignmentId", "status", "userId", "userEmail", "assetSource", "environment")
     val exception = new RuntimeException("SNS publish failed")
     when(snsUtils.publish(any[String], any[String])).thenThrow(exception)
 
