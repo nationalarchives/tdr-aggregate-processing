@@ -28,6 +28,7 @@ object Common {
     val EncodingError: Value = Value("ENCODING")
     val EventError: Value = Value("EVENT")
     val JsonError: Value = Value("JSON")
+    val MatchIdError: Value = Value("MATCH_ID")
     val ObjectKeyParsingError: Value = Value("OBJECT_KEY")
     val S3Error: Value = Value("S3")
   }
@@ -36,6 +37,7 @@ object Common {
     type ProcessErrorValue = Value
     val Failure: Value = Value("FAILURE")
     val Invalid: Value = Value("INVALID")
+    val Mismatch: Value = Value("MISMATCH")
     val ReadError: Value = Value("READ_ERROR")
   }
 
