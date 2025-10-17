@@ -125,7 +125,7 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
 
   private def sharePointLocationPathToFilePath(locationPath: String): SharePointLocationPath = {
     val pathComponents = locationPath.split("/")
-    SharePointLocationPath(pathComponents(1), pathComponents(2), pathComponents(3), pathComponents.slice(2, pathComponents.length).mkString("/"))
+    SharePointLocationPath(pathComponents(1), pathComponents(2), pathComponents(3), pathComponents.slice(1, pathComponents.length).mkString("/"))
   }
 
   private def toSuppliedMetadata(metadataJson: Json): List[SuppliedMetadata] = {
