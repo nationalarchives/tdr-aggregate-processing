@@ -27,8 +27,10 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec {
     """.stripMargin
 
   "handleRequest" should "process all valid messages in SQS event" in {
+    val objectKey = s"$userId/$source/$consignmentId/$category/$matchId.metadata"
     authOkJson()
-    mockS3GetObjectStream(userId, consignmentId.toString, matchId)
+    mockS3GetObjectTagging(objectKey)
+    mockS3GetObjectStream(objectKey, consignmentId.toString, matchId)
     mockS3ListBucketResponse(userId, consignmentId, List(matchId))
     mockSfnResponseOk()
     mockGraphQlAddFilesAndMetadataResponse
@@ -54,7 +56,13 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec {
     wiremockS3.verify(
       exactly(2),
       getRequestedFor(anyUrl())
-        .withUrl(s"/$userId/$source/$consignmentId/$category/$matchId.metadata")
+        .withUrl(s"/$objectKey")
+    )
+
+    wiremockS3.verify(
+      exactly(2),
+      getRequestedFor(anyUrl())
+        .withUrl(s"/$objectKey?tagging")
     )
 
     wiremockSfnServer.verify(
@@ -71,8 +79,10 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec {
   }
 
   "handleRequest" should "process request correctly where client side data load errors are present" in {
+    val objectKey = s"$userId/$source/$consignmentId/$category/$matchId.metadata"
     authOkJson()
-    mockS3GetObjectStream(userId, consignmentId.toString, matchId)
+    mockS3GetObjectTagging(objectKey)
+    mockS3GetObjectStream(objectKey, consignmentId.toString, matchId)
     mockS3ListBucketResponse(userId, consignmentId, List(matchId))
     mockSfnResponseOk()
     mockGraphQlAddFilesAndMetadataResponse
@@ -105,7 +115,13 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec {
     wiremockS3.verify(
       exactly(0),
       getRequestedFor(anyUrl())
-        .withUrl(s"/$userId/$source/$consignmentId/$category/$matchId.metadata")
+        .withUrl(s"/$objectKey")
+    )
+
+    wiremockS3.verify(
+      exactly(0),
+      getRequestedFor(anyUrl())
+        .withUrl(s"/$objectKey?tagging")
     )
 
     wiremockSfnServer.verify(
@@ -122,8 +138,10 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec {
   }
 
   "handleRequest" should "process request correctly when no objects are found for supplied object prefix" in {
+    val objectKey = s"$userId/$source/$consignmentId/$category/$matchId.metadata"
     authOkJson()
-    mockS3GetObjectStream(userId, consignmentId.toString, matchId)
+    mockS3GetObjectTagging(objectKey)
+    mockS3GetObjectStream(objectKey, consignmentId.toString, matchId)
     mockS3ListBucketResponseEmpty(userId, consignmentId)
     mockSfnResponseOk()
     mockGraphQlAddFilesAndMetadataResponse
@@ -148,7 +166,13 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec {
     wiremockS3.verify(
       exactly(0),
       getRequestedFor(anyUrl())
-        .withUrl(s"/$userId/$source/$consignmentId/$category/$matchId.metadata")
+        .withUrl(s"/$objectKey")
+    )
+
+    wiremockS3.verify(
+      exactly(0),
+      getRequestedFor(anyUrl())
+        .withUrl(s"/$objectKey?tagging")
     )
 
     wiremockSfnServer.verify(
@@ -165,6 +189,7 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec {
   }
 
   "handleRequest" should "throw an error for invalid message json" in {
+    val objectKey = s"$userId/$source/$consignmentId/$category/$matchId.metadata"
     val nonJsonMessage = "some string"
     val mockContext = mock[Context]
 
@@ -186,7 +211,13 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec {
     wiremockS3.verify(
       exactly(0),
       getRequestedFor(anyUrl())
-        .withUrl(s"/$userId/$source/$consignmentId/$category/$matchId.metadata")
+        .withUrl(s"/$objectKey")
+    )
+
+    wiremockS3.verify(
+      exactly(0),
+      getRequestedFor(anyUrl())
+        .withUrl(s"/$objectKey?tagging")
     )
 
     wiremockSfnServer.verify(
@@ -203,6 +234,7 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec {
   }
 
   "handleRequest" should "throw an error for invalid event" in {
+    val objectKey = s"$userId/$source/$consignmentId/$category/$matchId.metadata"
     val mockContext = mock[Context]
     val invalidEventMessage = s"""
       {
@@ -228,7 +260,13 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec {
     wiremockS3.verify(
       exactly(0),
       getRequestedFor(anyUrl())
-        .withUrl(s"/$userId/$source/$consignmentId/$category/$matchId.metadata")
+        .withUrl(s"/$objectKey")
+    )
+
+    wiremockS3.verify(
+      exactly(0),
+      getRequestedFor(anyUrl())
+        .withUrl(s"/$objectKey?tagging")
     )
 
     wiremockSfnServer.verify(

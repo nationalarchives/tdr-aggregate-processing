@@ -1,15 +1,16 @@
 package uk.gov.nationalarchives.aggregate.processing.modules
 
+import cats.effect.IO
 import com.typesafe.scalalogging.Logger
 import graphql.codegen.types.ClientSideMetadataInput
-import org.mockito.ArgumentMatchers.any
+import org.mockito.ArgumentMatchers.{any, anyString}
 import org.mockito.MockitoSugar.{mock, times, verify, when}
 import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper
 import org.slf4j.{Logger => UnderlyingLogger}
 import software.amazon.awssdk.core.ResponseBytes
 import software.amazon.awssdk.core.async.AsyncResponseTransformer
 import software.amazon.awssdk.services.s3.S3AsyncClient
-import software.amazon.awssdk.services.s3.model.{GetObjectRequest, GetObjectResponse}
+import software.amazon.awssdk.services.s3.model.{GetObjectRequest, GetObjectResponse, GetObjectTaggingRequest, GetObjectTaggingResponse, PutObjectTaggingResponse}
 import software.amazon.awssdk.utils.CompletableFutureUtils.failedFuture
 import uk.gov.nationalarchives.aggregate.processing.ExternalServiceSpec
 import uk.gov.nationalarchives.aggregate.processing.modules.AssetProcessing.AssetProcessingResult
@@ -17,6 +18,7 @@ import uk.gov.nationalarchives.aws.utils.s3.S3Utils
 
 import java.io.ByteArrayInputStream
 import java.util.UUID
+import java.util.concurrent.CompletableFuture
 
 class AssetProcessingSpec extends ExternalServiceSpec {
   private val userId = UUID.randomUUID()
@@ -56,6 +58,8 @@ class AssetProcessingSpec extends ExternalServiceSpec {
 
     result shouldEqual expectedResult
 
+    verify(s3UtilsMock, times(1)).addObjectTags("s3Bucket", s"$userId/sharepoint/$consignmentId/metadata/$matchId.metadata", Map("ASSET_PROCESSING" -> "Completed"))
+
     verify(mockLogger, times(0)).isErrorEnabled
     verifyDefaultInfoLogging(mockLogger)
     verify(mockLogger).info("Asset metadata successfully processed for: {}", s"$userId/sharepoint/$consignmentId/metadata/$matchId.metadata")
@@ -74,6 +78,8 @@ class AssetProcessingSpec extends ExternalServiceSpec {
     val result = assetProcessing.processAsset("s3Bucket", "incorrect/object/key/format.txt")
 
     result shouldEqual expectedResult
+
+    verify(s3UtilsMock, times(1)).addObjectTags("s3Bucket", "incorrect/object/key/format.txt", Map("ASSET_PROCESSING" -> "CompletedWithIssues"))
 
     verify(mockLogger).info("Processing asset metadata for: {}", s"incorrect/object/key/format.txt")
     verify(mockLogger).error(
@@ -104,6 +110,8 @@ class AssetProcessingSpec extends ExternalServiceSpec {
 
     result shouldEqual expectedResult
 
+    verify(s3UtilsMock, times(1)).addObjectTags("s3Bucket", s"$userId/sharepoint/$consignmentId/metadata/$matchId.metadata", Map("ASSET_PROCESSING" -> "CompletedWithIssues"))
+
     verifyDefaultInfoLogging(mockLogger)
     verify(mockLogger).error(
       s"AssetProcessingError: consignmentId: Some($consignmentId), matchId: Some($matchId), source: Some(sharepoint), errorCode: ASSET_PROCESSING.JSON.INVALID, errorMessage: DecodingFailure at .Length: Missing required field"
@@ -114,11 +122,14 @@ class AssetProcessingSpec extends ExternalServiceSpec {
     val mockLogger = mock[UnderlyingLogger]
     val s3AsyncClient = mock[S3AsyncClient]
     val s3UtilsMock = S3Utils(s3AsyncClient)
+    val objectTaggingResponse = GetObjectTaggingResponse.builder().build()
 
     when(mockLogger.isErrorEnabled()).thenReturn(true)
     when(mockLogger.isInfoEnabled()).thenReturn(true)
     when(s3AsyncClient.getObject(any[GetObjectRequest], any[AsyncResponseTransformer[GetObjectResponse, ResponseBytes[GetObjectResponse]]]))
       .thenReturn(failedFuture(new RuntimeException("read failed")))
+    when(s3AsyncClient.getObjectTagging(any[GetObjectTaggingRequest]))
+      .thenReturn(CompletableFuture.completedFuture(objectTaggingResponse))
 
     val expectedResult = AssetProcessingResult(Some(matchId), processingErrors = true, None)
 
@@ -126,6 +137,14 @@ class AssetProcessingSpec extends ExternalServiceSpec {
     val result = assetProcessing.processAsset("s3Bucket", s"$userId/sharepoint/$consignmentId/metadata/$matchId.metadata")
 
     result shouldEqual expectedResult
+
+    verify(s3AsyncClient, times(1)).getObjectTagging(
+      GetObjectTaggingRequest
+        .builder()
+        .bucket("s3Bucket")
+        .key(s"$userId/sharepoint/$consignmentId/metadata/$matchId.metadata")
+        .build()
+    )
 
     verifyDefaultInfoLogging(mockLogger)
     verify(mockLogger).error(
@@ -149,6 +168,8 @@ class AssetProcessingSpec extends ExternalServiceSpec {
 
     result shouldEqual expectedResult
 
+    verify(s3UtilsMock, times(1)).addObjectTags("s3Bucket", s"$userId/sharepoint/$consignmentId/metadata/$matchId.metadata", Map("ASSET_PROCESSING" -> "CompletedWithIssues"))
+
     verifyDefaultInfoLogging(mockLogger)
     verify(mockLogger).error(
       s"AssetProcessingError: consignmentId: Some($consignmentId), matchId: Some($matchId), source: Some(sharepoint), errorCode: ASSET_PROCESSING.ENCODING.INVALID, errorMessage: Invalid UTF-8 Sequence, expecting: 4bytes, but got: 3bytes - reached end of stream. @ byte position: -1"
@@ -170,6 +191,8 @@ class AssetProcessingSpec extends ExternalServiceSpec {
     val result = assetProcessing.processAsset("s3Bucket", s"$userId/sharepoint/$consignmentId/metadata/$matchId.metadata")
 
     result shouldEqual expectedResult
+
+    verify(s3UtilsMock, times(1)).addObjectTags("s3Bucket", s"$userId/sharepoint/$consignmentId/metadata/$matchId.metadata", Map("ASSET_PROCESSING" -> "CompletedWithIssues"))
 
     verifyDefaultInfoLogging(mockLogger)
     verify(mockLogger).error(
@@ -193,6 +216,8 @@ class AssetProcessingSpec extends ExternalServiceSpec {
 
     result shouldEqual expectedResult
 
+    verify(s3UtilsMock, times(1)).addObjectTags("s3Bucket", s"$userId/sharepoint/$consignmentId/metadata/$matchId.metadata", Map("ASSET_PROCESSING" -> "CompletedWithIssues"))
+
     verifyDefaultInfoLogging(mockLogger)
     verify(mockLogger).error(
       s"AssetProcessingError: consignmentId: Some($consignmentId), matchId: Some($matchId), source: Some(sharepoint), errorCode: ASSET_PROCESSING.JSON.INVALID, errorMessage: exhausted input"
@@ -214,6 +239,12 @@ class AssetProcessingSpec extends ExternalServiceSpec {
     val result = assetProcessing.processAsset("s3Bucket", s"$userId/sharepoint/$consignmentId/metadata/$differentMatchId.metadata")
 
     result shouldEqual expectedResult
+
+    verify(s3UtilsMock, times(1)).addObjectTags(
+      "s3Bucket",
+      s"$userId/sharepoint/$consignmentId/metadata/$differentMatchId.metadata",
+      Map("ASSET_PROCESSING" -> "CompletedWithIssues")
+    )
 
     verify(mockLogger).error(
       s"AssetProcessingError: consignmentId: Some($consignmentId), matchId: None, source: Some(sharepoint), errorCode: ASSET_PROCESSING.MATCH_ID.MISMATCH, errorMessage: Mismatched match ids: $differentMatchId and $matchId"
