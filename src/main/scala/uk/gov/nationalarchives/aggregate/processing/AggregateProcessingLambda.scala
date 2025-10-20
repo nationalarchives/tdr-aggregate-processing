@@ -6,13 +6,16 @@ import cats.effect.unsafe.implicits.global
 import com.amazonaws.services.lambda.runtime.events.SQSEvent
 import com.amazonaws.services.lambda.runtime.events.SQSEvent.SQSMessage
 import com.amazonaws.services.lambda.runtime.{Context, RequestHandler}
+import com.github.tototoshi.csv.CSVWriter
 import com.typesafe.config.{Config, ConfigFactory}
 import com.typesafe.scalalogging.Logger
+import graphql.codegen.types
 import graphql.codegen.types.AddFileAndMetadataInput
 import io.circe._
 import io.circe.generic.semiauto.deriveDecoder
 import io.circe.parser._
 import uk.gov.nationalarchives.aggregate.processing.AggregateProcessingLambda._
+import uk.gov.nationalarchives.aggregate.processing.modules.AssetProcessing.{RequiredSharePointMetadata, SuppliedMetadata}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ObjectCategory.ObjectCategory
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorType.{ClientDataLoadError, S3Error}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorValue.{Failure, ReadError}
@@ -23,8 +26,12 @@ import uk.gov.nationalarchives.aggregate.processing.modules.{AssetProcessing, Co
 import uk.gov.nationalarchives.aggregate.processing.persistence.GraphQlApi
 import uk.gov.nationalarchives.aggregate.processing.persistence.GraphQlApi.{backend, keycloakDeployment}
 import uk.gov.nationalarchives.aws.utils.s3.{S3Clients, S3Utils}
+import uk.gov.nationalarchives.tdr.schemautils.ConfigUtils
 
+import java.io.File
 import java.util.UUID
+import scala.collection.immutable.Map
+import scala.io.Source
 import scala.jdk.CollectionConverters.CollectionHasAsScala
 
 class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
@@ -93,6 +100,10 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
       assetProcessingResults <- IO(objectKeys.map(assetProcessor.processAsset(sourceBucket, _)))
       assetProcessingErrors = assetProcessingResults.exists(_.processingErrors)
       suppliedMetadata = assetProcessingResults.exists(_.suppliedMetadata.nonEmpty)
+      _ = if (suppliedMetadata) {
+        val metadataCSV = createMetadataCSV(assetProcessingResults)
+        uploadToS3(metadataCSV.toPath, "tdr-draft-metadata-{env}", s"/$consignmentId/draft-metadata.csv")
+      }
       _ <-
         if (assetProcessingErrors) {
           IO(Nil)
@@ -102,6 +113,74 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
           persistenceApi.addClientSideMetadata(input)
         }
     } yield AssetProcessingResult(assetProcessingErrors, suppliedMetadata)
+  }
+
+  import com.github.tototoshi.csv._
+  import java.nio.file.{Files, Path}
+  import cats.effect.IO
+
+  private def createMetadataCSV(assetProcessingResults: List[AssetProcessing.AssetProcessingResult]): File = {
+    val metadataConfiguration = ConfigUtils.loadConfiguration
+    val downloadDisplayProperties = metadataConfiguration
+      .downloadFileDisplayProperties("MetadataDownloadTemplate")
+      .sortBy(_.columnIndex)
+
+    val keyToTdrFileHeader = metadataConfiguration.propertyToOutputMapper("tdrFileHeader")
+    val keyToSharepointTag = metadataConfiguration.propertyToOutputMapper("sharePointTag")
+
+    // --- Determine headers ---
+    val dynamicHeaders: List[String] = downloadDisplayProperties.map(dp => keyToTdrFileHeader(dp.key))
+    val colHeaders: List[String] = dynamicHeaders
+
+    val propertiesDefaultValues = metadataConfiguration.getPropertiesWithDefaultValue.map(prop => keyToTdrFileHeader(prop._1) -> prop._2)
+
+    // --- Build rows ---
+    val rows: List[List[String]] = assetProcessingResults.map { result =>
+      val suppliedMetadataMap: Map[String, String] = result.suppliedMetadata.map(sm => sm.propertyName -> sm.propertyValue).toMap
+
+      // Match sharepoint system values to config.json system values
+      val systemPropertiesMap: Map[String, String] = Map(
+        "filepath" -> result.clientSideMetadataInput.map(_.originalPath).getOrElse(""),
+//        "filename" -> result.clientSideMetadataInput.map(_.filename),
+        "date last modified" -> result.clientSideMetadataInput.map(csmi => dateFormatter(csmi.lastModified)).getOrElse("")
+      )
+
+      val defaultValues: List[String] = dynamicHeaders.map(header => propertiesDefaultValues.getOrElse(header, ""))
+      val suppliedValues: List[String] = dynamicHeaders.map(header => suppliedMetadataMap.getOrElse(header, ""))
+      val systemValues: List[String] = dynamicHeaders.map(header => systemPropertiesMap.getOrElse(header, ""))
+
+      List(suppliedValues, defaultValues, systemValues).transpose
+        .map(_.find(_.nonEmpty).getOrElse(""))
+    }
+
+    // --- Write CSV ---
+    val tmpFile = Files.createTempFile("metadata-", ".csv").toFile
+    val writer = CSVWriter.open(tmpFile)
+
+    try {
+      writer.writeRow(colHeaders)
+      writer.writeAll(rows)
+    } finally {
+      writer.close()
+    }
+
+    val contents = Source.fromFile(tmpFile).getLines().mkString("\n")
+    logger.info("---- CSV Preview ----")
+    logger.info(contents)
+    logger.info("---------------------")
+
+    tmpFile
+  }
+
+  private def dateFormatter(longDate: Long): String = {
+    val instant = java.time.Instant.ofEpochMilli(longDate)
+    val dateTime = java.time.ZonedDateTime.ofInstant(instant, java.time.ZoneId.systemDefault())
+    val formatter = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd")
+    dateTime.format(formatter)
+  }
+
+  private def uploadToS3(filePath: Path, bucket: String, key: String): Unit = {
+    s3Utils.upload(bucket, key, filePath)
   }
 
   private def parseSqsMessage(sqsMessage: SQSMessage): AggregateEvent = {

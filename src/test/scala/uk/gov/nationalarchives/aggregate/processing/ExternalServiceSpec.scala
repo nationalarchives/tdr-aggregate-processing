@@ -36,7 +36,10 @@ class ExternalServiceSpec extends AnyFlatSpec with BeforeAndAfterEach with Befor
       "FileRef": "/sites/Retail/Shared Documents/file1.txt",
       "SHA256ClientSideChecksum": "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2",
       "matchId": "$matchId",
-      "transferId": "$consignmentId"
+      "transferId": "$consignmentId",
+      "description": "some kind of description1",
+      "copyright": "different value",
+      "random": "random value"
     }""".stripMargin
 
   def authOkJson(): StubMapping = wiremockAuthServer.stubFor(

@@ -16,6 +16,7 @@ import uk.gov.nationalarchives.aggregate.processing.modules.Common.StateStatusVa
 import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling.BaseError
 import uk.gov.nationalarchives.aggregate.processing.utilities.UTF8ValidationHandler
 import uk.gov.nationalarchives.aws.utils.s3.{S3Clients, S3Utils}
+import uk.gov.nationalarchives.tdr.schemautils.ConfigUtils
 import uk.gov.nationalarchives.utf8.validator.Utf8Validator
 
 import java.sql.Timestamp
@@ -89,9 +90,12 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
   }
 
   private def parseMetadataJson(metadataJson: Json, event: AssetProcessingEvent): AssetProcessingResult = {
+    val metadataConfig: ConfigUtils.MetadataConfiguration = ConfigUtils.loadConfiguration
+    val tdrDataLoadHeaderToPropertyMapper = metadataConfig.propertyToOutputMapper("tdrFileHeader")
+    val suppliedProperties: Seq[String] = metadataConfig.getPropertiesByPropertyType("Supplied").map(p => tdrDataLoadHeaderToPropertyMapper(p))
     val matchId = event.matchId
     val objectKey = event.objectKey
-    val suppliedMetadata = toSuppliedMetadata(metadataJson)
+    val suppliedMetadata = toSuppliedMetadata(metadataJson, suppliedProperties)
     val s3Bucket = event.s3SourceBucket
     metadataJson
       .as[RequiredSharePointMetadata]
@@ -113,7 +117,7 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
           } else {
             val dateLastModified = t"${metadata.Modified}".getTime
             val sharePointLocation = sharePointLocationPathToFilePath(metadata.FileRef)
-            val input = ClientSideMetadataInput(sharePointLocation.filePath, metadata.SHA256ClientSideChecksum, dateLastModified, metadata.Length, metadata.matchId)
+            val input = ClientSideMetadataInput(sharePointLocation.filePath, metadata.SHA256ClientSideChecksum, dateLastModified, metadata.Length, metadata.matchId) //need filename from FileLeafRef
             logger.info(s"Asset metadata successfully processed for: $objectKey")
             val completedTags = Map(ptAp.toString -> Completed.toString)
             s3Utils.addObjectTags(event.s3SourceBucket, event.objectKey, completedTags)
@@ -128,9 +132,22 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
     SharePointLocationPath(pathComponents(1), pathComponents(2), pathComponents(3), pathComponents.slice(1, pathComponents.length).mkString("/"))
   }
 
-  private def toSuppliedMetadata(metadataJson: Json): List[SuppliedMetadata] = {
+  private def toSuppliedMetadata(metadataJson: Json, suppliedProperties: Seq[String]): List[SuppliedMetadata] = {
     // TODO: check for any supplied metadata fields
-    Nil
+    //    metadataJson.asObject match {
+    //      case Some(jsonObj) =>
+    //        suppliedProperties.flatMap { key =>
+    //          jsonObj(key).flatMap(_.asString).map { value =>
+    //            SuppliedMetadata(key, value)
+    //          }
+    //        }.toList
+    //      case None => Nil
+    //    }
+    for {
+      obj <- metadataJson.asObject.toList
+      key <- suppliedProperties
+      value <- obj(key).flatMap(_.asString)
+    } yield SuppliedMetadata(key, value)
   }
 
   private def generateErrorMessage(event: AssetProcessingEvent, errorCode: String, errorMessage: String): AssetProcessingError = {
