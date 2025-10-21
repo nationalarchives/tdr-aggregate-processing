@@ -71,14 +71,14 @@ class TransferOrchestration(
           consignmentId = consignmentId
         )
       }
-//    if (event.suppliedMetadata) {
-//        logger.info(s"Triggering draft metadata validation for consignment: $consignmentId")
-//        triggerStepFunction(
-//            arnKey = "sfn.metadataChecksArn",
-//            input = MetadataChecksStepFunctionInput(consignmentId.toString),
-//            consignmentId = consignmentId
-//        )
-//    }
+    if (event.suppliedMetadata) {
+      logger.info(s"Triggering draft metadata validation for consignment: $consignmentId")
+      triggerStepFunction(
+        arnKey = "sfn.metadataChecksArn",
+        input = MetadataChecksStepFunctionInput(consignmentId.toString),
+        consignmentId = consignmentId
+      )
+    }
 
     val statusInput = ConsignmentStatusInput(consignmentId, ConsignmentStatusType.Upload.toString, Some(consignmentStatusValue.toString), Some(event.userId))
     for {

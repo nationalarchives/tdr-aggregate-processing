@@ -286,7 +286,7 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec {
     val objectKey = s"$userId/$source/$consignmentId/$category/$matchId.metadata"
     authOkJson()
     mockS3GetObjectTagging(objectKey)
-    mockS3GetObjectStream(objectKey, consignmentId.toString, matchId)
+    mockS3GetObjectStream(objectKey, consignmentId.toString, matchId, suppliedMetadata = true)
     mockS3ListBucketResponse(userId, consignmentId, List(matchId))
     mockSfnResponseOk()
     mockGraphQlAddFilesAndMetadataResponse
@@ -310,15 +310,18 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec {
     val sqsEvent = new SQSEvent()
     sqsEvent.setRecords(messages)
 
-    // Act
     new AggregateProcessingLambda().handleRequest(sqsEvent, mockContext)
 
     wiremockS3.verify(
       exactly(1),
       putRequestedFor(anyUrl())
         .withUrl(s"/draftMetadataBucket/$consignmentId/draft-metadata.csv")
-        .withRequestBody(containing("filepath,filename,date last modified,date of the record,description,former reference,closure status,closure start date,closure period,foi exemption code,foi schedule date,is filename closed,alternate filename,is description closed,alternate description,language,translated filename,copyright,related material,restrictions on use"))
-        .withRequestBody(containing("sites/Retail/Shared Documents/file1.txt,,2025-07-03,,some kind of description,,Open,,,,,false,,false,,English,,different value,,"))
+        .withRequestBody(
+          containing(
+            "filepath,filename,date last modified,date of the record,description,former reference,closure status,closure start date,closure period,foi exemption code,foi schedule date,is filename closed,alternate filename,is description closed,alternate description,language,translated filename,copyright,related material,restrictions on use"
+          )
+        )
+        .withRequestBody(containing("sites/Retail/Shared Documents/file1.txt,,2025-07-03,,some kind of description,,Open,,,,,false,,false,,English,,legal copyright,,"))
     )
   }
 }

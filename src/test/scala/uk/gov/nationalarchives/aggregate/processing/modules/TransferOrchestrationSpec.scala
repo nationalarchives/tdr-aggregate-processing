@@ -16,7 +16,7 @@ import software.amazon.awssdk.services.sfn.model.StartExecutionResponse
 import software.amazon.awssdk.services.sns.model.PublishResponse
 import uk.gov.nationalarchives.aggregate.processing.ExternalServiceSpec
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.AssetSource._
-import uk.gov.nationalarchives.aggregate.processing.modules.TransferOrchestration.{AggregateProcessingEvent, BackendChecksStepFunctionInput}
+import uk.gov.nationalarchives.aggregate.processing.modules.TransferOrchestration.{AggregateProcessingEvent, BackendChecksStepFunctionInput, MetadataChecksStepFunctionInput}
 import uk.gov.nationalarchives.aggregate.processing.persistence.GraphQlApi
 import uk.gov.nationalarchives.aggregate.processing.utilities.NotificationsClient.UploadEvent
 import uk.gov.nationalarchives.aggregate.processing.utilities.{KeycloakClient, NotificationsClient}
@@ -97,6 +97,80 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
       s"$userId/sharepoint/$consignmentId/records"
     )
     sfnNameCaptor.getValue shouldBe Some(s"transfer_service_$consignmentId")
+
+    verify(notificationUtils).publishUploadEvent(snsArgCaptor.capture())
+    snsArgCaptor.getValue.userEmail shouldBe userEmail
+    snsArgCaptor.getValue.userId shouldBe userId.toString
+    snsArgCaptor.getValue.consignmentId shouldBe consignmentId.toString
+    snsArgCaptor.getValue.status shouldBe "Completed"
+    snsArgCaptor.getValue.transferringBodyName shouldBe transferringBody
+    snsArgCaptor.getValue.consignmentReference shouldBe consignmentRef
+    snsArgCaptor.getValue.assetSource shouldBe assetSource.toString
+  }
+
+  "orchestrate" should "trigger backend processing, draft metadata sfn, update the consignment status and send an upload complete sns message when asset processing event does not contain errors and supplied metadata is provided" in {
+    val mockLogger = mock[UnderlyingLogger]
+    val mockGraphQlApi = mock[GraphQlApi]
+    val sfnUtils = mock[StepFunctionUtils]
+    val notificationUtils = mock[NotificationsClient]
+    val keycloakConfigurations = mock[KeycloakClient]
+    val config = ConfigFactory.load()
+
+    val consignmentStatusInputCaptor: ArgumentCaptor[ConsignmentStatusInput] = ArgumentCaptor.forClass(classOf[ConsignmentStatusInput])
+    val backendSfnArnCaptor: ArgumentCaptor[String] = ArgumentCaptor.forClass(classOf[String])
+    val backendSfnInputCaptor: ArgumentCaptor[BackendChecksStepFunctionInput] = ArgumentCaptor.forClass(classOf[BackendChecksStepFunctionInput])
+    val backendSfnNameCaptor: ArgumentCaptor[Option[String]] = ArgumentCaptor.forClass(classOf[Option[String]])
+
+    val draftMetadataSfnArnCaptor: ArgumentCaptor[String] = ArgumentCaptor.forClass(classOf[String])
+    val draftMetadataSfnInputCaptor: ArgumentCaptor[MetadataChecksStepFunctionInput] = ArgumentCaptor.forClass(classOf[MetadataChecksStepFunctionInput])
+    val draftMetadataSfnNameCaptor: ArgumentCaptor[Option[String]] = ArgumentCaptor.forClass(classOf[Option[String]])
+
+    val snsArgCaptor: ArgumentCaptor[UploadEvent] = ArgumentCaptor.forClass(classOf[UploadEvent])
+
+    when(mockLogger.isInfoEnabled()).thenReturn(true)
+    when(mockLogger.isErrorEnabled()).thenReturn(true)
+    when(mockGraphQlApi.updateConsignmentStatus(any[ConsignmentStatusInput])).thenReturn(IO(Some(1)))
+    when(mockGraphQlApi.getConsignmentDetails(consignmentId)).thenReturn(consignmentDetailsResponseStub)
+    when(sfnUtils.startExecution(any[String], any[BackendChecksStepFunctionInput], any[Option[String]])(any[Encoder[BackendChecksStepFunctionInput]]))
+      .thenReturn(IO.pure(StartExecutionResponse.builder.build))
+    when(sfnUtils.startExecution(any[String], any[MetadataChecksStepFunctionInput], any[Option[String]])(any[Encoder[MetadataChecksStepFunctionInput]]))
+      .thenReturn(IO.pure(StartExecutionResponse.builder.build))
+    when(keycloakConfigurations.userDetails(userId.toString)).thenReturn(Future.successful(UserDetails(userEmail)))
+    when(notificationUtils.publishUploadEvent(any[NotificationsClient.UploadEvent])).thenReturn(IO.pure(PublishResponse.builder.build()))
+
+    val event = AggregateProcessingEvent(assetSource, userId, consignmentId, processingErrors = false, suppliedMetadata = true)
+
+    val result = new TransferOrchestration(mockGraphQlApi, sfnUtils, notificationUtils, keycloakConfigurations, config)(Logger(mockLogger)).orchestrate(event).unsafeRunSync()
+    result.consignmentId.get shouldBe consignmentId
+    result.success shouldBe true
+    result.error shouldBe None
+
+    verify(mockLogger).info(s"Triggering file checks for consignment: {}", consignmentId)
+    verify(mockLogger).info(s"Triggering draft metadata validation for consignment: {}", consignmentId)
+    verify(mockLogger, never).isErrorEnabled()
+
+    verify(mockGraphQlApi).updateConsignmentStatus(consignmentStatusInputCaptor.capture())
+    consignmentStatusInputCaptor.getValue.consignmentId shouldBe consignmentId
+    consignmentStatusInputCaptor.getValue.statusType shouldBe "Upload"
+    consignmentStatusInputCaptor.getValue.statusValue.get shouldBe "Completed"
+    consignmentStatusInputCaptor.getValue.userIdOverride.get shouldBe userId
+
+    verify(mockGraphQlApi).getConsignmentDetails(consignmentId)
+
+    verify(keycloakConfigurations).userDetails(userId.toString)
+    verify(sfnUtils).startExecution(backendSfnArnCaptor.capture(), backendSfnInputCaptor.capture(), backendSfnNameCaptor.capture())(any[Encoder[BackendChecksStepFunctionInput]])
+    verify(sfnUtils).startExecution(draftMetadataSfnArnCaptor.capture(), draftMetadataSfnInputCaptor.capture(), draftMetadataSfnNameCaptor.capture())(
+      any[Encoder[MetadataChecksStepFunctionInput]]
+    )
+    backendSfnArnCaptor.getValue shouldBe config.getString("sfn.backendChecksArn")
+    draftMetadataSfnArnCaptor.getValue shouldBe config.getString("sfn.metadataChecksArn")
+    backendSfnInputCaptor.getValue shouldBe BackendChecksStepFunctionInput(
+      consignmentId.toString,
+      s"$userId/sharepoint/$consignmentId/records"
+    )
+    draftMetadataSfnInputCaptor.getValue shouldBe MetadataChecksStepFunctionInput(consignmentId.toString)
+    backendSfnNameCaptor.getValue shouldBe Some(s"transfer_service_$consignmentId")
+    draftMetadataSfnNameCaptor.getValue shouldBe Some(s"transfer_service_$consignmentId")
 
     verify(notificationUtils).publishUploadEvent(snsArgCaptor.capture())
     snsArgCaptor.getValue.userEmail shouldBe userEmail

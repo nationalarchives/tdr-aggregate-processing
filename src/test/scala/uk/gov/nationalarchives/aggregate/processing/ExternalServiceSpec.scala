@@ -36,9 +36,19 @@ class ExternalServiceSpec extends AnyFlatSpec with BeforeAndAfterEach with Befor
       "FileRef": "/sites/Retail/Shared Documents/file1.txt",
       "SHA256ClientSideChecksum": "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2",
       "matchId": "$matchId",
+      "transferId": "$consignmentId"
+    }""".stripMargin
+
+  private def defaultAndSuppliedMetadataJsonString(matchId: String, consignmentId: String) = s"""{
+      "Length": "12",
+      "Modified": "2025-07-03T09:19:47Z",
+      "FileLeafRef": "file1.txt",
+      "FileRef": "/sites/Retail/Shared Documents/file1.txt",
+      "SHA256ClientSideChecksum": "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2",
+      "matchId": "$matchId",
       "transferId": "$consignmentId",
       "description": "some kind of description",
-      "copyright": "different value",
+      "copyright": "legal copyright",
       "custom": "random value"
     }""".stripMargin
 
@@ -125,8 +135,12 @@ class ExternalServiceSpec extends AnyFlatSpec with BeforeAndAfterEach with Befor
       .willReturn(aResponse().withStatus(500).withBody("internal server error"))
   )
 
-  def mockS3GetObjectStream(key: String, consignmentId: String, matchId: String): StubMapping = {
-    val bytes = defaultMetadataJsonString(matchId, consignmentId).getBytes("UTF-8")
+  def mockS3GetObjectStream(key: String, consignmentId: String, matchId: String, suppliedMetadata: Boolean = false): StubMapping = {
+    val bytes = if (suppliedMetadata) {
+      defaultAndSuppliedMetadataJsonString(matchId, consignmentId).getBytes("UTF-8")
+    } else {
+      defaultMetadataJsonString(matchId, consignmentId).getBytes("UTF-8")
+    }
     wiremockS3.stubFor(
       get(urlEqualTo(s"/$key"))
         .willReturn(aResponse().withStatus(200).withBody(bytes))
