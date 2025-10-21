@@ -101,7 +101,7 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
       suppliedMetadata = assetProcessingResults.exists(_.suppliedMetadata.nonEmpty)
       _ = if (suppliedMetadata) {
         val metadataCSV = createMetadataCSV(assetProcessingResults)
-         uploadToS3(metadataCSV.toPath, draftMetadataBucket, s"/$consignmentId/draft-metadata.csv")
+        uploadToS3(metadataCSV.toPath, draftMetadataBucket, s"/$consignmentId/draft-metadata.csv")
       }
       _ <-
         if (assetProcessingErrors) {
