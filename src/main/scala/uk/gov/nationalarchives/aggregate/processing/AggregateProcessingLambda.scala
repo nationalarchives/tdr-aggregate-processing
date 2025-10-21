@@ -14,6 +14,7 @@ import io.circe._
 import io.circe.generic.semiauto.deriveDecoder
 import io.circe.parser._
 import uk.gov.nationalarchives.aggregate.processing.AggregateProcessingLambda._
+import uk.gov.nationalarchives.aggregate.processing.config.ApplicationConfig.draftMetadataBucket
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ObjectCategory.ObjectCategory
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorType.{ClientDataLoadError, S3Error}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorValue.{Failure, ReadError}
@@ -100,7 +101,7 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
       suppliedMetadata = assetProcessingResults.exists(_.suppliedMetadata.nonEmpty)
       _ = if (suppliedMetadata) {
         val metadataCSV = createMetadataCSV(assetProcessingResults)
-        // uploadToS3(metadataCSV.toPath, "tdr-draft-metadata-{env}", s"/$consignmentId/draft-metadata.csv")
+         uploadToS3(metadataCSV.toPath, draftMetadataBucket, s"/$consignmentId/draft-metadata.csv")
       }
       _ <-
         if (assetProcessingErrors) {
