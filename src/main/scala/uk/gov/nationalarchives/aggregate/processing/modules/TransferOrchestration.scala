@@ -15,7 +15,14 @@ import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.{
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.StateStatusValue.{Completed, CompletedWithIssues, ConsignmentStatusValue, Failed}
 import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling.{BaseError, handleError}
 import uk.gov.nationalarchives.aggregate.processing.utilities.NotificationsClient.UploadEvent
-import uk.gov.nationalarchives.aggregate.processing.modules.TransferOrchestration.{AggregateProcessingEvent, BackendChecksStepFunctionInput, OrchestrationResult, TransferError}
+import uk.gov.nationalarchives.aggregate.processing.modules.TransferOrchestration.{
+  AggregateProcessingEvent,
+  BackendChecksStepFunctionInput,
+  MetadataChecksStepFunctionInput,
+  OrchestrationResult,
+  StepFunctionInput,
+  TransferError
+}
 import uk.gov.nationalarchives.aggregate.processing.persistence.GraphQlApi
 import uk.gov.nationalarchives.aggregate.processing.persistence.GraphQlApi.{backend, keycloakDeployment}
 import uk.gov.nationalarchives.aggregate.processing.utilities.{KeycloakClient, NotificationsClient}
@@ -33,7 +40,8 @@ class TransferOrchestration(
     config: Config
 )(implicit logger: Logger) {
 
-  implicit val encoder: Encoder[BackendChecksStepFunctionInput] = deriveEncoder[BackendChecksStepFunctionInput]
+  implicit val backendChecksStepFunctionInputEncoder: Encoder[BackendChecksStepFunctionInput] = deriveEncoder[BackendChecksStepFunctionInput]
+  implicit val metadataChecksStepFunctionInputEncoder: Encoder[MetadataChecksStepFunctionInput] = deriveEncoder[MetadataChecksStepFunctionInput]
 
   def orchestrate[T <: Product](orchestrationEvent: T): IO[OrchestrationResult] = {
     orchestrationEvent match {
@@ -57,22 +65,20 @@ class TransferOrchestration(
         IO(ErrorHandling.handleError(transferError, logger))
       } else {
         logger.info(s"Triggering file checks for consignment: $consignmentId")
-        val input = BackendChecksStepFunctionInput(consignmentId.toString, s"$userId/$SharePoint/$consignmentId/$Records")
-        stepFunctionUtils
-          .startExecution(config.getString("sfn.backendChecksArn"), input, Some(s"transfer_service_$consignmentId"))(encoder)
-          .handleErrorWith { ex =>
-            IO(logger.error(ex.getMessage)) *> IO(
-              ErrorHandling.handleError(
-                TransferError(Some(consignmentId), s"$AggregateProcessing.$CompletedWithIssues", s"Step function error: ${ex.getMessage}"),
-                logger
-              )
-            )
-          }
+        triggerStepFunction(
+          arnKey = "sfn.backendChecksArn",
+          input = BackendChecksStepFunctionInput(consignmentId.toString, s"$userId/$SharePoint/$consignmentId/$Records"),
+          consignmentId = consignmentId
+        )
       }
-    if (event.suppliedMetadata) {
-      // TODO: trigger draft metadata step function
-      logger.info(s"Triggering draft metadata validation for consignment: $consignmentId")
-    }
+//    if (event.suppliedMetadata) {
+//        logger.info(s"Triggering draft metadata validation for consignment: $consignmentId")
+//        triggerStepFunction(
+//            arnKey = "sfn.metadataChecksArn",
+//            input = MetadataChecksStepFunctionInput(consignmentId.toString),
+//            consignmentId = consignmentId
+//        )
+//    }
 
     val statusInput = ConsignmentStatusInput(consignmentId, ConsignmentStatusType.Upload.toString, Some(consignmentStatusValue.toString), Some(event.userId))
     for {
@@ -96,6 +102,22 @@ class TransferOrchestration(
       )
     } yield result
   }
+
+  private def triggerStepFunction[A <: Product: Encoder](arnKey: String, input: A, consignmentId: UUID): IO[Unit] = {
+    val stepName = s"transfer_service_$consignmentId"
+    val arn = config.getString(arnKey)
+    stepFunctionUtils
+      .startExecution(arn, input, Some(stepName))
+      .handleErrorWith { ex =>
+        IO(logger.error(ex.getMessage)) *> IO(
+          ErrorHandling.handleError(
+            TransferError(Some(consignmentId), s"$AggregateProcessing.$CompletedWithIssues", s"Step function error: ${ex.getMessage}"),
+            logger
+          )
+        )
+      }
+      .void
+  }
 }
 
 object TransferOrchestration {
@@ -104,6 +126,7 @@ object TransferOrchestration {
 
   trait StepFunctionInput {}
   case class BackendChecksStepFunctionInput(consignmentId: String, s3SourceBucketPrefix: String) extends StepFunctionInput
+  case class MetadataChecksStepFunctionInput(consignmentId: String, fileName: String = "draft-metadata.csv") extends StepFunctionInput
 
   case class AggregateProcessingEvent(assetSource: AssetSource, userId: UUID, consignmentId: UUID, processingErrors: Boolean, suppliedMetadata: Boolean)
 

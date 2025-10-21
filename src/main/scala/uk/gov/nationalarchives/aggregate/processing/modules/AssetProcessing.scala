@@ -117,7 +117,8 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
           } else {
             val dateLastModified = t"${metadata.Modified}".getTime
             val sharePointLocation = sharePointLocationPathToFilePath(metadata.FileRef)
-            val input = ClientSideMetadataInput(sharePointLocation.filePath, metadata.SHA256ClientSideChecksum, dateLastModified, metadata.Length, metadata.matchId) //need filename from FileLeafRef
+            // need filename from FileLeafRef. Can pass separately or modify ClientSideMetadataInput
+            val input = ClientSideMetadataInput(sharePointLocation.filePath, metadata.SHA256ClientSideChecksum, dateLastModified, metadata.Length, metadata.matchId)
             logger.info(s"Asset metadata successfully processed for: $objectKey")
             val completedTags = Map(ptAp.toString -> Completed.toString)
             s3Utils.addObjectTags(event.s3SourceBucket, event.objectKey, completedTags)
@@ -133,16 +134,6 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
   }
 
   private def toSuppliedMetadata(metadataJson: Json, suppliedProperties: Seq[String]): List[SuppliedMetadata] = {
-    // TODO: check for any supplied metadata fields
-    //    metadataJson.asObject match {
-    //      case Some(jsonObj) =>
-    //        suppliedProperties.flatMap { key =>
-    //          jsonObj(key).flatMap(_.asString).map { value =>
-    //            SuppliedMetadata(key, value)
-    //          }
-    //        }.toList
-    //      case None => Nil
-    //    }
     for {
       obj <- metadataJson.asObject.toList
       key <- suppliedProperties
