@@ -141,7 +141,6 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
           keyToTdrFileHeader(sharepointHeaderToKey(k)) -> result.clientSideMetadataInput.map(csmi => dateFormatter(csmi.lastModified)).getOrElse("")
       }.toMap
 
-      // Do I Need to handle multi value properties??? frontend does val groupedMetadata: Map[String, String] = file.fileMetadata.groupBy(_.name).view.mapValues(_.map(_.value).mkString("|")).toMap
       val defaultValues: List[String] = dynamicHeaders.map(header => propertiesDefaultValues.getOrElse(header, ""))
       val suppliedValues: List[String] = dynamicHeaders.map(header => suppliedMetadataMap.getOrElse(header, ""))
       val systemValues: List[String] = dynamicHeaders.map(header => systemPropertiesMap.getOrElse(header, ""))
