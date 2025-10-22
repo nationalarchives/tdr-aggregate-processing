@@ -1,16 +1,15 @@
 package uk.gov.nationalarchives.aggregate.processing.modules
 
-import cats.effect.IO
 import com.typesafe.scalalogging.Logger
 import graphql.codegen.types.ClientSideMetadataInput
-import org.mockito.ArgumentMatchers.{any, anyString}
+import org.mockito.ArgumentMatchers.any
 import org.mockito.MockitoSugar.{mock, times, verify, when}
 import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper
 import org.slf4j.{Logger => UnderlyingLogger}
 import software.amazon.awssdk.core.ResponseBytes
 import software.amazon.awssdk.core.async.AsyncResponseTransformer
 import software.amazon.awssdk.services.s3.S3AsyncClient
-import software.amazon.awssdk.services.s3.model.{GetObjectRequest, GetObjectResponse, GetObjectTaggingRequest, GetObjectTaggingResponse, PutObjectTaggingResponse}
+import software.amazon.awssdk.services.s3.model.{GetObjectRequest, GetObjectResponse, GetObjectTaggingRequest, GetObjectTaggingResponse}
 import software.amazon.awssdk.utils.CompletableFutureUtils.failedFuture
 import uk.gov.nationalarchives.aggregate.processing.ExternalServiceSpec
 import uk.gov.nationalarchives.aggregate.processing.modules.AssetProcessing.{AssetProcessingResult, SuppliedMetadata}
@@ -46,7 +45,17 @@ class AssetProcessingSpec extends ExternalServiceSpec {
       matchId
     )
 
-    val expectedResult = AssetProcessingResult(Some(matchId), processingErrors = false, Some(expectedInput))
+    val expectedResult = AssetProcessingResult(
+      Some(matchId),
+      processingErrors = false,
+      Some(expectedInput),
+      systemMetadata = List(
+        SuppliedMetadata("FileRef", "/sites/Retail/Shared Documents/file1.txt"),
+        SuppliedMetadata("FileLeafRef", "file1.txt"),
+        SuppliedMetadata("Modified", "2025-07-03T09:19:47Z"),
+        SuppliedMetadata("Length", "12")
+      )
+    )
 
     when(mockLogger.isInfoEnabled()).thenReturn(true)
     when(mockLogger.isErrorEnabled).thenReturn(true)
@@ -278,7 +287,18 @@ class AssetProcessingSpec extends ExternalServiceSpec {
     )
 
     val expectedResult =
-      AssetProcessingResult(Some(matchId), processingErrors = false, Some(expectedInput), suppliedMetadata = List(SuppliedMetadata("description", "some kind of description"), SuppliedMetadata("filename", "file1.txt")))
+      AssetProcessingResult(
+        Some(matchId),
+        processingErrors = false,
+        Some(expectedInput),
+        systemMetadata = List(
+          SuppliedMetadata("FileRef", "/sites/Retail/Shared Documents/file1.txt"),
+          SuppliedMetadata("FileLeafRef", "file1.txt"),
+          SuppliedMetadata("Modified", "2025-07-03T09:19:47Z"),
+          SuppliedMetadata("Length", "12")
+        ),
+        suppliedMetadata = List(SuppliedMetadata("description", "some kind of description"))
+      )
 
     when(mockLogger.isInfoEnabled()).thenReturn(true)
     when(mockLogger.isErrorEnabled).thenReturn(true)

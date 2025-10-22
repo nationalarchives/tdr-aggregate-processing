@@ -90,9 +90,6 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
   }
 
   private def parseMetadataJson(metadataJson: Json, event: AssetProcessingEvent): AssetProcessingResult = {
-    val metadataConfig: ConfigUtils.MetadataConfiguration = ConfigUtils.loadConfiguration
-    val tdrDataLoadHeaderToPropertyMapper = metadataConfig.propertyToOutputMapper("tdrFileHeader")
-    val suppliedProperties: Seq[String] = metadataConfig.getPropertiesByPropertyType("Supplied").map(p => tdrDataLoadHeaderToPropertyMapper(p))
     val matchId = event.matchId
     val objectKey = event.objectKey
     val s3Bucket = event.s3SourceBucket
@@ -114,14 +111,22 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
             )
             handleProcessError(error, s3Bucket, objectKey)
           } else {
-            val suppliedMetadata = toSuppliedMetadata(metadataJson, suppliedProperties, metadata.FileLeafRef)
+            val metadataConfig: ConfigUtils.MetadataConfiguration = ConfigUtils.loadConfiguration
+            val tdrDataLoadHeaderToPropertyMapper = metadataConfig.propertyToOutputMapper("tdrFileHeader")
+            val keyToSharepointHeader = metadataConfig.propertyToOutputMapper("sharePointTag")
+            val suppliedProperties: Seq[String] = metadataConfig.getPropertiesByPropertyType("Supplied").map(p => tdrDataLoadHeaderToPropertyMapper(p))
+            val systemProperties: Seq[String] = metadataConfig.getPropertiesByPropertyType("System").map(p => keyToSharepointHeader(p))
+
+            val systemMetadata = toSystemMetadata(metadataJson, systemProperties)
+            val suppliedMetadata = toSuppliedMetadata(metadataJson, suppliedProperties)
+
             val dateLastModified = t"${metadata.Modified}".getTime
             val sharePointLocation = sharePointLocationPathToFilePath(metadata.FileRef)
             val input = ClientSideMetadataInput(sharePointLocation.filePath, metadata.SHA256ClientSideChecksum, dateLastModified, metadata.Length, metadata.matchId)
             logger.info(s"Asset metadata successfully processed for: $objectKey")
             val completedTags = Map(ptAp.toString -> Completed.toString)
             s3Utils.addObjectTags(event.s3SourceBucket, event.objectKey, completedTags)
-            AssetProcessingResult(Some(matchId), processingErrors = false, Some(input), suppliedMetadata)
+            AssetProcessingResult(Some(matchId), processingErrors = false, Some(input), systemMetadata, suppliedMetadata)
           }
         }
       )
@@ -132,13 +137,20 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
     SharePointLocationPath(pathComponents(1), pathComponents(2), pathComponents(3), pathComponents.slice(1, pathComponents.length).mkString("/"))
   }
 
-  private def toSuppliedMetadata(metadataJson: Json, suppliedProperties: Seq[String], filename: String): List[SuppliedMetadata] = {
-    val suppliedMetadata = for {
+  private def toSystemMetadata(metadataJson: Json, systemProperties: Seq[String]): List[SuppliedMetadata] = {
+    for {
+      obj <- metadataJson.asObject.toList
+      key <- systemProperties
+      value <- obj(key).flatMap(_.asString)
+    } yield SuppliedMetadata(key, value)
+  }
+
+  private def toSuppliedMetadata(metadataJson: Json, suppliedProperties: Seq[String]): List[SuppliedMetadata] = {
+    for {
       obj <- metadataJson.asObject.toList
       key <- suppliedProperties
       value <- obj(key).flatMap(_.asString)
     } yield SuppliedMetadata(key, value)
-    if(suppliedMetadata.nonEmpty) suppliedMetadata:+ SuppliedMetadata("filename", filename) else Nil
   }
 
   private def generateErrorMessage(event: AssetProcessingEvent, errorCode: String, errorMessage: String): AssetProcessingError = {
@@ -174,6 +186,7 @@ object AssetProcessing {
       matchId: Option[String],
       processingErrors: Boolean,
       clientSideMetadataInput: Option[ClientSideMetadataInput],
+      systemMetadata: List[SuppliedMetadata] = List(),
       suppliedMetadata: List[SuppliedMetadata] = List()
   )
   case class AssetProcessingError(consignmentId: Option[String], matchId: Option[String], source: Option[String], errorCode: String, errorMsg: String) extends BaseError {

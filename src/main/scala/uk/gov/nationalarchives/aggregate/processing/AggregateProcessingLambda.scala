@@ -29,6 +29,8 @@ import uk.gov.nationalarchives.tdr.schemautils.ConfigUtils
 
 import java.io.File
 import java.nio.file.{Files, Path}
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
 import java.util.UUID
 import scala.collection.immutable.Map
 import scala.jdk.CollectionConverters.CollectionHasAsScala
@@ -122,6 +124,7 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
 
     val keyToTdrFileHeader = metadataConfiguration.propertyToOutputMapper("tdrFileHeader")
     val keyToSharepointHeader = metadataConfiguration.propertyToOutputMapper("sharePointTag")
+    val tdrHeaderToKey = metadataConfiguration.inputToPropertyMapper("tdrFileHeader")
     val sharepointHeaderToKey = metadataConfiguration.inputToPropertyMapper("sharePointTag")
 
     // --- Determine headers ---
@@ -130,19 +133,25 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
 
     // --- Build rows ---
     val rows: List[List[String]] = assetProcessingResults.map { result =>
-      val propertiesDefaultValues = metadataConfiguration.getPropertiesWithDefaultValue.map(prop => keyToTdrFileHeader(prop._1) -> prop._2)
-      val suppliedMetadataMap: Map[String, String] = result.suppliedMetadata.map(sm => sm.propertyName -> sm.propertyValue).toMap
-      val sharePointTagMapping = downloadDisplayProperties.map(dp => keyToSharepointHeader(dp.key))
-
-      val systemPropertiesMap = sharePointTagMapping.collect {
-        case k if k.contains("FileRef") => keyToTdrFileHeader(sharepointHeaderToKey(k)) -> result.clientSideMetadataInput.map(_.originalPath).getOrElse("")
-        case k if k.contains("Modified") =>
-          keyToTdrFileHeader(sharepointHeaderToKey(k)) -> result.clientSideMetadataInput.map(csmi => dateFormatter(csmi.lastModified)).getOrElse("")
+      val propertiesDefaultValues = metadataConfiguration.getPropertiesWithDefaultValue.map { prop =>
+        val propertyType = metadataConfiguration.getPropertyType(prop._1)
+        val convertedValue = convertValue(propertyType, prop._2)
+        keyToTdrFileHeader(prop._1) -> convertedValue
+      }
+      val suppliedMetadataMap: Map[String, String] = result.suppliedMetadata.map { sm =>
+        val propertyType = metadataConfiguration.getPropertyType(tdrHeaderToKey(sm.propertyName))
+        val convertedValue = convertValue(propertyType, sm.propertyValue)
+        sm.propertyName -> convertedValue
+      }.toMap
+      val systemMetadataMap: Map[String, String] = result.systemMetadata.map { sm =>
+        val propertyType = metadataConfiguration.getPropertyType(sharepointHeaderToKey(sm.propertyName))
+        val convertedValue = convertValue(propertyType, sm.propertyValue)
+        keyToTdrFileHeader(sharepointHeaderToKey(sm.propertyName)) -> convertedValue
       }.toMap
 
       val defaultValues: List[String] = dynamicHeaders.map(header => propertiesDefaultValues.getOrElse(header, ""))
       val suppliedValues: List[String] = dynamicHeaders.map(header => suppliedMetadataMap.getOrElse(header, ""))
-      val systemValues: List[String] = dynamicHeaders.map(header => systemPropertiesMap.getOrElse(header, ""))
+      val systemValues: List[String] = dynamicHeaders.map(header => systemMetadataMap.getOrElse(header, ""))
 
       List(suppliedValues, defaultValues, systemValues).transpose
         .map(_.find(_.nonEmpty).getOrElse(""))
@@ -161,11 +170,18 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
     csvFile
   }
 
-  private def dateFormatter(longDate: Long): String = {
-    val instant = java.time.Instant.ofEpochMilli(longDate)
-    val dateTime = java.time.ZonedDateTime.ofInstant(instant, java.time.ZoneId.systemDefault())
-    val formatter = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd")
-    dateTime.format(formatter)
+  private def convertValue(propertyType: String, fileMetadataValue: String): String = {
+    propertyType match {
+      case "date"    => convertToLocalDateOrString(fileMetadataValue)
+      case "boolean" => if (fileMetadataValue == "true") "Yes" else "No"
+//      case "integer"                   => Integer.valueOf(fileMetadataValue)
+      case _ => fileMetadataValue
+    }
+  }
+
+  private def convertToLocalDateOrString(timestampString: String): String = {
+    val parsedDate = ZonedDateTime.parse(timestampString)
+    parsedDate.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
   }
 
   private def uploadToS3(filePath: Path, bucket: String, key: String): Unit = {
