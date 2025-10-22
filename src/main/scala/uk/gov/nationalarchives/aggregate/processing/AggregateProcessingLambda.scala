@@ -136,7 +136,6 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
 
       val systemPropertiesMap = sharePointTagMapping.collect {
         case k if k.contains("FileRef") => keyToTdrFileHeader(sharepointHeaderToKey(k)) -> result.clientSideMetadataInput.map(_.originalPath).getOrElse("")
-        //        case k if k.contains("FileLeafRef") => Map(k -> result.clientSideMetadataInput.map(_.filename).getOrElse(""))
         case k if k.contains("Modified") =>
           keyToTdrFileHeader(sharepointHeaderToKey(k)) -> result.clientSideMetadataInput.map(csmi => dateFormatter(csmi.lastModified)).getOrElse("")
       }.toMap

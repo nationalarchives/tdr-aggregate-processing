@@ -95,7 +95,6 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
     val suppliedProperties: Seq[String] = metadataConfig.getPropertiesByPropertyType("Supplied").map(p => tdrDataLoadHeaderToPropertyMapper(p))
     val matchId = event.matchId
     val objectKey = event.objectKey
-    val suppliedMetadata = toSuppliedMetadata(metadataJson, suppliedProperties)
     val s3Bucket = event.s3SourceBucket
     metadataJson
       .as[RequiredSharePointMetadata]
@@ -115,9 +114,9 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
             )
             handleProcessError(error, s3Bucket, objectKey)
           } else {
+            val suppliedMetadata = toSuppliedMetadata(metadataJson, suppliedProperties, metadata.FileLeafRef)
             val dateLastModified = t"${metadata.Modified}".getTime
             val sharePointLocation = sharePointLocationPathToFilePath(metadata.FileRef)
-            // need filename from FileLeafRef. Can pass separately or modify ClientSideMetadataInput
             val input = ClientSideMetadataInput(sharePointLocation.filePath, metadata.SHA256ClientSideChecksum, dateLastModified, metadata.Length, metadata.matchId)
             logger.info(s"Asset metadata successfully processed for: $objectKey")
             val completedTags = Map(ptAp.toString -> Completed.toString)
@@ -133,12 +132,13 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
     SharePointLocationPath(pathComponents(1), pathComponents(2), pathComponents(3), pathComponents.slice(1, pathComponents.length).mkString("/"))
   }
 
-  private def toSuppliedMetadata(metadataJson: Json, suppliedProperties: Seq[String]): List[SuppliedMetadata] = {
-    for {
+  private def toSuppliedMetadata(metadataJson: Json, suppliedProperties: Seq[String], filename: String): List[SuppliedMetadata] = {
+    val suppliedMetadata = for {
       obj <- metadataJson.asObject.toList
       key <- suppliedProperties
       value <- obj(key).flatMap(_.asString)
     } yield SuppliedMetadata(key, value)
+    if(suppliedMetadata.nonEmpty) suppliedMetadata:+ SuppliedMetadata("filename", filename) else Nil
   }
 
   private def generateErrorMessage(event: AssetProcessingEvent, errorCode: String, errorMessage: String): AssetProcessingError = {

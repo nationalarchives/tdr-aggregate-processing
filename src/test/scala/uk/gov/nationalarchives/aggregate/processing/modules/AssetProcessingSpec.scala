@@ -278,7 +278,7 @@ class AssetProcessingSpec extends ExternalServiceSpec {
     )
 
     val expectedResult =
-      AssetProcessingResult(Some(matchId), processingErrors = false, Some(expectedInput), suppliedMetadata = List(SuppliedMetadata("description", "some kind of description")))
+      AssetProcessingResult(Some(matchId), processingErrors = false, Some(expectedInput), suppliedMetadata = List(SuppliedMetadata("description", "some kind of description"), SuppliedMetadata("filename", "file1.txt")))
 
     when(mockLogger.isInfoEnabled()).thenReturn(true)
     when(mockLogger.isErrorEnabled).thenReturn(true)
