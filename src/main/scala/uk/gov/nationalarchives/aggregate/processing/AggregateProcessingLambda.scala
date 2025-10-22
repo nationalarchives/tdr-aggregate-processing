@@ -150,7 +150,7 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
     }
 
     // --- Write CSV ---
-    val csvFile = Files.createTempFile("metadata-", ".csv").toFile
+    val csvFile = Files.createTempFile("draft-metadata", ".csv").toFile
     val writer = CSVWriter.open(csvFile)
 
     try {
