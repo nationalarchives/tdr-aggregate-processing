@@ -137,12 +137,12 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
     SharePointLocationPath(pathComponents(1), pathComponents(2), pathComponents(3), pathComponents.slice(1, pathComponents.length).mkString("/"))
   }
 
-  private def toSystemMetadata(metadataJson: Json, systemProperties: Seq[String]): List[SuppliedMetadata] = {
+  private def toSystemMetadata(metadataJson: Json, systemProperties: Seq[String]): List[SystemMetadata] = {
     for {
       obj <- metadataJson.asObject.toList
       key <- systemProperties
       value <- obj(key).flatMap(_.asString)
-    } yield SuppliedMetadata(key, value)
+    } yield SystemMetadata(key, value)
   }
 
   private def toSuppliedMetadata(metadataJson: Json, suppliedProperties: Seq[String]): List[SuppliedMetadata] = {
@@ -181,12 +181,13 @@ object AssetProcessing {
       s3SourceBucket: String,
       objectKey: String
   )
+  case class SystemMetadata(propertyName: String, propertyValue: String)
   case class SuppliedMetadata(propertyName: String, propertyValue: String)
   case class AssetProcessingResult(
       matchId: Option[String],
       processingErrors: Boolean,
       clientSideMetadataInput: Option[ClientSideMetadataInput],
-      systemMetadata: List[SuppliedMetadata] = List(),
+      systemMetadata: List[SystemMetadata] = List(),
       suppliedMetadata: List[SuppliedMetadata] = List()
   )
   case class AssetProcessingError(consignmentId: Option[String], matchId: Option[String], source: Option[String], errorCode: String, errorMsg: String) extends BaseError {

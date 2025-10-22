@@ -123,7 +123,6 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
       .sortBy(_.columnIndex)
 
     val keyToTdrFileHeader = metadataConfiguration.propertyToOutputMapper("tdrFileHeader")
-    val keyToSharepointHeader = metadataConfiguration.propertyToOutputMapper("sharePointTag")
     val tdrHeaderToKey = metadataConfiguration.inputToPropertyMapper("tdrFileHeader")
     val sharepointHeaderToKey = metadataConfiguration.inputToPropertyMapper("sharePointTag")
 
@@ -174,8 +173,7 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
     propertyType match {
       case "date"    => convertToLocalDateOrString(fileMetadataValue)
       case "boolean" => if (fileMetadataValue == "true") "Yes" else "No"
-//      case "integer"                   => Integer.valueOf(fileMetadataValue)
-      case _ => fileMetadataValue
+      case _         => fileMetadataValue
     }
   }
 
