@@ -32,7 +32,7 @@ object RequiredClientSideMetadataHandler {
     SharePointLocationPath(pathComponents(1), pathComponents(2), pathComponents(3), pathComponents.slice(1, pathComponents.length).mkString("/"))
   }
 
-  def getDecoder(assetSource: AssetSource): Decoder[_ >: SharePointRequiredMetadata <: RequiredClientSideMetadata] = {
+  def getRequiredMetadataDecoder(assetSource: AssetSource): Decoder[_ >: SharePointRequiredMetadata <: RequiredClientSideMetadata] = {
     assetSource match {
       case AssetSource.SharePoint => RequiredClientSideMetadataHandler.sharePointDecoder
     }

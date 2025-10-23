@@ -13,7 +13,7 @@ import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorV
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.{AssetProcessing => ptAp}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.StateStatusValue.{Completed, CompletedWithIssues}
 import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling.BaseError
-import uk.gov.nationalarchives.aggregate.processing.modules.RequiredClientSideMetadataHandler.{RequiredClientSideMetadata, getDecoder, toClientSideMetadataInput}
+import uk.gov.nationalarchives.aggregate.processing.modules.RequiredClientSideMetadataHandler.{RequiredClientSideMetadata, getRequiredMetadataDecoder, toClientSideMetadataInput}
 import uk.gov.nationalarchives.aggregate.processing.utilities.UTF8ValidationHandler
 import uk.gov.nationalarchives.aws.utils.s3.{S3Clients, S3Utils}
 import uk.gov.nationalarchives.utf8.validator.Utf8Validator
@@ -84,11 +84,13 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
         val error = generateErrorMessage(event, s"$ptAp.$JsonError.$Invalid", parseEx.getMessage())
         handleProcessError(error, s3Bucket, objectKey)
       case Success(Right(json)) =>
-        parseMetadataJson(json, event)(getDecoder(event.source))
+        parseMetadataJson(json, event)(getRequiredMetadataDecoder(event.source))
     }
   }
 
-  private def parseMetadataJson[T <: RequiredClientSideMetadata](metadataJson: Json, event: AssetProcessingEvent)(implicit decoder: Decoder[T]): AssetProcessingResult = {
+  private def parseMetadataJson[T <: RequiredClientSideMetadata](metadataJson: Json, event: AssetProcessingEvent)(implicit
+      requiredMetadataDecoder: Decoder[T]
+  ): AssetProcessingResult = {
     val matchId = event.matchId
     val objectKey = event.objectKey
     val suppliedMetadata = toSuppliedMetadata(metadataJson)
