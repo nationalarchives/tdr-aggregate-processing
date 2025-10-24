@@ -13,6 +13,7 @@ import io.circe._
 import io.circe.generic.semiauto.deriveDecoder
 import io.circe.parser._
 import uk.gov.nationalarchives.aggregate.processing.AggregateProcessingLambda._
+import uk.gov.nationalarchives.aggregate.processing.config.ApplicationConfig.draftMetadataBucket
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ObjectCategory.ObjectCategory
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorType.{ClientDataLoadError, S3Error}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorValue.{Failure, ReadError}
@@ -22,8 +23,10 @@ import uk.gov.nationalarchives.aggregate.processing.modules.TransferOrchestratio
 import uk.gov.nationalarchives.aggregate.processing.modules.{AssetProcessing, Common, TransferOrchestration}
 import uk.gov.nationalarchives.aggregate.processing.persistence.GraphQlApi
 import uk.gov.nationalarchives.aggregate.processing.persistence.GraphQlApi.{backend, keycloakDeployment}
+import uk.gov.nationalarchives.aggregate.processing.utilities.DraftMetadataCSVWriter
 import uk.gov.nationalarchives.aws.utils.s3.{S3Clients, S3Utils}
 
+import java.nio.file.Path
 import java.util.UUID
 import scala.jdk.CollectionConverters.CollectionHasAsScala
 
@@ -93,6 +96,11 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
       assetProcessingResults <- IO(objectKeys.map(assetProcessor.processAsset(sourceBucket, _)))
       assetProcessingErrors = assetProcessingResults.exists(_.processingErrors)
       suppliedMetadata = assetProcessingResults.exists(_.suppliedMetadata.nonEmpty)
+      _ = if (suppliedMetadata) {
+        val draftMetadataCSVWriter = new DraftMetadataCSVWriter()
+        val metadataCSV = draftMetadataCSVWriter.createMetadataCSV(assetProcessingResults)
+        uploadToS3(metadataCSV.toPath, draftMetadataBucket, s"/$consignmentId/draft-metadata.csv")
+      }
       _ <-
         if (assetProcessingErrors) {
           IO(Nil)
@@ -102,6 +110,10 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
           persistenceApi.addClientSideMetadata(input)
         }
     } yield AssetProcessingResult(assetProcessingErrors, suppliedMetadata)
+  }
+
+  private def uploadToS3(filePath: Path, bucket: String, key: String): Unit = {
+    s3Utils.upload(bucket, key, filePath)
   }
 
   private def parseSqsMessage(sqsMessage: SQSMessage): AggregateEvent = {

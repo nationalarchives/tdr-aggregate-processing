@@ -17,6 +17,7 @@ object ApplicationConfig {
   val graphqlApiRequestTimeOut: FiniteDuration = 180.seconds
   val s3Endpoint: String = configFactory.getString("s3.endpoint")
   val timeToLiveSecs: Int = 60
+  val draftMetadataBucket: String = configFactory.getString("s3.draftMetadataBucket")
 
   def getClientSecret(secretPath: String = authClientSecretPath): String = {
     val ssmClient = SSMClients.ssm(ssmEndpoint)
