@@ -11,7 +11,7 @@ import java.time.format.DateTimeFormatter
 
 class DraftMetadataCSVWriter {
 
-   def createMetadataCSV(assetProcessingResults: List[AssetProcessing.AssetProcessingResult]): File = {
+  def createMetadataCSV(assetProcessingResults: List[AssetProcessing.AssetProcessingResult]): File = {
     val metadataConfiguration = ConfigUtils.loadConfiguration
     val downloadDisplayProperties = metadataConfiguration
       .downloadFileDisplayProperties("MetadataDownloadTemplate")
@@ -54,8 +54,8 @@ class DraftMetadataCSVWriter {
       // For each header pick the first non-empty value from supplied, default, system (in that precedence)
       dynamicHeaders.map { header =>
         val supplied = suppliedMetadataMap.getOrElse(header, "")
-        val default  = propertiesDefaultValues.getOrElse(header, "")
-        val system   = systemMetadataMap.getOrElse(header, "")
+        val default = propertiesDefaultValues.getOrElse(header, "")
+        val system = systemMetadataMap.getOrElse(header, "")
         List(supplied, default, system).find(_.nonEmpty).getOrElse("")
       }
     }
