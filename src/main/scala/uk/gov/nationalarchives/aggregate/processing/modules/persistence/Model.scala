@@ -45,6 +45,6 @@ object Model {
   case class TransferStateFilter(consignmentId: UUID, filter: Set[TransferStateCategory]) extends StateFilter
 
   trait JsonData { }
-  case class AssetData(consignmentId: UUID, assetId: UUID, category: DataCategory, input: Json, pathTo: Option[Path2] = None) extends JsonData
+  case class AssetData(consignmentId: UUID, assetId: UUID, matchId: String, userId: UUID, category: DataCategory, input: Json, pathTo: Option[Path2] = None) extends JsonData
   case class ErrorData(consignmentId: UUID, objectIdentifier: String, DataCategory: DataCategory, input: Json, pathTo: Option[Path2] = None)
 }

@@ -1,25 +1,33 @@
 import sbt.*
 
 object Dependencies {
-  private val circeVersion = "0.14.14"
+  private val circeVersion = "0.14.15"
   private val mockitoScalaVersion = "2.0.0"
+  private val doobieVersion = "1.0.0-RC10"
+  private val awsVersion = "2.36.1"
 
-  lazy val authUtils = "uk.gov.nationalarchives" %% "tdr-auth-utils" % "0.0.258"
+  lazy val authUtils = "uk.gov.nationalarchives" %% "tdr-auth-utils" % "0.0.260"
   lazy val awsLambdaCore = "com.amazonaws" % "aws-lambda-java-core" % "1.4.0"
   lazy val awsLambdaEvents = "com.amazonaws" % "aws-lambda-java-events" % "3.16.1"
-  lazy val awsSqs = "com.amazonaws" % "aws-java-sdk-sqs" % "1.12.791"
+  lazy val awsSqs = "com.amazonaws" % "aws-java-sdk-sqs" % "1.12.792"
+  lazy val awsRds = "software.amazon.awssdk" % "rds" % awsVersion
+  lazy val awsSsm = "software.amazon.awssdk" % "ssm" % awsVersion
+  lazy val awsS3 = "software.amazon.awssdk" % "s3" % awsVersion
 
   lazy val circeCore = "io.circe" %% "circe-core" % circeVersion
   lazy val circeGeneric = "io.circe" %% "circe-generic" % circeVersion
   lazy val circeParser = "io.circe" %% "circe-parser" % circeVersion
 
-  lazy val generatedGraphql = "uk.gov.nationalarchives" %% "tdr-generated-graphql" % "0.0.431"
-  lazy val graphqlClient = "uk.gov.nationalarchives" %% "tdr-graphql-client" % "0.0.253"
-  lazy val gson = "com.google.code.gson" % "gson" % "2.13.1"
+  lazy val doobie = "org.tpolecat" %% "doobie-core" % doobieVersion
+  lazy val doobiePostgres = "org.tpolecat" %% "doobie-postgres"  % doobieVersion
 
-  lazy val jedis = "redis.clients" % "jedis" % "6.2.0"
+  lazy val generatedGraphql = "uk.gov.nationalarchives" %% "tdr-generated-graphql" % "0.0.438"
+  lazy val graphqlClient = "uk.gov.nationalarchives" %% "tdr-graphql-client" % "0.0.256"
+  lazy val gson = "com.google.code.gson" % "gson" % "2.13.2"
 
-  lazy val logback = "ch.qos.logback" % "logback-classic" % "1.5.18"
+  lazy val jedis = "redis.clients" % "jedis" % "7.0.0"
+
+  lazy val logback = "ch.qos.logback" % "logback-classic" % "1.5.20"
   lazy val logstash = "net.logstash.logback" % "logstash-logback-encoder" % "8.1"
 
   lazy val mockitoScala = "org.mockito" %% "mockito-scala" % mockitoScalaVersion
@@ -27,12 +35,12 @@ object Dependencies {
 
   lazy val parallelCollections = "org.scala-lang.modules" %% "scala-parallel-collections" % "1.2.0"
 
-  lazy val s3Utils = "uk.gov.nationalarchives" %% "s3-utils" % "0.1.305"
+  lazy val s3Utils = "uk.gov.nationalarchives" %% "s3-utils" % "0.1.311"
   lazy val scalaLogging = "com.typesafe.scala-logging" %% "scala-logging" % "3.9.6"
   lazy val scalaTest = "org.scalatest" %% "scalatest" % "3.2.19"
-  lazy val schemaConfig = "uk.gov.nationalarchives" %% "da-metadata-schema"% "0.0.92"
-  lazy val ssmUtils = "uk.gov.nationalarchives" %% "ssm-utils" % "0.1.305"
-  lazy val stepFunctionUtils = "uk.gov.nationalarchives" %% "stepfunction-utils" % "0.1.305"
+  lazy val schemaConfig = "uk.gov.nationalarchives" %% "da-metadata-schema"% "0.0.97"
+  lazy val ssmUtils = "uk.gov.nationalarchives" %% "ssm-utils" % "0.1.311"
+  lazy val stepFunctionUtils = "uk.gov.nationalarchives" %% "stepfunction-utils" % "0.1.311"
 
   lazy val typesafeConfig = "com.typesafe" % "config" % "1.4.5"
 

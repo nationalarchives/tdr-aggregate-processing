@@ -11,7 +11,7 @@ import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType
 import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling.handleError
 import uk.gov.nationalarchives.aggregate.processing.modules.persistence.Model.DataCategory.{assetMetadata, filePathErrorData}
 import uk.gov.nationalarchives.aggregate.processing.modules.persistence.Model._
-import uk.gov.nationalarchives.aggregate.processing.modules.persistence.{DataPersistence, StateCache}
+import uk.gov.nationalarchives.aggregate.processing.modules.persistence.{DataPersistence, MetadataUtils, StateCache}
 import uk.gov.nationalarchives.tdr.schemautils.ConfigUtils
 
 import java.io.{File => JIOFile}
@@ -101,8 +101,9 @@ class AtomicAssetProcessor(stateCache: StateCache, dataPersistence: DataPersiste
       }
 
       val enrichedJson = addParentReference(consignmentId, treeNode, assetJsonObject).asJson
-
-      dataPersistence.setAssetData(AssetData(consignmentId, assetId, assetMetadata, enrichedJson))
+      val assetData = AssetData(consignmentId, assetId, matchId, event.userId, assetMetadata, enrichedJson)
+      dataPersistence.setAssetData(assetData)
+//      new MetadataUtils().insertAssetData(List(assetData))
     })
   }
 
@@ -159,7 +160,7 @@ object AtomicAssetProcessor {
   private val dataPersistence = DataPersistence.apply()
   private val schemaConfig = ConfigUtils.loadConfiguration
 
-  case class AtomicAssetProcessingEvent(source: AssetSource, consignmentId: UUID, matchId: String, assetMetadata: Json)
+  case class AtomicAssetProcessingEvent(source: AssetSource, consignmentId: UUID, matchId: String, userId: UUID, assetMetadata: Json)
   case class TreeNode(assetId: UUID, path: String, nodeType: String, parentPath: Option[String], fileReference: String, hasParent: Boolean)
 
   def apply() = new AtomicAssetProcessor(stateCache, dataPersistence)(logger)
