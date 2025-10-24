@@ -10,6 +10,7 @@ import uk.gov.nationalarchives.aggregate.processing.modules.Common.AssetSource.A
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType
 import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling.handleError
 import uk.gov.nationalarchives.aggregate.processing.modules.persistence.Model.DataCategory.{assetMetadata, filePathErrorData}
+import uk.gov.nationalarchives.aggregate.processing.modules.persistence.Model.TransferStateCategory.processedObjects
 import uk.gov.nationalarchives.aggregate.processing.modules.persistence.Model._
 import uk.gov.nationalarchives.aggregate.processing.modules.persistence.{DataPersistence, MetadataUtils, StateCache}
 import uk.gov.nationalarchives.tdr.schemautils.ConfigUtils
@@ -103,6 +104,13 @@ class AtomicAssetProcessor(stateCache: StateCache, dataPersistence: DataPersiste
       val enrichedJson = addParentReference(consignmentId, treeNode, assetJsonObject).asJson
       val assetData = AssetData(consignmentId, assetId, matchId, event.userId, assetMetadata, enrichedJson)
       dataPersistence.setAssetData(assetData)
+
+      //Not interested in folders for tracking progress as generated
+      if (treeNode.nodeType == "File") {
+        val state = TransferState(consignmentId, processedObjects, matchId)
+        stateCache.updateTransferState(state)
+      }
+
 //      new MetadataUtils().insertAssetData(List(assetData))
     })
   }

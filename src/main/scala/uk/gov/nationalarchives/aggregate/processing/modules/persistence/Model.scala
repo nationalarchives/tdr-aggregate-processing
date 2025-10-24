@@ -24,6 +24,7 @@ object Model {
     val uploadedObjectsState: Value = Value("uploadedObjects")
     val pathToAssetState: Value = Value("pathToAsset")
     val pathToReferenceState: Value = Value("pathToReference")
+    val processedObjects: Value = Value("processedObjects")
   }
 
   object DataCategory extends Filter {
