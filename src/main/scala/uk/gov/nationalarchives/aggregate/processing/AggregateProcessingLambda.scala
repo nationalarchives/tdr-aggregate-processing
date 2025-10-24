@@ -6,7 +6,6 @@ import cats.effect.unsafe.implicits.global
 import com.amazonaws.services.lambda.runtime.events.SQSEvent
 import com.amazonaws.services.lambda.runtime.events.SQSEvent.SQSMessage
 import com.amazonaws.services.lambda.runtime.{Context, RequestHandler}
-import com.github.tototoshi.csv.CSVWriter
 import com.typesafe.config.{Config, ConfigFactory}
 import com.typesafe.scalalogging.Logger
 import graphql.codegen.types.AddFileAndMetadataInput
@@ -24,15 +23,11 @@ import uk.gov.nationalarchives.aggregate.processing.modules.TransferOrchestratio
 import uk.gov.nationalarchives.aggregate.processing.modules.{AssetProcessing, Common, TransferOrchestration}
 import uk.gov.nationalarchives.aggregate.processing.persistence.GraphQlApi
 import uk.gov.nationalarchives.aggregate.processing.persistence.GraphQlApi.{backend, keycloakDeployment}
+import uk.gov.nationalarchives.aggregate.processing.utilities.DraftMetadataCSVWriter
 import uk.gov.nationalarchives.aws.utils.s3.{S3Clients, S3Utils}
-import uk.gov.nationalarchives.tdr.schemautils.ConfigUtils
 
-import java.io.File
-import java.nio.file.{Files, Path}
-import java.time.ZonedDateTime
-import java.time.format.DateTimeFormatter
+import java.nio.file.Path
 import java.util.UUID
-import scala.collection.immutable.Map
 import scala.jdk.CollectionConverters.CollectionHasAsScala
 
 class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
@@ -102,7 +97,8 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
       assetProcessingErrors = assetProcessingResults.exists(_.processingErrors)
       suppliedMetadata = assetProcessingResults.exists(_.suppliedMetadata.nonEmpty)
       _ = if (suppliedMetadata) {
-        val metadataCSV = createMetadataCSV(assetProcessingResults)
+        val draftMetadataCSVWriter = new DraftMetadataCSVWriter()
+        val metadataCSV = draftMetadataCSVWriter.createMetadataCSV(assetProcessingResults)
         uploadToS3(metadataCSV.toPath, draftMetadataBucket, s"/$consignmentId/draft-metadata.csv")
       }
       _ <-
@@ -114,72 +110,6 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
           persistenceApi.addClientSideMetadata(input)
         }
     } yield AssetProcessingResult(assetProcessingErrors, suppliedMetadata)
-  }
-
-  private def createMetadataCSV(assetProcessingResults: List[AssetProcessing.AssetProcessingResult]): File = {
-    val metadataConfiguration = ConfigUtils.loadConfiguration
-    val downloadDisplayProperties = metadataConfiguration
-      .downloadFileDisplayProperties("MetadataDownloadTemplate")
-      .sortBy(_.columnIndex)
-
-    val keyToTdrFileHeader = metadataConfiguration.propertyToOutputMapper("tdrFileHeader")
-    val tdrHeaderToKey = metadataConfiguration.inputToPropertyMapper("tdrFileHeader")
-    val sharepointHeaderToKey = metadataConfiguration.inputToPropertyMapper("sharePointTag")
-
-    // --- Determine headers ---
-    val dynamicHeaders: List[String] = downloadDisplayProperties.map(dp => keyToTdrFileHeader(dp.key))
-    val colHeaders: List[String] = dynamicHeaders
-
-    // --- Build rows ---
-    val rows: List[List[String]] = assetProcessingResults.map { result =>
-      val propertiesDefaultValues = metadataConfiguration.getPropertiesWithDefaultValue.map { prop =>
-        val propertyType = metadataConfiguration.getPropertyType(prop._1)
-        val convertedValue = convertValue(propertyType, prop._2)
-        keyToTdrFileHeader(prop._1) -> convertedValue
-      }
-      val suppliedMetadataMap: Map[String, String] = result.suppliedMetadata.map { sm =>
-        val propertyType = metadataConfiguration.getPropertyType(tdrHeaderToKey(sm.propertyName))
-        val convertedValue = convertValue(propertyType, sm.propertyValue)
-        sm.propertyName -> convertedValue
-      }.toMap
-      val systemMetadataMap: Map[String, String] = result.systemMetadata.map { sm =>
-        val propertyType = metadataConfiguration.getPropertyType(sharepointHeaderToKey(sm.propertyName))
-        val convertedValue = convertValue(propertyType, sm.propertyValue)
-        keyToTdrFileHeader(sharepointHeaderToKey(sm.propertyName)) -> convertedValue
-      }.toMap
-
-      val defaultValues: List[String] = dynamicHeaders.map(header => propertiesDefaultValues.getOrElse(header, ""))
-      val suppliedValues: List[String] = dynamicHeaders.map(header => suppliedMetadataMap.getOrElse(header, ""))
-      val systemValues: List[String] = dynamicHeaders.map(header => systemMetadataMap.getOrElse(header, ""))
-
-      List(suppliedValues, defaultValues, systemValues).transpose
-        .map(_.find(_.nonEmpty).getOrElse(""))
-    }
-
-    // --- Write CSV ---
-    val csvFile = Files.createTempFile("draft-metadata", ".csv").toFile
-    val writer = CSVWriter.open(csvFile)
-
-    try {
-      writer.writeRow(colHeaders)
-      writer.writeAll(rows)
-    } finally {
-      writer.close()
-    }
-    csvFile
-  }
-
-  private def convertValue(propertyType: String, fileMetadataValue: String): String = {
-    propertyType match {
-      case "date"    => convertToLocalDateOrString(fileMetadataValue)
-      case "boolean" => if (fileMetadataValue == "true") "Yes" else "No"
-      case _         => fileMetadataValue
-    }
-  }
-
-  private def convertToLocalDateOrString(timestampString: String): String = {
-    val parsedDate = ZonedDateTime.parse(timestampString)
-    parsedDate.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
   }
 
   private def uploadToS3(filePath: Path, bucket: String, key: String): Unit = {

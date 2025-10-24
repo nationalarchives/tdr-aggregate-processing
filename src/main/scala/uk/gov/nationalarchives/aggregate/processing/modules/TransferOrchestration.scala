@@ -14,17 +14,10 @@ import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorV
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.{AggregateProcessing, Orchestration}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.StateStatusValue.{Completed, CompletedWithIssues, ConsignmentStatusValue, Failed}
 import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling.{BaseError, handleError}
-import uk.gov.nationalarchives.aggregate.processing.utilities.NotificationsClient.UploadEvent
-import uk.gov.nationalarchives.aggregate.processing.modules.TransferOrchestration.{
-  AggregateProcessingEvent,
-  BackendChecksStepFunctionInput,
-  MetadataChecksStepFunctionInput,
-  OrchestrationResult,
-  StepFunctionInput,
-  TransferError
-}
+import uk.gov.nationalarchives.aggregate.processing.modules.TransferOrchestration._
 import uk.gov.nationalarchives.aggregate.processing.persistence.GraphQlApi
 import uk.gov.nationalarchives.aggregate.processing.persistence.GraphQlApi.{backend, keycloakDeployment}
+import uk.gov.nationalarchives.aggregate.processing.utilities.NotificationsClient.UploadEvent
 import uk.gov.nationalarchives.aggregate.processing.utilities.{KeycloakClient, NotificationsClient}
 import uk.gov.nationalarchives.aws.utils.stepfunction.StepFunctionClients.sfnAsyncClient
 import uk.gov.nationalarchives.aws.utils.stepfunction.StepFunctionUtils
@@ -103,7 +96,7 @@ class TransferOrchestration(
     } yield result
   }
 
-  private def triggerStepFunction[A <: Product: Encoder](arnKey: String, input: A, consignmentId: UUID): IO[Unit] = {
+  private def triggerStepFunction[T <: Product: Encoder](arnKey: String, input: T, consignmentId: UUID): IO[Unit] = {
     val stepName = s"transfer_service_$consignmentId"
     val arn = config.getString(arnKey)
     stepFunctionUtils
@@ -124,7 +117,9 @@ object TransferOrchestration {
   val config: Config = ConfigFactory.load()
   val logger = Logger[TransferOrchestration]
 
-  trait StepFunctionInput {}
+  trait StepFunctionInput {
+    def consignmentId: String
+  }
   case class BackendChecksStepFunctionInput(consignmentId: String, s3SourceBucketPrefix: String) extends StepFunctionInput
   case class MetadataChecksStepFunctionInput(consignmentId: String, fileName: String = "draft-metadata.csv") extends StepFunctionInput
 

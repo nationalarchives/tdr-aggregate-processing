@@ -282,7 +282,7 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec {
     )
   }
 
-  "handleRequest" should "upload a draft-metadata.csv to S3 containing the supplied metadata" in {
+  "handleRequest" should "upload a draft-metadata.csv to S3 when supplied metadata present in uploaded metadata" in {
     val objectKey = s"$userId/$source/$consignmentId/$category/$matchId.metadata"
     authOkJson()
     mockS3GetObjectTagging(objectKey)
@@ -322,6 +322,79 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec {
           )
         )
         .withRequestBody(containing("/sites/Retail/Shared Documents/file1.txt,file1.txt,2025-07-03,,some kind of description,,Open,,,,,No,,No,,English,,legal copyright,,"))
+    )
+  }
+
+  "handleRequest" should "upload a draft-metadata.csv with multiple rows when multiple objects exist" in {
+    val matchId1 = "match-1"
+    val matchId2 = "match-2"
+    val objectKey1 = s"$userId/$source/$consignmentId/$category/$matchId1.metadata"
+    val objectKey2 = s"$userId/$source/$consignmentId/$category/$matchId2.metadata"
+
+    authOkJson()
+    // stub tagging and streams for both object keys
+    mockS3GetObjectTagging(objectKey1)
+    mockS3GetObjectTagging(objectKey2)
+    mockS3GetObjectStream(objectKey1, consignmentId.toString, matchId1, suppliedMetadata = true)
+    mockS3GetObjectStream(objectKey2, consignmentId.toString, matchId2, suppliedMetadata = true)
+
+    // list response returns two objects
+    mockS3ListBucketResponse(userId, consignmentId, List(matchId1, matchId2))
+    mockSfnResponseOk()
+    mockGraphQlAddFilesAndMetadataResponse
+    mockGraphQlUpdateConsignmentStatusResponse
+    mockGraphQlGetConsignmentResponse
+
+    val mockContext = mock[Context]
+
+    val validMessageBody: String =
+      s"""
+    {
+      "metadataSourceBucket": "source-bucket",
+      "metadataSourceObjectPrefix": "$userId/$source/$consignmentId/$category",
+      "dataLoadErrors": false
+    }
+    """.stripMargin
+
+    val message = new SQSMessage()
+    message.setBody(validMessageBody)
+    val messages: java.util.List[SQSMessage] = List(message).asJava
+    val sqsEvent = new SQSEvent()
+    sqsEvent.setRecords(messages)
+
+    // Act
+    new AggregateProcessingLambda().handleRequest(sqsEvent, mockContext)
+
+    // Each object should have been GET and tagging requested once
+    wiremockS3.verify(
+      exactly(1),
+      getRequestedFor(anyUrl()).withUrl(s"/$objectKey1")
+    )
+    wiremockS3.verify(
+      exactly(1),
+      getRequestedFor(anyUrl()).withUrl(s"/$objectKey2")
+    )
+    wiremockS3.verify(
+      exactly(1),
+      getRequestedFor(anyUrl()).withUrl(s"/$objectKey1?tagging")
+    )
+    wiremockS3.verify(
+      exactly(1),
+      getRequestedFor(anyUrl()).withUrl(s"/$objectKey2?tagging")
+    )
+
+    // Verify single PUT to draft metadata path and that CSV body contains values for both objects
+    wiremockS3.verify(
+      exactly(1),
+      putRequestedFor(anyUrl())
+        .withUrl(s"/draftMetadataBucket/$consignmentId/draft-metadata.csv")
+        .withRequestBody(
+          containing(
+            "filepath,filename,date last modified,date of the record,description,former reference,closure status,closure start date,closure period,foi exemption code,foi schedule date,is filename closed,alternate filename,is description closed,alternate description,language,translated filename,copyright,related material,restrictions on use"
+          )
+        )
+        .withRequestBody(containing("sites/Retail/Shared Documents/file1.txt,,2025-07-03,,some kind of description,,Open,,,,,false,,false,,English,,different value,,"))
+        .withRequestBody(containing("sites/Retail/Shared Documents/file2.txt,,2025-07-03,,some kind of description,,Open,,,,,false,,false,,English,,different value,,"))
     )
   }
 }

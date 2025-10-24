@@ -30,6 +30,10 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
       Timestamp.from(Instant.parse(sc.s(args: _*)))
   }
 
+  private lazy val metadataConfig: ConfigUtils.MetadataConfiguration = ConfigUtils.loadConfiguration
+  private lazy val tdrDataLoadHeaderToPropertyMapper: String => String = metadataConfig.propertyToOutputMapper("tdrFileHeader")
+  private lazy val keyToSharepointHeader: String => String = metadataConfig.propertyToOutputMapper("sharePointTag")
+
   private def handleProcessError(error: AssetProcessingError, s3Bucket: String, s3ObjectKey: String): AssetProcessingResult = {
     ErrorHandling.handleError(error, logger)
     val errorTags: Map[String, String] = Map(ptAp.toString -> CompletedWithIssues.toString)
@@ -111,14 +115,11 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
             )
             handleProcessError(error, s3Bucket, objectKey)
           } else {
-            val metadataConfig: ConfigUtils.MetadataConfiguration = ConfigUtils.loadConfiguration
-            val tdrDataLoadHeaderToPropertyMapper = metadataConfig.propertyToOutputMapper("tdrFileHeader")
-            val keyToSharepointHeader = metadataConfig.propertyToOutputMapper("sharePointTag")
             val suppliedProperties: Seq[String] = metadataConfig.getPropertiesByPropertyType("Supplied").map(p => tdrDataLoadHeaderToPropertyMapper(p))
             val systemProperties: Seq[String] = metadataConfig.getPropertiesByPropertyType("System").map(p => keyToSharepointHeader(p))
 
-            val systemMetadata = toSystemMetadata(metadataJson, systemProperties)
-            val suppliedMetadata = toSuppliedMetadata(metadataJson, suppliedProperties)
+            val systemMetadata = toMetadataProperties(metadataJson, systemProperties)
+            val suppliedMetadata = toMetadataProperties(metadataJson, suppliedProperties)
 
             val dateLastModified = t"${metadata.Modified}".getTime
             val sharePointLocation = sharePointLocationPathToFilePath(metadata.FileRef)
@@ -137,20 +138,12 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
     SharePointLocationPath(pathComponents(1), pathComponents(2), pathComponents(3), pathComponents.slice(1, pathComponents.length).mkString("/"))
   }
 
-  private def toSystemMetadata(metadataJson: Json, systemProperties: Seq[String]): List[SystemMetadata] = {
+  private def toMetadataProperties(json: Json, properties: Seq[String]): List[MetadataProperty] = {
     for {
-      obj <- metadataJson.asObject.toList
-      key <- systemProperties
+      obj <- json.asObject.toList
+      key <- properties
       value <- obj(key).flatMap(_.asString)
-    } yield SystemMetadata(key, value)
-  }
-
-  private def toSuppliedMetadata(metadataJson: Json, suppliedProperties: Seq[String]): List[SuppliedMetadata] = {
-    for {
-      obj <- metadataJson.asObject.toList
-      key <- suppliedProperties
-      value <- obj(key).flatMap(_.asString)
-    } yield SuppliedMetadata(key, value)
+    } yield MetadataProperty(key, value)
   }
 
   private def generateErrorMessage(event: AssetProcessingEvent, errorCode: String, errorMessage: String): AssetProcessingError = {
@@ -181,14 +174,13 @@ object AssetProcessing {
       s3SourceBucket: String,
       objectKey: String
   )
-  case class SystemMetadata(propertyName: String, propertyValue: String)
-  case class SuppliedMetadata(propertyName: String, propertyValue: String)
+  case class MetadataProperty(propertyName: String, propertyValue: String)
   case class AssetProcessingResult(
       matchId: Option[String],
       processingErrors: Boolean,
       clientSideMetadataInput: Option[ClientSideMetadataInput],
-      systemMetadata: List[SystemMetadata] = List(),
-      suppliedMetadata: List[SuppliedMetadata] = List()
+      systemMetadata: List[MetadataProperty] = List(),
+      suppliedMetadata: List[MetadataProperty] = List()
   )
   case class AssetProcessingError(consignmentId: Option[String], matchId: Option[String], source: Option[String], errorCode: String, errorMsg: String) extends BaseError {
     override def toString: String = {

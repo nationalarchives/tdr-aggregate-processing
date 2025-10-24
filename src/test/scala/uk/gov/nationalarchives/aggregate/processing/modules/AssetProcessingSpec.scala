@@ -12,7 +12,7 @@ import software.amazon.awssdk.services.s3.S3AsyncClient
 import software.amazon.awssdk.services.s3.model.{GetObjectRequest, GetObjectResponse, GetObjectTaggingRequest, GetObjectTaggingResponse}
 import software.amazon.awssdk.utils.CompletableFutureUtils.failedFuture
 import uk.gov.nationalarchives.aggregate.processing.ExternalServiceSpec
-import uk.gov.nationalarchives.aggregate.processing.modules.AssetProcessing.{AssetProcessingResult, SuppliedMetadata, SystemMetadata}
+import uk.gov.nationalarchives.aggregate.processing.modules.AssetProcessing.{AssetProcessingResult, MetadataProperty}
 import uk.gov.nationalarchives.aws.utils.s3.S3Utils
 
 import java.io.ByteArrayInputStream
@@ -50,10 +50,10 @@ class AssetProcessingSpec extends ExternalServiceSpec {
       processingErrors = false,
       Some(expectedInput),
       systemMetadata = List(
-        SystemMetadata("FileRef", "/sites/Retail/Shared Documents/file1.txt"),
-        SystemMetadata("FileLeafRef", "file1.txt"),
-        SystemMetadata("Modified", "2025-07-03T09:19:47Z"),
-        SystemMetadata("Length", "12")
+        MetadataProperty("FileRef", "/sites/Retail/Shared Documents/file1.txt"),
+        MetadataProperty("FileLeafRef", "file1.txt"),
+        MetadataProperty("Modified", "2025-07-03T09:19:47Z"),
+        MetadataProperty("Length", "12")
       )
     )
 
@@ -292,12 +292,12 @@ class AssetProcessingSpec extends ExternalServiceSpec {
         processingErrors = false,
         Some(expectedInput),
         systemMetadata = List(
-          SystemMetadata("FileRef", "/sites/Retail/Shared Documents/file1.txt"),
-          SystemMetadata("FileLeafRef", "file1.txt"),
-          SystemMetadata("Modified", "2025-07-03T09:19:47Z"),
-          SystemMetadata("Length", "12")
+          MetadataProperty("FileRef", "/sites/Retail/Shared Documents/file1.txt"),
+          MetadataProperty("FileLeafRef", "file1.txt"),
+          MetadataProperty("Modified", "2025-07-03T09:19:47Z"),
+          MetadataProperty("Length", "12")
         ),
-        suppliedMetadata = List(SuppliedMetadata("description", "some kind of description"))
+        suppliedMetadata = List(MetadataProperty("description", "some kind of description"))
       )
 
     when(mockLogger.isInfoEnabled()).thenReturn(true)

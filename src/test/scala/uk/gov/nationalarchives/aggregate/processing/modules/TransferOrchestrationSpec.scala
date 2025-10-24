@@ -9,6 +9,7 @@ import graphql.codegen.types.ConsignmentStatusInput
 import io.circe.Encoder
 import org.mockito.ArgumentCaptor
 import org.mockito.ArgumentMatchers.any
+import org.mockito.Mockito.times
 import org.mockito.MockitoSugar.{mock, never, verify, when}
 import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper
 import org.slf4j.{Logger => UnderlyingLogger}
@@ -90,6 +91,7 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     verify(mockGraphQlApi).getConsignmentDetails(consignmentId)
 
     verify(keycloakConfigurations).userDetails(userId.toString)
+    verify(sfnUtils, times(1)).startExecution(any[String], any, any[Option[String]])(any())
     verify(sfnUtils).startExecution(sfnArnCaptor.capture(), sfnInputCaptor.capture(), sfnNameCaptor.capture())(any[Encoder[BackendChecksStepFunctionInput]])
     sfnArnCaptor.getValue shouldBe config.getString("sfn.backendChecksArn")
     sfnInputCaptor.getValue shouldBe BackendChecksStepFunctionInput(
@@ -148,7 +150,6 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     verify(mockLogger).info(s"Triggering file checks for consignment: {}", consignmentId)
     verify(mockLogger).info(s"Triggering draft metadata validation for consignment: {}", consignmentId)
     verify(mockLogger, never).isErrorEnabled()
-
     verify(mockGraphQlApi).updateConsignmentStatus(consignmentStatusInputCaptor.capture())
     consignmentStatusInputCaptor.getValue.consignmentId shouldBe consignmentId
     consignmentStatusInputCaptor.getValue.statusType shouldBe "Upload"
@@ -158,6 +159,8 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     verify(mockGraphQlApi).getConsignmentDetails(consignmentId)
 
     verify(keycloakConfigurations).userDetails(userId.toString)
+
+    verify(sfnUtils, times(2)).startExecution(any[String], any, any[Option[String]])(any())
     verify(sfnUtils).startExecution(backendSfnArnCaptor.capture(), backendSfnInputCaptor.capture(), backendSfnNameCaptor.capture())(any[Encoder[BackendChecksStepFunctionInput]])
     verify(sfnUtils).startExecution(draftMetadataSfnArnCaptor.capture(), draftMetadataSfnInputCaptor.capture(), draftMetadataSfnNameCaptor.capture())(
       any[Encoder[MetadataChecksStepFunctionInput]]
@@ -304,6 +307,7 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     new TransferOrchestration(mockGraphQlApi, sfnUtils, notificationUtils, keycloakConfigurations, config)(Logger(mockLogger)).orchestrate(event).unsafeRunSync()
 
     verify(keycloakConfigurations).userDetails(userId.toString)
+    verify(sfnUtils, times(1)).startExecution(any[String], any, any[Option[String]])(any())
     verify(sfnUtils).startExecution(
       arnCaptor.capture(),
       sfnInputCaptor.capture(),
