@@ -1,5 +1,6 @@
 package uk.gov.nationalarchives.aggregate.processing.modules
 
+import cats.effect.unsafe.implicits.global
 import com.typesafe.scalalogging.Logger
 import io.circe.generic.semiauto.deriveEncoder
 import io.circe.syntax.EncoderOps
@@ -12,6 +13,7 @@ import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling.handle
 import uk.gov.nationalarchives.aggregate.processing.modules.persistence.Model.DataCategory.{assetMetadata, filePathErrorData}
 import uk.gov.nationalarchives.aggregate.processing.modules.persistence.Model.TransferStateCategory.processedObjects
 import uk.gov.nationalarchives.aggregate.processing.modules.persistence.Model._
+import uk.gov.nationalarchives.aggregate.processing.modules.persistence.StateCache.cacheClient
 import uk.gov.nationalarchives.aggregate.processing.modules.persistence.{DataPersistence, MetadataUtils, StateCache}
 import uk.gov.nationalarchives.tdr.schemautils.ConfigUtils
 
@@ -44,6 +46,7 @@ class AtomicAssetProcessor(stateCache: StateCache, dataPersistence: DataPersiste
       .add("UUID", s"${node.assetId}".asJson)
       .add("file_type", s"${node.nodeType}".asJson)
       .add("file_reference", s"${node.fileReference}".asJson)
+      .add("file_name", s"${node.fileName}".asJson)
     if (fileId.nonEmpty) {
       result.add("file_ids", s"[${fileId.get}]".asJson)
     } else result
@@ -111,7 +114,7 @@ class AtomicAssetProcessor(stateCache: StateCache, dataPersistence: DataPersiste
         stateCache.updateTransferState(state)
       }
 
-//      new MetadataUtils().insertAssetData(List(assetData))
+//      new MetadataUtils().insertAssetData(List(assetData)).unsafeRunSync()
     })
   }
 
@@ -136,7 +139,8 @@ class AtomicAssetProcessor(stateCache: StateCache, dataPersistence: DataPersiste
           stateCache.updatePathToAssetState(pathToAssetIdState)
           val pathToReferenceState = PathToReferenceState(consignmentId, originalPath, reference)
           updateReferenceState(matchId, pathToReferenceState)
-          val node = TreeNode(nodeId, originalPath, typeIdentifier, parentPath, reference, parentPath.nonEmpty)
+          val fileName = jioFile.getName
+          val node = TreeNode(nodeId, originalPath, typeIdentifier, parentPath, reference, parentPath.nonEmpty, fileName)
           val nextList = nodes :+ node
           if (parentPath.nonEmpty) {
             innerFunction(parentPath.get, "Folder", nextList)
@@ -169,7 +173,7 @@ object AtomicAssetProcessor {
   private val schemaConfig = ConfigUtils.loadConfiguration
 
   case class AtomicAssetProcessingEvent(source: AssetSource, consignmentId: UUID, matchId: String, userId: UUID, assetMetadata: Json)
-  case class TreeNode(assetId: UUID, path: String, nodeType: String, parentPath: Option[String], fileReference: String, hasParent: Boolean)
+  case class TreeNode(assetId: UUID, path: String, nodeType: String, parentPath: Option[String], fileReference: String, hasParent: Boolean, fileName: String)
 
   def apply() = new AtomicAssetProcessor(stateCache, dataPersistence)(logger)
 }

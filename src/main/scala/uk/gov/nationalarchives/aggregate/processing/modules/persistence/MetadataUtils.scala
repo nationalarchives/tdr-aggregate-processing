@@ -51,7 +51,7 @@ class MetadataUtils {
     )
   }
 
-  case class DataLoadInput(FileType: String, Filename: String, FileReference: String, ParentReference: String)
+  case class DataLoadInput(FileType: String, Filename: String, FileReference: String, ParentReference: Option[String])
 
   private val dataLoadMapper = schemaConfig.propertyToOutputMapper("tdrDataLoadHeader")
 
@@ -67,7 +67,7 @@ class MetadataUtils {
 
     def fileInsert(
                     fileId: UUID, consignmentId: UUID, userId: UUID, fileType: String, fileName: String, fileRef: String, parentRef: String, uploadMatchId: String): doobie.ConnectionIO[Int] =
-      sql"INSERT INTO File (FileId, ConsignmentId, UserId, FileType, FileName, FileReference, ParentReference, UploadMatchId) values ($fileId, $consignmentId, $userId, $fileType, $fileName, $fileRef, $parentRef, $uploadMatchId)"
+      sql"""INSERT INTO "File" ("FileId", "ConsignmentId", "UserId", "FileType", "FileName", "FileReference", "ParentReference", "UploadMatchId") values ($fileId, $consignmentId, $userId, $fileType, $fileName, $fileRef, $parentRef, $uploadMatchId)"""
         .update.run
 
     inputs.map(input => {
@@ -79,7 +79,7 @@ class MetadataUtils {
         err => throw new RuntimeException(err.getMessage()),
         input => input)
 
-      fileInsert(fileId, consignmentId, userId, dataLoadInput.FileType, dataLoadInput.Filename, dataLoadInput.FileReference, dataLoadInput.ParentReference, matchId).transact(transactor)
+      fileInsert(fileId, consignmentId, userId, dataLoadInput.FileType, dataLoadInput.Filename, dataLoadInput.FileReference, dataLoadInput.ParentReference.getOrElse(""), matchId).transact(transactor)
     }).sequence
   }
 }

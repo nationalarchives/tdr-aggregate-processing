@@ -2,7 +2,7 @@ package uk.gov.nationalarchives.aggregate.processing.modules.persistence
 
 
 import redis.clients.jedis.UnifiedJedis
-import uk.gov.nationalarchives.aggregate.processing.modules.persistence.Model.TransferStateCategory.{matchIdToFileIdState, pathToAssetState, pathToReferenceState}
+import uk.gov.nationalarchives.aggregate.processing.modules.persistence.Model.TransferStateCategory.{matchIdToFileIdState, pathToAssetState, pathToReferenceState, processedObjects}
 import uk.gov.nationalarchives.aggregate.processing.modules.persistence.Model._
 import uk.gov.nationalarchives.aggregate.processing.modules.persistence.StateCache.cacheClient
 
@@ -21,10 +21,11 @@ class StateCache {
 
   def getReferences(numberOfReferences: Int): List[String] = {
     val remainingRefs = cacheClient.llen(referencePoolKey)
-    if (remainingRefs < 500 + numberOfReferences) {
-      replenishReferencePool(500)
+    if (remainingRefs < 1000 + numberOfReferences) {
+      replenishReferencePool(1000)
     }
-    cacheClient.rpop(referencePoolKey, numberOfReferences).asScala.toList
+
+    cacheClient.lpop(referencePoolKey, numberOfReferences).asScala.toList
   }
 
   def updateTransferState(state: TransferState): Long = {
@@ -68,6 +69,11 @@ class StateCache {
     hGet(key, path)
   }
 
+  def getProcessedObjects(consignmentId: UUID) = {
+    val key = s"$consignmentId:$processedObjects"
+    getSetCardinality(key)
+  }
+
   private def getState(keyPrefix: String, filters: Set[String]): Map[String, Long] = {
     filters.map(v => {
       v -> getSetCardinality(s"$keyPrefix:$v")
@@ -92,7 +98,7 @@ class StateCache {
 
   def replenishReferencePool(numberOfReferences: Long): Unit = {
     val newRefs = psuedoReferenceGenerator(numberOfReferences)
-    newRefs.foreach(cacheClient.lpush(referencePoolKey, _))
+    newRefs.foreach(cacheClient.rpush(referencePoolKey, _))
   }
 }
 
