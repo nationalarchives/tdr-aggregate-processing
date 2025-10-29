@@ -16,6 +16,7 @@ import uk.gov.nationalarchives.aggregate.processing.modules.Common.StateStatusVa
 import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling.BaseError
 import uk.gov.nationalarchives.aggregate.processing.utilities.UTF8ValidationHandler
 import uk.gov.nationalarchives.aws.utils.s3.{S3Clients, S3Utils}
+import uk.gov.nationalarchives.tdr.schemautils.ConfigUtils
 import uk.gov.nationalarchives.utf8.validator.Utf8Validator
 
 import java.sql.Timestamp
@@ -28,6 +29,10 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
     def t(args: Any*): Timestamp =
       Timestamp.from(Instant.parse(sc.s(args: _*)))
   }
+
+  private lazy val metadataConfig: ConfigUtils.MetadataConfiguration = ConfigUtils.loadConfiguration
+  private lazy val tdrDataLoadHeaderToPropertyMapper: String => String = metadataConfig.propertyToOutputMapper("tdrFileHeader")
+  private lazy val keyToSharepointHeader: String => String = metadataConfig.propertyToOutputMapper("sharePointTag")
 
   private def handleProcessError(error: AssetProcessingError, s3Bucket: String, s3ObjectKey: String): AssetProcessingResult = {
     ErrorHandling.handleError(error, logger)
@@ -91,7 +96,6 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
   private def parseMetadataJson(metadataJson: Json, event: AssetProcessingEvent): AssetProcessingResult = {
     val matchId = event.matchId
     val objectKey = event.objectKey
-    val suppliedMetadata = toSuppliedMetadata(metadataJson)
     val s3Bucket = event.s3SourceBucket
     metadataJson
       .as[RequiredSharePointMetadata]
@@ -111,13 +115,25 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
             )
             handleProcessError(error, s3Bucket, objectKey)
           } else {
+            val suppliedProperties: Seq[String] = metadataConfig.getPropertiesByPropertyType("Supplied").map(p => tdrDataLoadHeaderToPropertyMapper(p))
+            val systemProperties: Seq[String] = metadataConfig.getPropertiesByPropertyType("System").map(p => keyToSharepointHeader(p))
+
+            val systemMetadata = toMetadataProperties(metadataJson, systemProperties)
+            val suppliedMetadata = toMetadataProperties(metadataJson, suppliedProperties)
+
             val dateLastModified = t"${metadata.Modified}".getTime
             val sharePointLocation = sharePointLocationPathToFilePath(metadata.FileRef)
+            val updatedSystemMetadata: List[MetadataProperty] = systemMetadata.map {
+              case mp @ MetadataProperty(_, value) =>
+                val normalizedValue = value.stripPrefix("/")
+                if (normalizedValue == sharePointLocation.filePath) mp.copy(propertyValue = sharePointLocation.filePath) else mp
+              case mp => mp
+            }
             val input = ClientSideMetadataInput(sharePointLocation.filePath, metadata.SHA256ClientSideChecksum, dateLastModified, metadata.Length, metadata.matchId)
             logger.info(s"Asset metadata successfully processed for: $objectKey")
             val completedTags = Map(ptAp.toString -> Completed.toString)
             s3Utils.addObjectTags(event.s3SourceBucket, event.objectKey, completedTags)
-            AssetProcessingResult(Some(matchId), processingErrors = false, Some(input), suppliedMetadata)
+            AssetProcessingResult(Some(matchId), processingErrors = false, Some(input), updatedSystemMetadata, suppliedMetadata)
           }
         }
       )
@@ -128,9 +144,12 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
     SharePointLocationPath(pathComponents(1), pathComponents(2), pathComponents(3), pathComponents.slice(1, pathComponents.length).mkString("/"))
   }
 
-  private def toSuppliedMetadata(metadataJson: Json): List[SuppliedMetadata] = {
-    // TODO: check for any supplied metadata fields
-    Nil
+  private def toMetadataProperties(json: Json, properties: Seq[String]): List[MetadataProperty] = {
+    for {
+      obj <- json.asObject.toList
+      key <- properties
+      value <- obj(key).flatMap(_.asString)
+    } yield MetadataProperty(key, value)
   }
 
   private def generateErrorMessage(event: AssetProcessingEvent, errorCode: String, errorMessage: String): AssetProcessingError = {
@@ -161,12 +180,13 @@ object AssetProcessing {
       s3SourceBucket: String,
       objectKey: String
   )
-  case class SuppliedMetadata(propertyName: String, propertyValue: String)
+  case class MetadataProperty(propertyName: String, propertyValue: String)
   case class AssetProcessingResult(
       matchId: Option[String],
       processingErrors: Boolean,
       clientSideMetadataInput: Option[ClientSideMetadataInput],
-      suppliedMetadata: List[SuppliedMetadata] = List()
+      systemMetadata: List[MetadataProperty] = List(),
+      suppliedMetadata: List[MetadataProperty] = List()
   )
   case class AssetProcessingError(consignmentId: Option[String], matchId: Option[String], source: Option[String], errorCode: String, errorMsg: String) extends BaseError {
     override def toString: String = {
