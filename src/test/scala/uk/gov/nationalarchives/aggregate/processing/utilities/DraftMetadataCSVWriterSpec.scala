@@ -87,6 +87,7 @@ class DraftMetadataCSVWriterSpec extends AnyFlatSpec with Matchers with MockitoS
   }
 
   private def checkHeaders(csvContent: List[List[String]]) = {
+    csvContent.head.size shouldBe 20
     csvContent.head should contain allOf (
       "filepath",
       "filename",

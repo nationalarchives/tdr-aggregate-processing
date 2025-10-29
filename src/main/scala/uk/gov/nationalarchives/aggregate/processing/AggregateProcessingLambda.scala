@@ -96,11 +96,6 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
       assetProcessingResults <- IO(objectKeys.map(assetProcessor.processAsset(sourceBucket, _)))
       assetProcessingErrors = assetProcessingResults.exists(_.processingErrors)
       suppliedMetadata = assetProcessingResults.exists(_.suppliedMetadata.nonEmpty)
-      _ = if (suppliedMetadata) {
-        val draftMetadataCSVWriter = new DraftMetadataCSVWriter()
-        val metadataCSV = draftMetadataCSVWriter.createMetadataCSV(assetProcessingResults)
-        uploadToS3(metadataCSV.toPath, draftMetadataBucket, s"/$consignmentId/draft-metadata.csv")
-      }
       _ <-
         if (assetProcessingErrors) {
           IO(Nil)
@@ -109,6 +104,11 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
           val input = AddFileAndMetadataInput(consignmentId, clientSideMetadataInput, None, Some(userId))
           persistenceApi.addClientSideMetadata(input)
         }
+      _ = if (suppliedMetadata) {
+        val draftMetadataCSVWriter = new DraftMetadataCSVWriter()
+        val metadataCSV = draftMetadataCSVWriter.createMetadataCSV(assetProcessingResults)
+        uploadToS3(metadataCSV.toPath, draftMetadataBucket, s"$consignmentId/draft-metadata.csv")
+      }
     } yield AssetProcessingResult(assetProcessingErrors, suppliedMetadata)
   }
 

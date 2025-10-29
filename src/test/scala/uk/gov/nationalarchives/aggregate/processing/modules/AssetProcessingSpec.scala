@@ -50,7 +50,7 @@ class AssetProcessingSpec extends ExternalServiceSpec {
       processingErrors = false,
       Some(expectedInput),
       systemMetadata = List(
-        MetadataProperty("FileRef", "/sites/Retail/Shared Documents/file1.txt"),
+        MetadataProperty("FileRef", "sites/Retail/Shared Documents/file1.txt"),
         MetadataProperty("FileLeafRef", "file1.txt"),
         MetadataProperty("Modified", "2025-07-03T09:19:47Z"),
         MetadataProperty("Length", "12")
@@ -292,7 +292,7 @@ class AssetProcessingSpec extends ExternalServiceSpec {
         processingErrors = false,
         Some(expectedInput),
         systemMetadata = List(
-          MetadataProperty("FileRef", "/sites/Retail/Shared Documents/file1.txt"),
+          MetadataProperty("FileRef", "sites/Retail/Shared Documents/file1.txt"),
           MetadataProperty("FileLeafRef", "file1.txt"),
           MetadataProperty("Modified", "2025-07-03T09:19:47Z"),
           MetadataProperty("Length", "12")
