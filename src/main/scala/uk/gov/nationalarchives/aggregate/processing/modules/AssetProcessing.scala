@@ -123,11 +123,10 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
 
             val dateLastModified = t"${metadata.Modified}".getTime
             val sharePointLocation = sharePointLocationPathToFilePath(metadata.FileRef)
-            val normalizedTarget = sharePointLocation.filePath.stripPrefix("/")
             val updatedSystemMetadata: List[MetadataProperty] = systemMetadata.map {
               case mp @ MetadataProperty(_, value) =>
                 val normalizedValue = value.stripPrefix("/")
-                if (normalizedValue == normalizedTarget) mp.copy(propertyValue = normalizedTarget) else mp
+                if (normalizedValue == sharePointLocation.filePath) mp.copy(propertyValue = sharePointLocation.filePath) else mp
               case mp => mp
             }
             val input = ClientSideMetadataInput(sharePointLocation.filePath, metadata.SHA256ClientSideChecksum, dateLastModified, metadata.Length, metadata.matchId)
