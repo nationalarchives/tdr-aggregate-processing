@@ -6,8 +6,7 @@ import uk.gov.nationalarchives.tdr.schemautils.ConfigUtils
 
 import java.io.File
 import java.nio.file.Files
-import java.time.ZonedDateTime
-import java.time.format.DateTimeFormatter
+import java.text.SimpleDateFormat
 
 class DraftMetadataCSVWriter {
 
@@ -82,7 +81,8 @@ class DraftMetadataCSVWriter {
   }
 
   private def convertToLocalDateOrString(timestampString: String): String = {
-    val parsedDate = ZonedDateTime.parse(timestampString)
-    parsedDate.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
+    val ts = timestampString.toLong
+    val df: SimpleDateFormat = new SimpleDateFormat("yyyy-MM-dd")
+    df.format(ts)
   }
 }
