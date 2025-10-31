@@ -12,7 +12,7 @@ import software.amazon.awssdk.services.s3.S3AsyncClient
 import software.amazon.awssdk.services.s3.model.{GetObjectRequest, GetObjectResponse, GetObjectTaggingRequest, GetObjectTaggingResponse}
 import software.amazon.awssdk.utils.CompletableFutureUtils.failedFuture
 import uk.gov.nationalarchives.aggregate.processing.ExternalServiceSpec
-import uk.gov.nationalarchives.aggregate.processing.modules.AssetProcessing.{AssetProcessingResult, MetadataProperty}
+import uk.gov.nationalarchives.aggregate.processing.modules.AssetProcessing.AssetProcessingResult
 import uk.gov.nationalarchives.aws.utils.s3.S3Utils
 
 import java.io.ByteArrayInputStream
@@ -28,7 +28,7 @@ class AssetProcessingSpec extends ExternalServiceSpec {
       "Modified": "2025-07-03T09:19:47Z",
       "FileLeafRef": "file1.txt",
       "FileRef": "/sites/Retail/Shared Documents/file1.txt",
-      "SHA256ClientSideChecksum": "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2",
+      "sha256ClientSideChecksum": "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2",
       "matchId": "$matchId",
       "transferId": "$consignmentId"
     }""".stripMargin
@@ -50,10 +50,11 @@ class AssetProcessingSpec extends ExternalServiceSpec {
       processingErrors = false,
       Some(expectedInput),
       systemMetadata = List(
-        MetadataProperty("FileRef", "sites/Retail/Shared Documents/file1.txt"),
-        MetadataProperty("FileLeafRef", "file1.txt"),
-        MetadataProperty("Modified", "2025-07-03T09:19:47Z"),
-        MetadataProperty("Length", "12")
+        MetadataProperty("file_path", "sites/Retail/Shared Documents/file1.txt"),
+        MetadataProperty("file_name", "file1.txt"),
+        MetadataProperty("date_last_modified", "1751534387000"),
+        MetadataProperty("file_size", "12"),
+        MetadataProperty("client_side_checksum", "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2")
       )
     )
 
@@ -103,7 +104,7 @@ class AssetProcessingSpec extends ExternalServiceSpec {
       "Modified": "2025-07-03T09:19:47Z",
       "FileLeafRef": "file1.txt",
       "FileRef": "/sites/Retail/Shared Documents/file1.txt",
-      "SHA256ClientSideChecksum": "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2",
+      "sha256ClientSideChecksum": "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2",
       "matchId": "$matchId",
       "transferId": "$consignmentId"
     }""".stripMargin
@@ -123,7 +124,7 @@ class AssetProcessingSpec extends ExternalServiceSpec {
 
     verifyDefaultInfoLogging(mockLogger)
     verify(mockLogger).error(
-      s"AssetProcessingError: consignmentId: Some($consignmentId), matchId: Some($matchId), source: Some(sharepoint), errorCode: ASSET_PROCESSING.JSON.INVALID, errorMessage: DecodingFailure at .Length: Missing required field"
+      s"AssetProcessingError: consignmentId: Some($consignmentId), matchId: Some($matchId), source: Some(sharepoint), errorCode: ASSET_PROCESSING.JSON.INVALID, errorMessage: DecodingFailure at .file_size: Missing required field"
     )
   }
 
@@ -269,7 +270,7 @@ class AssetProcessingSpec extends ExternalServiceSpec {
       "Modified": "2025-07-03T09:19:47Z",
       "FileLeafRef": "file1.txt",
       "FileRef": "/sites/Retail/Shared Documents/file1.txt",
-      "SHA256ClientSideChecksum": "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2",
+      "sha256ClientSideChecksum": "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2",
       "matchId": "$matchId",
       "transferId": "$consignmentId",
       "filepath": "file/Path/1",
@@ -292,10 +293,11 @@ class AssetProcessingSpec extends ExternalServiceSpec {
         processingErrors = false,
         Some(expectedInput),
         systemMetadata = List(
-          MetadataProperty("FileRef", "sites/Retail/Shared Documents/file1.txt"),
-          MetadataProperty("FileLeafRef", "file1.txt"),
-          MetadataProperty("Modified", "2025-07-03T09:19:47Z"),
-          MetadataProperty("Length", "12")
+          MetadataProperty("file_path", "sites/Retail/Shared Documents/file1.txt"),
+          MetadataProperty("file_name", "file1.txt"),
+          MetadataProperty("date_last_modified", "1751534387000"),
+          MetadataProperty("file_size", "12"),
+          MetadataProperty("client_side_checksum", "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2")
         ),
         suppliedMetadata = List(MetadataProperty("description", "some kind of description"))
       )

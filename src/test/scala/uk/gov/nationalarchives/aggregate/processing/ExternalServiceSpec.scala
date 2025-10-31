@@ -34,7 +34,7 @@ class ExternalServiceSpec extends AnyFlatSpec with BeforeAndAfterEach with Befor
       "Modified": "2025-07-03T09:19:47Z",
       "FileLeafRef": "file1.txt",
       "FileRef": "/sites/Retail/Shared Documents/file1.txt",
-      "SHA256ClientSideChecksum": "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2",
+      "sha256ClientSideChecksum": "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2",
       "matchId": "$matchId",
       "transferId": "$consignmentId"
     }""".stripMargin
@@ -44,7 +44,7 @@ class ExternalServiceSpec extends AnyFlatSpec with BeforeAndAfterEach with Befor
       "Modified": "2025-07-03T09:19:47Z",
       "FileLeafRef": "file1.txt",
       "FileRef": "/sites/Retail/Shared Documents/file1.txt",
-      "SHA256ClientSideChecksum": "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2",
+      "sha256ClientSideChecksum": "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2",
       "matchId": "$matchId",
       "transferId": "$consignmentId",
       "description": "some kind of description",
