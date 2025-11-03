@@ -6,24 +6,39 @@ import io.circe.{Decoder, Json}
 
 case class MetadataProperty(propertyName: String, propertyValue: String)
 
-trait MetadataHandler {
-  private object ClientSideMetadataInputProperty extends Enumeration {
-    type ClientSideMetadataInputProperty = Value
-    val FilePath: Value = Value("file_path")
-    val Checksum: Value = Value("client_side_checksum")
-    val LastModified: Value = Value("date_last_modified")
-    val FileSize: Value = Value("file_size")
-    val MatchId: Value = Value("matchId")
-  }
+sealed trait BaseProperty {
+  val id: String
+}
 
+case object FilePathProperty extends BaseProperty {
+  val id: String = "file_path"
+}
+
+case object ClientSideChecksumProperty extends BaseProperty {
+  val id: String = "client_side_checksum"
+}
+
+case object DateLastModifiedProperty extends BaseProperty {
+  val id: String = "date_last_modified"
+}
+
+case object FileSizeProperty extends BaseProperty {
+  val id: String = "file_size"
+}
+
+case object MatchIdProperty extends BaseProperty {
+  val id: String = "matchId"
+}
+
+trait MetadataHandler {
   implicit val decodeClientSideInput: Decoder[ClientSideMetadataInput] =
     Decoder.instance[ClientSideMetadataInput] { c =>
       for {
-        path <- c.downField(ClientSideMetadataInputProperty.FilePath.toString).as[String]
-        checksum <- c.downField(ClientSideMetadataInputProperty.Checksum.toString).as[String]
-        modified <- c.downField(ClientSideMetadataInputProperty.LastModified.toString).as[Long]
-        fileSize <- c.downField(ClientSideMetadataInputProperty.FileSize.toString).as[Long]
-        matchId <- c.downField(ClientSideMetadataInputProperty.MatchId.toString).as[String]
+        path <- c.downField(FilePathProperty.id).as[String]
+        checksum <- c.downField(ClientSideChecksumProperty.id).as[String]
+        modified <- c.downField(DateLastModifiedProperty.id).as[Long]
+        fileSize <- c.downField(FileSizeProperty.id).as[Long]
+        matchId <- c.downField(MatchIdProperty.id).as[String]
       } yield {
         new ClientSideMetadataInput(path, checksum, modified, fileSize, matchId)
       }

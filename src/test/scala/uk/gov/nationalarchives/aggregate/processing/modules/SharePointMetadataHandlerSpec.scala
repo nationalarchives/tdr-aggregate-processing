@@ -19,12 +19,6 @@ class SharePointMetadataHandlerSpec extends ExternalServiceSpec {
       | "client_side_checksum": "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2"
       |}""".stripMargin
 
-  "NormaliseValueProperty" should "contain the correct enum values" in {
-    SharePointMetadataHandler.NormaliseValueProperty.values.size shouldBe 2
-    SharePointMetadataHandler.NormaliseValueProperty.FilePath.name shouldBe "file_path"
-    SharePointMetadataHandler.NormaliseValueProperty.LastModified.name shouldBe "date_last_modified"
-  }
-
   "normaliseValues" should "normalise only specified property values" in {
     val filePathJson = "/sites/Retail/Shared Documents/file1.txt".asJson
     val dateLastModifiedJson = "2025-07-03T09:19:47Z".asJson

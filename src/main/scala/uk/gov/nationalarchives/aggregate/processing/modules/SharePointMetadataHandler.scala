@@ -2,7 +2,8 @@ package uk.gov.nationalarchives.aggregate.processing.modules
 
 import io.circe.Json
 import io.circe.syntax.EncoderOps
-import uk.gov.nationalarchives.aggregate.processing.modules.SharePointMetadataHandler.NormaliseValueProperty.{FilePath, LastModified}
+import uk.gov.nationalarchives.aggregate.processing.modules
+import uk.gov.nationalarchives.aggregate.processing.modules.SharePointMetadataHandler.NormalisePropertyValue
 import uk.gov.nationalarchives.tdr.schemautils.ConfigUtils
 
 import java.sql.Timestamp
@@ -13,15 +14,12 @@ class SharePointMetadataHandler(mapper: String => String) extends MetadataHandle
   override val sourceToBasePropertiesMapper: String => String = mapper
 
   override def normaliseValues(property: String, value: Json): Json = {
-    property match {
-      case _ if property == FilePath.name     => FilePath.normalisedValue(value)
-      case _ if property == LastModified.name => LastModified.normalisedValue(value)
-      case _                                  => value
-    }
+    NormalisePropertyValue.normalise(property, value)
   }
 }
 
 object SharePointMetadataHandler {
+
   implicit class StringTimeConversions(sc: StringContext) {
     def t(args: Any*): Timestamp =
       Timestamp.from(Instant.parse(sc.s(args: _*)))
@@ -36,26 +34,33 @@ object SharePointMetadataHandler {
     SharePointLocationPath(pathComponents(1), pathComponents(2), pathComponents(3), pathComponents.slice(1, pathComponents.length).mkString("/"))
   }
 
-  object NormaliseValueProperty extends Enumeration {
-    case class NormaliseValuePropertyType(name: String, normaliseFunction: Json => Json) extends super.Val {
-      def normalisedValue(json: Json): Json = {
-        normaliseFunction(json)
-      }
+  private sealed trait SharePointProperty {
+    val baseProperty: BaseProperty
+    def normaliseFunction: Json => Json
+  }
+
+  object NormalisePropertyValue {
+    def normalise(id: String, value: Json): Json = id match {
+      case SharePointFilePath.baseProperty.id         => SharePointFilePath.normaliseFunction.apply(value)
+      case SharePointDateLastModified.baseProperty.id => SharePointDateLastModified.normaliseFunction.apply(value)
+      case _                                          => value
     }
-    val FilePath = NormaliseValuePropertyType(
-      "file_path",
-      (value: Json) => {
-        val originalValue = value.asString.get
-        sharePointLocationPathToFilePath(originalValue).filePath.asJson
-      }
-    )
-    val LastModified = NormaliseValuePropertyType(
-      "date_last_modified",
-      (value: Json) => {
-        val originalValue = value.asString.get
-        t"$originalValue".getTime.toString.asJson
-      }
-    )
+  }
+
+  private case object SharePointFilePath extends SharePointProperty {
+    override val baseProperty: BaseProperty = modules.FilePathProperty
+    override def normaliseFunction: Json => Json = (value: Json) => {
+      val originalValue = value.asString.get
+      sharePointLocationPathToFilePath(originalValue).filePath.asJson
+    }
+  }
+
+  private case object SharePointDateLastModified extends SharePointProperty {
+    override val baseProperty: BaseProperty = modules.DateLastModifiedProperty
+    override def normaliseFunction: Json => Json = (value: Json) => {
+      val originalValue = value.asString.get
+      t"$originalValue".getTime.toString.asJson
+    }
   }
 
   def apply() = new SharePointMetadataHandler(mapper)
