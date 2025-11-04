@@ -318,10 +318,10 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec {
         .withUrl(s"/draftMetadataBucket/$consignmentId/draft-metadata.csv")
         .withRequestBody(
           containing(
-            "filepath,filename,date last modified,date of the record,description,former reference,closure status,closure start date,closure period,foi exemption code,foi schedule date,is filename closed,alternate filename,is description closed,alternate description,language,translated filename,copyright,related material,restrictions on use"
+            "filepath,filename,date last modified,date of the record,description,former reference,closure status,closure start date,closure period,foi exemption code,foi schedule date,is filename closed,alternate filename,is description closed,alternate description,language,translated filename,copyright,related material,restrictions on use,evidence provided by"
           )
         )
-        .withRequestBody(containing("sites/Retail/Shared Documents/file1.txt,file1.txt,2025-07-03,,some kind of description,,Open,,,,,No,,No,,English,,legal copyright,,"))
+        .withRequestBody(containing("sites/Retail/Shared Documents/file1.txt,file1.txt,2025-07-03,,some kind of description,,Open,,,,,No,,No,,English,,legal copyright,,,"))
     )
   }
 }

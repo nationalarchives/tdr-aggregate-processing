@@ -5,7 +5,8 @@ import graphql.codegen.types.ClientSideMetadataInput
 import org.mockito.MockitoSugar
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import uk.gov.nationalarchives.aggregate.processing.modules.AssetProcessing.{AssetProcessingResult, MetadataProperty}
+import uk.gov.nationalarchives.aggregate.processing.modules.AssetProcessing.AssetProcessingResult
+import uk.gov.nationalarchives.aggregate.processing.modules.MetadataProperty
 
 class DraftMetadataCSVWriterSpec extends AnyFlatSpec with Matchers with MockitoSugar {
 
@@ -14,12 +15,12 @@ class DraftMetadataCSVWriterSpec extends AnyFlatSpec with Matchers with MockitoS
     val assetProcessingResults = AssetProcessingResult(
       matchId = Some("1"),
       processingErrors = false,
-      clientSideMetadataInput = Some(ClientSideMetadataInput(originalPath = "path", checksum = "checksum", lastModified = 1L, fileSize = 123L, matchId = "matchID")),
+      clientSideMetadataInput = Some(ClientSideMetadataInput(originalPath = "path", checksum = "checksum", lastModified = 1647339630000L, fileSize = 123L, matchId = "matchID")),
       systemMetadata = List(
         MetadataProperty("FileRef", "path/file1.txt"),
         MetadataProperty("FileLeafRef", "file1.txt"),
-        MetadataProperty("Modified", "2022-03-15T10:20:30Z"),
-        MetadataProperty("Length", "filesize")
+        MetadataProperty("Modified", "1647339630000"),
+        MetadataProperty("Length", "123")
       ),
       suppliedMetadata = List(
         MetadataProperty("description", "some kind of desc"),
@@ -51,6 +52,7 @@ class DraftMetadataCSVWriterSpec extends AnyFlatSpec with Matchers with MockitoS
       "",
       "legal copyright",
       "",
+      "",
       ""
     )
   }
@@ -61,13 +63,13 @@ class DraftMetadataCSVWriterSpec extends AnyFlatSpec with Matchers with MockitoS
       matchId = Some("1"),
       processingErrors = false,
       clientSideMetadataInput = Some(ClientSideMetadataInput(originalPath = "path", checksum = "checksum", lastModified = 1L, fileSize = 123L, matchId = "matchID")),
-      systemMetadata = List(MetadataProperty(propertyName = "Modified", propertyValue = "2022-03-15T10:20:30Z")),
+      systemMetadata = List(MetadataProperty(propertyName = "Modified", propertyValue = "1647339630000")),
       suppliedMetadata = Nil
     )
     val actual = writer.createMetadataCSV(List(assetProcessingResults))
     val csvContent: List[List[String]] = CSVReader.open(actual).all()
     checkHeaders(csvContent)
-    csvContent(1) shouldBe List("", "", "2022-03-15", "", "", "", "Open", "", "", "", "", "No", "", "No", "", "English", "", "Crown copyright", "", "")
+    csvContent(1) shouldBe List("", "", "2022-03-15", "", "", "", "Open", "", "", "", "", "No", "", "No", "", "English", "", "Crown copyright", "", "", "")
   }
 
   it should "convert boolean true -> Yes and false -> No" in {
@@ -83,11 +85,11 @@ class DraftMetadataCSVWriterSpec extends AnyFlatSpec with Matchers with MockitoS
     val actual = writer.createMetadataCSV(List(assetProcessingResults))
     val csvContent: List[List[String]] = CSVReader.open(actual).all()
     checkHeaders(csvContent)
-    csvContent(1) shouldBe List("", "", "", "", "", "", "Open", "", "", "", "", "Yes", "", "No", "", "English", "", "Crown copyright", "", "")
+    csvContent(1) shouldBe List("", "", "", "", "", "", "Open", "", "", "", "", "Yes", "", "No", "", "English", "", "Crown copyright", "", "", "")
   }
 
   private def checkHeaders(csvContent: List[List[String]]) = {
-    csvContent.head.size shouldBe 20
+    csvContent.head.size shouldBe 21
     csvContent.head should contain allOf (
       "filepath",
       "filename",
@@ -108,7 +110,8 @@ class DraftMetadataCSVWriterSpec extends AnyFlatSpec with Matchers with MockitoS
       "translated filename",
       "copyright",
       "related material",
-      "restrictions on use"
+      "restrictions on use",
+      "evidence provided by"
     )
   }
 }
