@@ -29,6 +29,24 @@ class ExternalServiceSpec extends AnyFlatSpec with BeforeAndAfterEach with Befor
   val graphQlPath = "/graphql"
   def graphQlUrl: String = wiremockGraphqlServer.url(graphQlPath)
 
+  def validBaseMetadataJsonString(filePath: String, closureType: String = "Open", language: String = "English"): String =
+    s"""{
+       | "closure_type" : "$closureType",
+       | "file_size": "12",
+       | "transferId": "consignmentId",
+       | "language" : "$language",
+       | "file_path": "$filePath",
+       | "legal_status" : "Public Record(s)",
+       | "description_closed" : "false",
+       | "title_closed" : "false",
+       | "matchId": "matchId",
+       | "date_last_modified": "1751534387000",
+       | "rights_copyright" : "Crown copyright",
+       | "held_by" : "The National Archives, Kew",
+       | "file_name": "file1.txt",
+       | "client_side_checksum": "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2"
+       |}""".stripMargin
+
   private def defaultMetadataJsonString(matchId: String, consignmentId: String) = s"""{
       "Length": "12",
       "Modified": "2025-07-03T09:19:47Z",

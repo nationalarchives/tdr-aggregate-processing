@@ -6,18 +6,25 @@ import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper
 import uk.gov.nationalarchives.aggregate.processing.ExternalServiceSpec
 
 class SharePointMetadataHandlerSpec extends ExternalServiceSpec {
-  val handler = SharePointMetadataHandler()
+  val handler: BaseMetadataHandler = SharePointMetadataHandler()
 
-  val validBaseMetadataJsonString: String =
-    """{
-      | "file_size": "12",
-      | "transferId": "consignmentId",
-      | "file_path": "sites/Retail/Shared Documents/file1.txt",
-      | "matchId": "matchId",
-      | "date_last_modified": "1751534387000",
-      | "file_name": "file1.txt",
-      | "client_side_checksum": "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2"
-      |}""".stripMargin
+//  def validBaseMetadataJsonString(closureType: String = "Open", language: String = "English"): String =
+//    s"""{
+//       | "closure_type" : "$closureType",
+//       | "file_size": "12",
+//       | "transferId": "consignmentId",
+//       | "language" : "$language",
+//       | "file_path": "sites/Retail/Shared Documents/file1.txt",
+//       | "legal_status" : "Public Record(s)",
+//       | "description_closed" : "false",
+//       | "title_closed" : "false",
+//       | "matchId": "matchId",
+//       | "date_last_modified": "1751534387000",
+//       | "rights_copyright" : "Crown copyright",
+//       | "held_by" : "The National Archives, Kew",
+//       | "file_name": "file1.txt",
+//       | "client_side_checksum": "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2"
+//       |}""".stripMargin
 
   "normaliseValues" should "normalise only specified property values" in {
     val filePathJson = "/sites/Retail/Shared Documents/file1.txt".asJson
@@ -29,7 +36,7 @@ class SharePointMetadataHandlerSpec extends ExternalServiceSpec {
     handler.normaliseValues("some_other_property", someOtherJson) shouldBe someOtherJson
   }
 
-  "convertToBaseMetadata" should "convert valid SharePoint json to base metadata json" in {
+  "convertToBaseMetadata" should "convert valid SharePoint json  with no default properties to base metadata json" in {
     val rawSharePointJsonString = """{
       | "Length": "12",
       | "Modified": "2025-07-03T09:19:47Z",
@@ -41,7 +48,26 @@ class SharePointMetadataHandlerSpec extends ExternalServiceSpec {
     }""".stripMargin
 
     val rawSharePointJson = convertStringToJson(rawSharePointJsonString)
-    val expectedJson = convertStringToJson(validBaseMetadataJsonString)
+    val expectedJson = convertStringToJson(validBaseMetadataJsonString(""))
+
+    handler.convertToBaseMetadata(rawSharePointJson) shouldBe expectedJson
+  }
+
+  "convertToBaseMetadata" should "convert valid SharePoint json with default properties to base metadata json" in {
+    val rawSharePointJsonString = """{
+      | "Length": "12",
+      | "Modified": "2025-07-03T09:19:47Z",
+      | "FileLeafRef": "file1.txt",
+      | "FileRef": "/sites/Retail/Shared Documents/file1.txt",
+      | "sha256ClientSideChecksum": "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2",
+      | "matchId": "matchId",
+      | "transferId": "consignmentId",
+      | "language": "",
+      | "closure_type": "Closed"
+    }""".stripMargin
+
+    val rawSharePointJson = convertStringToJson(rawSharePointJsonString)
+    val expectedJson = convertStringToJson(validBaseMetadataJsonString("Closed"))
 
     handler.convertToBaseMetadata(rawSharePointJson) shouldBe expectedJson
   }
@@ -54,7 +80,7 @@ class SharePointMetadataHandlerSpec extends ExternalServiceSpec {
   }
 
   "toClientSideMetadataInput" should "convert valid base metadata json to ClientSideMetadataInput" in {
-    val input = handler.toClientSideMetadataInput(convertStringToJson(validBaseMetadataJsonString))
+    val input = handler.toClientSideMetadataInput(convertStringToJson(validBaseMetadataJsonString("")))
     input.isLeft shouldBe false
     input.map(i => {
       i.matchId shouldBe "matchId"
@@ -73,7 +99,7 @@ class SharePointMetadataHandlerSpec extends ExternalServiceSpec {
 
   "toMetadataProperties" should "return specified properties if exist in json" in {
     val properties = Seq("file_size", "file_name", "somePropertyNotInJson")
-    val selectedMetadata = handler.toMetadataProperties(convertStringToJson(validBaseMetadataJsonString), properties)
+    val selectedMetadata = handler.toMetadataProperties(convertStringToJson(validBaseMetadataJsonString("")), properties)
     selectedMetadata.size shouldBe 2
     selectedMetadata.contains(MetadataProperty("file_size", "12")) shouldBe true
     selectedMetadata.contains(MetadataProperty("file_name", "file1.txt")) shouldBe true

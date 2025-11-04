@@ -7,50 +7,43 @@ import uk.gov.nationalarchives.tdr.schemautils.ConfigUtils
 
 import java.sql.Timestamp
 import java.time.Instant
-import scala.language.implicitConversions
 
-object SharePointMetadataHandler {
+object DroidMetadataHandler {
   implicit class StringTimeConversions(sc: StringContext) {
     def t(args: Any*): Timestamp =
       Timestamp.from(Instant.parse(sc.s(args: _*)))
   }
 
   private val metadataConfig: ConfigUtils.MetadataConfiguration = ConfigUtils.loadConfiguration
-  private val mapper: String => String = metadataConfig.inputToPropertyMapper("sharePointTag")
+  private val mapper: String => String = metadataConfig.inputToPropertyMapper("droidHeader")
   private val defaultPropertyValues: Map[String, String] = metadataConfig.getPropertiesWithDefaultValue
 
-  private case class SharePointLocationPath(root: String, site: String, library: String, filePath: String)
-
-  private def sharePointLocationPathToFilePath(locationPath: String): SharePointLocationPath = {
-    val pathComponents = locationPath.split("/")
-    SharePointLocationPath(pathComponents(1), pathComponents(2), pathComponents(3), pathComponents.slice(1, pathComponents.length).mkString("/"))
-  }
-
-  private sealed trait SharePointProperty {
+  private sealed trait DroidProperty {
     val baseProperty: BaseProperty
     def normaliseFunction: Json => Json
   }
 
   object NormalisePropertyValue {
     def normalise(id: String, value: Json): Json = id match {
-      case SharePointFilePath.baseProperty.id         => SharePointFilePath.normaliseFunction.apply(value)
-      case SharePointDateLastModified.baseProperty.id => SharePointDateLastModified.normaliseFunction.apply(value)
-      case _                                          => value
+      case DroidFilePath.baseProperty.id         => DroidFilePath.normaliseFunction.apply(value)
+      case DroidDateLastModified.baseProperty.id => DroidDateLastModified.normaliseFunction.apply(value)
+      case _                                     => value
     }
   }
 
-  private case object SharePointFilePath extends SharePointProperty {
+  private case object DroidFilePath extends DroidProperty {
     override val baseProperty: BaseProperty = modules.FilePathProperty
     override def normaliseFunction: Json => Json = (value: Json) => {
       val originalValue = value.asString.get
-      sharePointLocationPathToFilePath(originalValue).filePath.asJson
+      val replaceBackSlashes = originalValue.replace("\\", "/")
+      replaceBackSlashes.drop(replaceBackSlashes.indexOfSlice("Content/")).mkString.asJson
     }
   }
 
-  private case object SharePointDateLastModified extends SharePointProperty {
+  private case object DroidDateLastModified extends DroidProperty {
     override val baseProperty: BaseProperty = modules.DateLastModifiedProperty
     override def normaliseFunction: Json => Json = (value: Json) => {
-      val originalValue = value.asString.get
+      val originalValue = value.asString.get + "Z"
       t"$originalValue".getTime.toString.asJson
     }
   }
