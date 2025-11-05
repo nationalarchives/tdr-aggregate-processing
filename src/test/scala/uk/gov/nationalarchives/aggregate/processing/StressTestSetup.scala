@@ -47,9 +47,10 @@ object StressTestSetup extends App {
          |  "Modified": "2025-07-03T09:19:47Z",
          |  "FileLeafRef": "$fileName",
          |  "FileRef": "$filePath",
-         |  "SHA256ClientSideChecksum": "$checksum",
+         |  "sha256ClientSideChecksum": "$checksum",
          |  "matchId": "$matchId",
-         |  "transferId": "$consignmentId"
+         |  "transferId": "$consignmentId",
+         |  "description": "a TDR description field for file $fileName. Some more text"
          |}
          |""".stripMargin
 
