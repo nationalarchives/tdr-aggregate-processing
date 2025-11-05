@@ -39,7 +39,5 @@ trait MetadataHandler {
 
   def toMetadataProperties(json: Json, properties: Seq[String]): List[MetadataProperty]
 
-  def normaliseValues(str: String, json: Json): Json
-
   def convertToBaseMetadata(sourceJson: Json): Json
 }

@@ -22,7 +22,7 @@ class BaseMetadataHandler(mapper: String => String, defaultProperties: Map[Strin
   override val sourceToBasePropertiesMapper: String => String = mapper
   override val defaultPropertyValues: Map[String, String] = defaultProperties
 
-  override def normaliseValues(property: String, value: Json): Json = {
+  def normaliseValues(property: String, value: Json): Json = {
     normaliseFunction(property, value)
   }
 
