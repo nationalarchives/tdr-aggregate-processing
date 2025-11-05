@@ -281,4 +281,47 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec {
         .withUrl("/graphql")
     )
   }
+
+  "handleRequest" should "upload a draft-metadata.csv to S3 when supplied metadata present in uploaded metadata" in {
+    val objectKey = s"$userId/$source/$consignmentId/$category/$matchId.metadata"
+    authOkJson()
+    mockS3GetObjectTagging(objectKey)
+    mockS3GetObjectStream(objectKey, consignmentId.toString, matchId, suppliedMetadata = true)
+    mockS3ListBucketResponse(userId, consignmentId, List(matchId))
+    mockSfnResponseOk()
+    mockGraphQlAddFilesAndMetadataResponse
+    mockGraphQlUpdateConsignmentStatusResponse
+    mockGraphQlGetConsignmentResponse
+
+    val mockContext = mock[Context]
+
+    val validMessageBody: String =
+      s"""
+      {
+        "metadataSourceBucket": "source-bucket",
+        "metadataSourceObjectPrefix": "$userId/$source/$consignmentId/$category",
+        "dataLoadErrors": false
+      }
+      """.stripMargin
+
+    val message = new SQSMessage()
+    message.setBody(validMessageBody)
+    val messages: java.util.List[SQSMessage] = List(message).asJava
+    val sqsEvent = new SQSEvent()
+    sqsEvent.setRecords(messages)
+
+    new AggregateProcessingLambda().handleRequest(sqsEvent, mockContext)
+
+    wiremockS3.verify(
+      exactly(1),
+      putRequestedFor(anyUrl())
+        .withUrl(s"/draftMetadataBucket/$consignmentId/draft-metadata.csv")
+        .withRequestBody(
+          containing(
+            "filepath,filename,date last modified,date of the record,description,former reference,closure status,closure start date,closure period,foi exemption code,foi schedule date,is filename closed,alternate filename,is description closed,alternate description,language,translated filename,copyright,related material,restrictions on use,evidence provided by"
+          )
+        )
+        .withRequestBody(containing("sites/Retail/Shared Documents/file1.txt,file1.txt,2025-07-03,,some kind of description,,Open,,,,,No,,No,,English,,legal copyright,,,"))
+    )
+  }
 }

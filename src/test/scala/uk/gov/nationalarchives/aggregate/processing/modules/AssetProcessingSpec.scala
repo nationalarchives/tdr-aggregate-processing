@@ -1,16 +1,15 @@
 package uk.gov.nationalarchives.aggregate.processing.modules
 
-import cats.effect.IO
 import com.typesafe.scalalogging.Logger
 import graphql.codegen.types.ClientSideMetadataInput
-import org.mockito.ArgumentMatchers.{any, anyString}
+import org.mockito.ArgumentMatchers.any
 import org.mockito.MockitoSugar.{mock, times, verify, when}
 import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper
 import org.slf4j.{Logger => UnderlyingLogger}
 import software.amazon.awssdk.core.ResponseBytes
 import software.amazon.awssdk.core.async.AsyncResponseTransformer
 import software.amazon.awssdk.services.s3.S3AsyncClient
-import software.amazon.awssdk.services.s3.model.{GetObjectRequest, GetObjectResponse, GetObjectTaggingRequest, GetObjectTaggingResponse, PutObjectTaggingResponse}
+import software.amazon.awssdk.services.s3.model.{GetObjectRequest, GetObjectResponse, GetObjectTaggingRequest, GetObjectTaggingResponse}
 import software.amazon.awssdk.utils.CompletableFutureUtils.failedFuture
 import uk.gov.nationalarchives.aggregate.processing.ExternalServiceSpec
 import uk.gov.nationalarchives.aggregate.processing.modules.AssetProcessing.AssetProcessingResult
@@ -29,7 +28,7 @@ class AssetProcessingSpec extends ExternalServiceSpec {
       "Modified": "2025-07-03T09:19:47Z",
       "FileLeafRef": "file1.txt",
       "FileRef": "/sites/Retail/Shared Documents/file1.txt",
-      "SHA256ClientSideChecksum": "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2",
+      "sha256ClientSideChecksum": "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2",
       "matchId": "$matchId",
       "transferId": "$consignmentId"
     }""".stripMargin
@@ -39,14 +38,25 @@ class AssetProcessingSpec extends ExternalServiceSpec {
     val s3UtilsMock = mock[S3Utils]
 
     val expectedInput = ClientSideMetadataInput(
-      "Retail/Shared Documents/file1.txt",
+      "sites/Retail/Shared Documents/file1.txt",
       "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2",
       1751534387000L,
       12L,
       matchId
     )
 
-    val expectedResult = AssetProcessingResult(Some(matchId), processingErrors = false, Some(expectedInput))
+    val expectedResult = AssetProcessingResult(
+      Some(matchId),
+      processingErrors = false,
+      Some(expectedInput),
+      systemMetadata = List(
+        MetadataProperty("file_path", "sites/Retail/Shared Documents/file1.txt"),
+        MetadataProperty("file_name", "file1.txt"),
+        MetadataProperty("date_last_modified", "1751534387000"),
+        MetadataProperty("file_size", "12"),
+        MetadataProperty("client_side_checksum", "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2")
+      )
+    )
 
     when(mockLogger.isInfoEnabled()).thenReturn(true)
     when(mockLogger.isErrorEnabled).thenReturn(true)
@@ -94,7 +104,7 @@ class AssetProcessingSpec extends ExternalServiceSpec {
       "Modified": "2025-07-03T09:19:47Z",
       "FileLeafRef": "file1.txt",
       "FileRef": "/sites/Retail/Shared Documents/file1.txt",
-      "SHA256ClientSideChecksum": "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2",
+      "sha256ClientSideChecksum": "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2",
       "matchId": "$matchId",
       "transferId": "$consignmentId"
     }""".stripMargin
@@ -114,7 +124,7 @@ class AssetProcessingSpec extends ExternalServiceSpec {
 
     verifyDefaultInfoLogging(mockLogger)
     verify(mockLogger).error(
-      s"AssetProcessingError: consignmentId: Some($consignmentId), matchId: Some($matchId), source: Some(sharepoint), errorCode: ASSET_PROCESSING.JSON.INVALID, errorMessage: DecodingFailure at .Length: Missing required field"
+      s"AssetProcessingError: consignmentId: Some($consignmentId), matchId: Some($matchId), source: Some(sharepoint), errorCode: ASSET_PROCESSING.JSON.INVALID, errorMessage: DecodingFailure at .file_size: Missing required field"
     )
   }
 
@@ -249,6 +259,62 @@ class AssetProcessingSpec extends ExternalServiceSpec {
     verify(mockLogger).error(
       s"AssetProcessingError: consignmentId: Some($consignmentId), matchId: None, source: Some(sharepoint), errorCode: ASSET_PROCESSING.MATCH_ID.MISMATCH, errorMessage: Mismatched match ids: $differentMatchId and $matchId"
     )
+  }
+
+  "processAsset" should "return asset processing result and not log errors when supplied metadata json is valid" in {
+    val mockLogger = mock[UnderlyingLogger]
+    val s3UtilsMock = mock[S3Utils]
+
+    val defaultMetadataWithSupplied = s"""{
+      "Length": "12",
+      "Modified": "2025-07-03T09:19:47Z",
+      "FileLeafRef": "file1.txt",
+      "FileRef": "/sites/Retail/Shared Documents/file1.txt",
+      "sha256ClientSideChecksum": "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2",
+      "matchId": "$matchId",
+      "transferId": "$consignmentId",
+      "filepath": "file/Path/1",
+      "description": "some kind of description"
+    }""".stripMargin
+
+    val jsonMetadataString = defaultMetadataWithSupplied
+
+    val expectedInput = ClientSideMetadataInput(
+      "sites/Retail/Shared Documents/file1.txt",
+      "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2",
+      1751534387000L,
+      12L,
+      matchId
+    )
+
+    val expectedResult =
+      AssetProcessingResult(
+        Some(matchId),
+        processingErrors = false,
+        Some(expectedInput),
+        systemMetadata = List(
+          MetadataProperty("file_path", "sites/Retail/Shared Documents/file1.txt"),
+          MetadataProperty("file_name", "file1.txt"),
+          MetadataProperty("date_last_modified", "1751534387000"),
+          MetadataProperty("file_size", "12"),
+          MetadataProperty("client_side_checksum", "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2")
+        ),
+        suppliedMetadata = List(MetadataProperty("description", "some kind of description"))
+      )
+
+    when(mockLogger.isInfoEnabled()).thenReturn(true)
+    when(mockLogger.isErrorEnabled).thenReturn(true)
+    when(s3UtilsMock.getObjectAsStream(any[String], any[String]))
+      .thenReturn(new ByteArrayInputStream(jsonMetadataString.getBytes("UTF-8")))
+
+    val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
+    val result = assetProcessing.processAsset("s3Bucket", s"$userId/sharepoint/$consignmentId/metadata/$matchId.metadata")
+
+    result shouldEqual expectedResult
+
+    verify(mockLogger, times(0)).isErrorEnabled
+    verifyDefaultInfoLogging(mockLogger)
+    verify(mockLogger).info("Asset metadata successfully processed for: {}", s"$userId/sharepoint/$consignmentId/metadata/$matchId.metadata")
   }
 
   private def verifyDefaultInfoLogging(logger: UnderlyingLogger): Unit = {
