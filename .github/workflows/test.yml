@@ -11,6 +11,6 @@ jobs:
     with:
       repo-name: tdr-api-update
       test-command: |
-        sbt test
+        sbt scalafmtCheckAll test
     secrets:
       SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
