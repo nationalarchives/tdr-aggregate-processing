@@ -7,15 +7,10 @@ on:
       - release-*
 jobs:
   test:
-    runs-on:  ubuntu-latest
-    steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-      - uses: sbt/setup-sbt@3e125ece5c3e5248e18da9ed8d2cce3d335ec8dd # v1.1.14
-      - uses: nationalarchives/tdr-github-actions/.github/actions/run-git-secrets@23171128721c6f4e951b8c6868a57a787e44db82 # v0.0.8
-      - uses: nationalarchives/tdr-github-actions/.github/actions/slack-send@23171128721c6f4e951b8c6868a57a787e44db82 # v0.0.8
-        if: failure()
-        with:
-          message: ":warning: Secrets found in repository ${{ inputs.repo-name }}"
-          slack-url: ${{ secrets.SLACK_WEBHOOK }}
-      - name: Run tests
-        run: sbt scalafmtCheckAll test
+    uses: nationalarchives/tdr-github-actions/.github/workflows/tdr_test.yml@23171128721c6f4e951b8c6868a57a787e44db82 # v.0.0.8
+    with:
+      repo-name: tdr-api-update
+      test-command: |
+        sbt test
+    secrets:
+      SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
