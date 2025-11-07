@@ -130,6 +130,13 @@ class ExternalServiceSpec extends AnyFlatSpec with BeforeAndAfterEach with Befor
     )
   }
 
+  def mockGraphQlUpdateParentFolderResponse: StubMapping =
+    wiremockGraphqlServer.stubFor(
+      post(urlEqualTo("/graphql"))
+        .withRequestBody(containing("updateParentFolder"))
+        .willReturn(ok("""{"data":{"updateParentFolder": 1}}"""))
+    )
+
   def mockGraphQlResponseError: StubMapping = wiremockGraphqlServer.stubFor(
     post(urlEqualTo(graphQlPath))
       .willReturn(aResponse().withStatus(500).withBody("internal server error"))
