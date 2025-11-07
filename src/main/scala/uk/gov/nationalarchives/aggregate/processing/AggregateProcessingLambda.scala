@@ -8,7 +8,7 @@ import com.amazonaws.services.lambda.runtime.events.SQSEvent.SQSMessage
 import com.amazonaws.services.lambda.runtime.{Context, RequestHandler}
 import com.typesafe.config.{Config, ConfigFactory}
 import com.typesafe.scalalogging.Logger
-import graphql.codegen.types.AddFileAndMetadataInput
+import graphql.codegen.types.{AddFileAndMetadataInput, UpdateParentFolderInput}
 import io.circe._
 import io.circe.generic.semiauto.deriveDecoder
 import io.circe.parser._
@@ -101,8 +101,12 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
           IO(Nil)
         } else {
           val clientSideMetadataInput = assetProcessingResults.flatMap(_.clientSideMetadataInput)
-          val input = AddFileAndMetadataInput(consignmentId, clientSideMetadataInput, None, Some(userId))
-          persistenceApi.addClientSideMetadata(input)
+          val addFileAndMetadataInput = AddFileAndMetadataInput(consignmentId, clientSideMetadataInput, None, Some(userId))
+          val updateParentFolderInput = UpdateParentFolderInput(consignmentId, parentFolder = clientSideMetadataInput.head.originalPath.split("/").head, Some(userId))
+          for {
+            _ <- persistenceApi.addParentFolder(updateParentFolderInput)
+            _ <- persistenceApi.addClientSideMetadata(addFileAndMetadataInput)
+          } yield ()
         }
       _ = if (suppliedMetadata) {
         val draftMetadataCSVWriter = new DraftMetadataCSVWriter()
