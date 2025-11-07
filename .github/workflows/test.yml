@@ -9,7 +9,7 @@ jobs:
   test:
     uses: nationalarchives/tdr-github-actions/.github/workflows/tdr_test.yml@f4766d435f6a5fbcf8ebbf64020b208c04ac2a2f # v.0.0.9
     with:
-      repo-name: tdr-api-update
+      repo-name: tdr-aggregate-processing
       test-command: |
         sbt scalafmtCheckAll test
     secrets:
