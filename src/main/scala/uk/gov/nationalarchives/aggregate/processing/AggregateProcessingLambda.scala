@@ -97,8 +97,9 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
       assetProcessingErrors = assetProcessingResults.exists(_.processingErrors)
       suppliedMetadata = assetProcessingResults.exists(_.suppliedMetadata.nonEmpty)
       _ <-
-        if (assetProcessingErrors) IO.unit
-        else {
+        if (assetProcessingErrors) {
+          IO.unit
+        } else {
           val clientSideMetadataInput = assetProcessingResults.flatMap(_.clientSideMetadataInput)
           val addFileAndMetadataInput = AddFileAndMetadataInput(consignmentId, clientSideMetadataInput, None, Some(userId))
           val updateParentFolderInput = UpdateParentFolderInput(consignmentId, parentFolder = clientSideMetadataInput.head.originalPath.split("/").head, Some(userId))
@@ -109,6 +110,7 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
         }
       _ <-
         if (suppliedMetadata) {
+          logger.info("Creating draft-metadata.csv")
           val draftMetadataCSVWriter = new DraftMetadataCSVWriter()
           val metadataCSV = draftMetadataCSVWriter.createMetadataCSV(assetProcessingResults)
           uploadToS3(metadataCSV.toPath, draftMetadataBucket, s"$consignmentId/draft-metadata.csv")
@@ -117,7 +119,7 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
   }
 
   private def uploadToS3(filePath: Path, bucket: String, key: String): IO[Unit] = {
-    logger.info(s"Uploading $key to S3")
+    logger.info(s"Uploading draft-metadata.csv to s3://$bucket/$key")
     s3Utils.upload(bucket, key, filePath).void
   }
 
