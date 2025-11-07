@@ -6,7 +6,8 @@ import com.typesafe.scalalogging.Logger
 import graphql.codegen.AddFilesAndMetadata.{addFilesAndMetadata => afm}
 import graphql.codegen.GetConsignment.{getConsignment => gc}
 import graphql.codegen.UpdateConsignmentStatus.{updateConsignmentStatus => ucs}
-import graphql.codegen.types.{AddFileAndMetadataInput, ConsignmentStatusInput}
+import graphql.codegen.UpdateParentFolder.{updateParentFolder => upf}
+import graphql.codegen.types.{AddFileAndMetadataInput, ConsignmentStatusInput, UpdateParentFolderInput}
 import sttp.client3.{HttpURLConnectionBackend, Identity, SttpBackend, SttpBackendOptions}
 import uk.gov.nationalarchives.aggregate.processing.config.ApplicationConfig._
 import uk.gov.nationalarchives.tdr.GraphQLClient
@@ -20,7 +21,8 @@ class GraphQlApi(
     keycloak: KeycloakUtils,
     updateConsignmentStatusClient: GraphQLClient[ucs.Data, ucs.Variables],
     addFilesAndMetadataClient: GraphQLClient[afm.Data, afm.Variables],
-    getConsignmentClient: GraphQLClient[gc.Data, gc.Variables]
+    getConsignmentClient: GraphQLClient[gc.Data, gc.Variables],
+    updateParentFolderClient: GraphQLClient[upf.Data, upf.Variables]
 )(implicit
     logger: Logger,
     keycloakDeployment: TdrKeycloakDeployment,
@@ -62,6 +64,17 @@ class GraphQlApi(
       data <- IO.fromOption(result.data)(throw new RuntimeException(s"Unable to get consignment details for consignment: $consignmentId"))
     } yield data.getConsignment
   }
+
+  def addParentFolder(updateParentFolderInput: UpdateParentFolderInput): IO[Option[Int]] = {
+    val consignmentId = updateParentFolderInput.consignmentId
+
+    logger.info(s"Add parent folder for consignment: $consignmentId")
+    for {
+      token <- keycloak.serviceAccountToken(authClientId, clientSecret).toIO
+      result <- updateParentFolderClient.getResult(token, upf.document, upf.Variables(updateParentFolderInput).some).toIO
+      data <- IO.fromOption(result.data)(throw new RuntimeException(s"Unable to add parent folder: $consignmentId"))
+    } yield data.updateParentFolder
+  }
 }
 
 object GraphQlApi {
@@ -71,11 +84,12 @@ object GraphQlApi {
   private val updateConsignmentStatusClient = new GraphQLClient[ucs.Data, ucs.Variables](graphQlApiUrl)
   private val addFilesAndMetadataClient = new GraphQLClient[afm.Data, afm.Variables](graphQlApiUrl)
   private val getConsignmentClient = new GraphQLClient[gc.Data, gc.Variables](graphQlApiUrl)
+  private val updateParentFolderClient = new GraphQLClient[upf.Data, upf.Variables](graphQlApiUrl)
 
   val logger = Logger[GraphQlApi]
 
   def apply()(implicit
       backend: SttpBackend[Identity, Any],
       keycloakDeployment: TdrKeycloakDeployment
-  ) = new GraphQlApi(keycloakUtils, updateConsignmentStatusClient, addFilesAndMetadataClient, getConsignmentClient)(logger, keycloakDeployment, backend)
+  ) = new GraphQlApi(keycloakUtils, updateConsignmentStatusClient, addFilesAndMetadataClient, getConsignmentClient, updateParentFolderClient)(logger, keycloakDeployment, backend)
 }
