@@ -6,7 +6,7 @@ import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper
 import uk.gov.nationalarchives.aggregate.processing.ExternalServiceSpec
 
 class SharePointMetadataHandlerSpec extends ExternalServiceSpec {
-  val handler = SharePointMetadataHandler()
+  val handler: BaseMetadataHandler = SharePointMetadataHandler.metadataHandler
 
   val validBaseMetadataJsonString: String =
     """{

@@ -31,40 +31,13 @@ case object MatchIdProperty extends BaseProperty {
 }
 
 trait MetadataHandler {
-  implicit val decodeClientSideInput: Decoder[ClientSideMetadataInput] =
-    Decoder.instance[ClientSideMetadataInput] { c =>
-      for {
-        path <- c.downField(FilePathProperty.id).as[String]
-        checksum <- c.downField(ClientSideChecksumProperty.id).as[String]
-        modified <- c.downField(DateLastModifiedProperty.id).as[Long]
-        fileSize <- c.downField(FileSizeProperty.id).as[Long]
-        matchId <- c.downField(MatchIdProperty.id).as[String]
-      } yield {
-        new ClientSideMetadataInput(path, checksum, modified, fileSize, matchId)
-      }
-    }
-
   val sourceToBasePropertiesMapper: String => String
 
-  def toClientSideMetadataInput(baseMetadataJson: Json): Decoder.Result[ClientSideMetadataInput] = baseMetadataJson.as[ClientSideMetadataInput]
+  val defaultPropertyValues: Map[String, String]
 
-  def toMetadataProperties(json: Json, properties: Seq[String]): List[MetadataProperty] = {
-    for {
-      obj <- json.asObject.toList
-      key <- properties
-      value <- obj(key).flatMap(_.asString)
-    } yield MetadataProperty(key, value)
-  }
+  def toClientSideMetadataInput(baseMetadataJson: Json): Decoder.Result[ClientSideMetadataInput]
 
-  def normaliseValues(str: String, json: Json): Json
+  def toMetadataProperties(json: Json, properties: Seq[String]): List[MetadataProperty]
 
-  def convertToBaseMetadata(sourceJson: Json): Json = {
-    sourceJson.asObject.get.toMap
-      .map(fv => {
-        val originalField = fv._1
-        val field = sourceToBasePropertiesMapper(originalField)
-        field -> normaliseValues(field, fv._2)
-      })
-      .asJson
-  }
+  def convertToBaseMetadata(sourceJson: Json): Json
 }
