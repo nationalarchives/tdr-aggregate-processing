@@ -97,23 +97,24 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
       assetProcessingErrors = assetProcessingResults.exists(_.processingErrors)
       suppliedMetadata = assetProcessingResults.exists(_.suppliedMetadata.nonEmpty)
       _ <-
-        if (assetProcessingErrors) {
-          IO(Nil)
-        } else {
+        if (assetProcessingErrors) IO.unit
+        else {
           val clientSideMetadataInput = assetProcessingResults.flatMap(_.clientSideMetadataInput)
           val input = AddFileAndMetadataInput(consignmentId, clientSideMetadataInput, None, Some(userId))
           persistenceApi.addClientSideMetadata(input)
         }
-      _ = if (suppliedMetadata) {
-        val draftMetadataCSVWriter = new DraftMetadataCSVWriter()
-        val metadataCSV = draftMetadataCSVWriter.createMetadataCSV(assetProcessingResults)
-        uploadToS3(metadataCSV.toPath, draftMetadataBucket, s"$consignmentId/draft-metadata.csv")
-      }
+      _ <-
+        if (suppliedMetadata) {
+          val draftMetadataCSVWriter = new DraftMetadataCSVWriter()
+          val metadataCSV = draftMetadataCSVWriter.createMetadataCSV(assetProcessingResults)
+          uploadToS3(metadataCSV.toPath, draftMetadataBucket, s"$consignmentId/draft-metadata.csv")
+        } else IO.unit
     } yield AssetProcessingResult(assetProcessingErrors, suppliedMetadata)
   }
 
-  private def uploadToS3(filePath: Path, bucket: String, key: String): Unit = {
-    s3Utils.upload(bucket, key, filePath)
+  private def uploadToS3(filePath: Path, bucket: String, key: String): IO[Unit] = {
+    logger.info(s"Uploading $key to S3")
+    s3Utils.upload(bucket, key, filePath).void
   }
 
   private def parseSqsMessage(sqsMessage: SQSMessage): AggregateEvent = {
