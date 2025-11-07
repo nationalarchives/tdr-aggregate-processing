@@ -104,8 +104,8 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
           val addFileAndMetadataInput = AddFileAndMetadataInput(consignmentId, clientSideMetadataInput, None, Some(userId))
           val updateParentFolderInput = UpdateParentFolderInput(consignmentId, parentFolder = clientSideMetadataInput.head.originalPath.split("/").head, Some(userId))
           for {
-            _ <- persistenceApi.addClientSideMetadata(addFileAndMetadataInput)
             _ <- persistenceApi.addParentFolder(updateParentFolderInput)
+            _ <- persistenceApi.addClientSideMetadata(addFileAndMetadataInput)
           } yield ()
         }
       _ = if (suppliedMetadata) {
