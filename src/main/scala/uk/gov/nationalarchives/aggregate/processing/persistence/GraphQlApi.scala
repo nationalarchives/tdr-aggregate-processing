@@ -3,6 +3,7 @@ package uk.gov.nationalarchives.aggregate.processing.persistence
 import cats.effect.IO
 import cats.implicits.catsSyntaxOptionId
 import com.typesafe.scalalogging.Logger
+import graphql.codegen.AddConsignmentStatus.{addConsignmentStatus => acs}
 import graphql.codegen.AddFilesAndMetadata.{addFilesAndMetadata => afm}
 import graphql.codegen.GetConsignment.{getConsignment => gc}
 import graphql.codegen.UpdateConsignmentStatus.{updateConsignmentStatus => ucs}
@@ -20,6 +21,7 @@ import scala.concurrent.Future
 class GraphQlApi(
     keycloak: KeycloakUtils,
     updateConsignmentStatusClient: GraphQLClient[ucs.Data, ucs.Variables],
+    addConsignmentStatusClient: GraphQLClient[acs.Data, acs.Variables],
     addFilesAndMetadataClient: GraphQLClient[afm.Data, afm.Variables],
     getConsignmentClient: GraphQLClient[gc.Data, gc.Variables],
     updateParentFolderClient: GraphQLClient[upf.Data, upf.Variables]
@@ -43,6 +45,17 @@ class GraphQlApi(
       result <- updateConsignmentStatusClient.getResult(token, ucs.document, ucs.Variables(consignmentStatusInput).some).toIO
       data <- IO.fromOption(result.data)(throw new RuntimeException(s"Unable to update consignment status: $consignmentId"))
     } yield data.updateConsignmentStatus
+  }
+
+  def addConsignmentStatus(consignmentStatusInput: ConsignmentStatusInput): IO[acs.AddConsignmentStatus] = {
+    val consignmentId = consignmentStatusInput.consignmentId
+
+    logger.info("Adding consignment status: " + consignmentStatusInput.statusType + " for consignment: " + consignmentId)
+    for {
+      token <- keycloak.serviceAccountToken(authClientId, clientSecret).toIO
+      result <- addConsignmentStatusClient.getResult(token, acs.document, acs.Variables(consignmentStatusInput).some).toIO
+      data <- IO.fromOption(result.data)(throw new RuntimeException(s"Unable to add consignment status: $consignmentId"))
+    } yield data.addConsignmentStatus
   }
 
   def addClientSideMetadata(addFileAndMetadataInput: AddFileAndMetadataInput): IO[List[afm.AddFilesAndMetadata]] = {
@@ -82,6 +95,7 @@ object GraphQlApi {
   implicit val keycloakDeployment: TdrKeycloakDeployment = TdrKeycloakDeployment(authUrl, "tdr", timeToLiveSecs)
   private val keycloakUtils = new KeycloakUtils()
   private val updateConsignmentStatusClient = new GraphQLClient[ucs.Data, ucs.Variables](graphQlApiUrl)
+  private val addConsignmentStatusClient = new GraphQLClient[acs.Data, acs.Variables](graphQlApiUrl)
   private val addFilesAndMetadataClient = new GraphQLClient[afm.Data, afm.Variables](graphQlApiUrl)
   private val getConsignmentClient = new GraphQLClient[gc.Data, gc.Variables](graphQlApiUrl)
   private val updateParentFolderClient = new GraphQLClient[upf.Data, upf.Variables](graphQlApiUrl)
@@ -91,5 +105,5 @@ object GraphQlApi {
   def apply()(implicit
       backend: SttpBackend[Identity, Any],
       keycloakDeployment: TdrKeycloakDeployment
-  ) = new GraphQlApi(keycloakUtils, updateConsignmentStatusClient, addFilesAndMetadataClient, getConsignmentClient, updateParentFolderClient)(logger, keycloakDeployment, backend)
+  ) = new GraphQlApi(keycloakUtils, updateConsignmentStatusClient, addConsignmentStatusClient, addFilesAndMetadataClient, getConsignmentClient, updateParentFolderClient)(logger, keycloakDeployment, backend)
 }

@@ -3,6 +3,7 @@ package uk.gov.nationalarchives.aggregate.processing.persistence
 import cats.effect.unsafe.implicits.global
 import com.nimbusds.oauth2.sdk.token.BearerAccessToken
 import com.typesafe.scalalogging.Logger
+import graphql.codegen.AddConsignmentStatus.{addConsignmentStatus => acs}
 import graphql.codegen.AddFilesAndMetadata.{addFilesAndMetadata => afm}
 import graphql.codegen.GetConsignment.{getConsignment => gc}
 import graphql.codegen.UpdateConsignmentStatus.{updateConsignmentStatus => ucs}
@@ -31,6 +32,7 @@ class GraphQlApiSpec extends ExternalServiceSpec {
   implicit val backend: SttpBackend[Identity, Any] = HttpURLConnectionBackend()
 
   private val updateConsignmentStatusClient = mock[GraphQLClient[ucs.Data, ucs.Variables]]
+  private val addConsignmentStatusClient = mock[GraphQLClient[acs.Data, acs.Variables]]
   private val addFilesAndMetadataClient = mock[GraphQLClient[afm.Data, afm.Variables]]
   private val getConsignmentClient = mock[GraphQLClient[gc.Data, gc.Variables]]
   private val updateParentFolderClient = mock[GraphQLClient[upf.Data, upf.Variables]]
@@ -39,7 +41,7 @@ class GraphQlApiSpec extends ExternalServiceSpec {
     val mockLogger = mock[UnderlyingLogger]
     val mockApiResponse = List[afm.AddFilesAndMetadata]()
 
-    val api = new GraphQlApi(keycloak, updateConsignmentStatusClient, addFilesAndMetadataClient, getConsignmentClient, updateParentFolderClient)(
+    val api = new GraphQlApi(keycloak, updateConsignmentStatusClient, addConsignmentStatusClient, addFilesAndMetadataClient, getConsignmentClient, updateParentFolderClient)(
       Logger(mockLogger),
       tdrKeycloakDeployment,
       backend
@@ -89,7 +91,7 @@ class GraphQlApiSpec extends ExternalServiceSpec {
 
     val input = AddFileAndMetadataInput(consignmentId, Nil, None, Some(overrideUserId))
 
-    val api = new GraphQlApi(keycloak, updateConsignmentStatusClient, addFilesAndMetadataClient, getConsignmentClient, updateParentFolderClient)(
+    val api = new GraphQlApi(keycloak, updateConsignmentStatusClient, addConsignmentStatusClient, addFilesAndMetadataClient, getConsignmentClient, updateParentFolderClient)(
       Logger(mockLogger),
       tdrKeycloakDeployment,
       backend
@@ -106,7 +108,7 @@ class GraphQlApiSpec extends ExternalServiceSpec {
   "updateConsignmentStatus" should "update the consignment status with the given arguments" in {
     val mockLogger = mock[UnderlyingLogger]
 
-    val api = new GraphQlApi(keycloak, updateConsignmentStatusClient, addFilesAndMetadataClient, getConsignmentClient, updateParentFolderClient)(
+    val api = new GraphQlApi(keycloak, updateConsignmentStatusClient, addConsignmentStatusClient, addFilesAndMetadataClient, getConsignmentClient, updateParentFolderClient)(
       Logger(mockLogger),
       tdrKeycloakDeployment,
       backend
@@ -151,7 +153,7 @@ class GraphQlApiSpec extends ExternalServiceSpec {
       .when(updateConsignmentStatusClient)
       .getResult[Identity](any[BearerAccessToken], any[Document], any[Option[ucs.Variables]])(any[SttpBackend[Identity, Any]], any[ClassTag[Identity[_]]])
 
-    val api = new GraphQlApi(keycloak, updateConsignmentStatusClient, addFilesAndMetadataClient, getConsignmentClient, updateParentFolderClient)(
+    val api = new GraphQlApi(keycloak, updateConsignmentStatusClient, addConsignmentStatusClient, addFilesAndMetadataClient, getConsignmentClient, updateParentFolderClient)(
       Logger(mockLogger),
       tdrKeycloakDeployment,
       backend
@@ -168,7 +170,7 @@ class GraphQlApiSpec extends ExternalServiceSpec {
   "getConsignmentDetails" should "return details for a consignment given a consignment id" in {
     val mockLogger = mock[UnderlyingLogger]
 
-    val api = new GraphQlApi(keycloak, updateConsignmentStatusClient, addFilesAndMetadataClient, getConsignmentClient, updateParentFolderClient)(
+    val api = new GraphQlApi(keycloak, updateConsignmentStatusClient, addConsignmentStatusClient, addFilesAndMetadataClient, getConsignmentClient, updateParentFolderClient)(
       Logger(mockLogger),
       tdrKeycloakDeployment,
       backend
@@ -200,7 +202,7 @@ class GraphQlApiSpec extends ExternalServiceSpec {
   "getConsignmentDetails" should "throw an error when getting consignment fails" in {
     val mockLogger = mock[UnderlyingLogger]
 
-    val api = new GraphQlApi(keycloak, updateConsignmentStatusClient, addFilesAndMetadataClient, getConsignmentClient, updateParentFolderClient)(
+    val api = new GraphQlApi(keycloak, updateConsignmentStatusClient, addConsignmentStatusClient, addFilesAndMetadataClient, getConsignmentClient, updateParentFolderClient)(
       Logger(mockLogger),
       tdrKeycloakDeployment,
       backend
@@ -231,7 +233,7 @@ class GraphQlApiSpec extends ExternalServiceSpec {
   "addParentFolder" should "add parent folder with the given arguments" in {
     val mockLogger = mock[UnderlyingLogger]
 
-    val api = new GraphQlApi(keycloak, updateConsignmentStatusClient, addFilesAndMetadataClient, getConsignmentClient, updateParentFolderClient)(
+    val api = new GraphQlApi(keycloak, updateConsignmentStatusClient, addConsignmentStatusClient, addFilesAndMetadataClient, getConsignmentClient, updateParentFolderClient)(
       Logger(mockLogger),
       tdrKeycloakDeployment,
       backend
@@ -279,7 +281,7 @@ class GraphQlApiSpec extends ExternalServiceSpec {
 
     val input = UpdateParentFolderInput(consignmentId, parentFolder, Some(overrideUserId))
 
-    val api = new GraphQlApi(keycloak, updateConsignmentStatusClient, addFilesAndMetadataClient, getConsignmentClient, updateParentFolderClient)(
+    val api = new GraphQlApi(keycloak, updateConsignmentStatusClient, addConsignmentStatusClient, addFilesAndMetadataClient, getConsignmentClient, updateParentFolderClient)(
       Logger(mockLogger),
       tdrKeycloakDeployment,
       backend

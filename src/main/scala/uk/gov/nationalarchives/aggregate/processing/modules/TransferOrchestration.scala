@@ -7,7 +7,7 @@ import graphql.codegen.types.ConsignmentStatusInput
 import io.circe.Encoder
 import io.circe.generic.semiauto.deriveEncoder
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.AssetSource.{AssetSource, SharePoint}
-import uk.gov.nationalarchives.aggregate.processing.modules.Common.ConsignmentStatusType
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.{ConsignmentStatusType, StateStatusValue}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ObjectCategory.Records
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorType.EventError
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorValue.Invalid
@@ -52,7 +52,7 @@ class TransferOrchestration(
     val userId = event.userId
     val consignmentStatusValue: ConsignmentStatusValue = if (errors) Failed else Completed
 
-    val triggerSfnEffect =
+    val triggerBackendChecksSfn =
       if (errors) {
         val transferError = TransferError(Some(consignmentId), s"$AggregateProcessing.$CompletedWithIssues", "One or more assets failed to process.")
         IO(ErrorHandling.handleError(transferError, logger))
@@ -64,18 +64,23 @@ class TransferOrchestration(
           consignmentId = consignmentId
         )
       }
-    if (event.suppliedMetadata) {
+    val triggerDraftMetadataSfn = if (event.suppliedMetadata) {
       logger.info(s"Triggering draft metadata validation for consignment: $consignmentId")
-      triggerStepFunction(
-        arnKey = "sfn.metadataChecksArn",
-        input = MetadataChecksStepFunctionInput(consignmentId.toString),
-        consignmentId = consignmentId
-      )
-    }
+      val statusInput = ConsignmentStatusInput(consignmentId, ConsignmentStatusType.DraftMetadata.toString, Some(StateStatusValue.InProgress.toString), Some(event.userId))
+      for {
+        _ <- graphQlApi.addConsignmentStatus(statusInput)
+        _ <- triggerStepFunction(
+          arnKey = "sfn.metadataChecksArn",
+          input = MetadataChecksStepFunctionInput(consignmentId.toString),
+          consignmentId = consignmentId
+        )
+      } yield ()
+    } else IO.unit
 
     val statusInput = ConsignmentStatusInput(consignmentId, ConsignmentStatusType.Upload.toString, Some(consignmentStatusValue.toString), Some(event.userId))
     for {
-      _ <- triggerSfnEffect
+      _ <- triggerBackendChecksSfn
+      _ <- triggerDraftMetadataSfn
       updateResult <- graphQlApi.updateConsignmentStatus(statusInput)
       success = updateResult.nonEmpty
       result = OrchestrationResult(Some(consignmentId), success = success)
