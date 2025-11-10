@@ -4,6 +4,7 @@ import cats.effect.IO
 import cats.effect.unsafe.implicits.global
 import com.typesafe.config.ConfigFactory
 import com.typesafe.scalalogging.Logger
+import graphql.codegen.AddConsignmentStatus.addConsignmentStatus.AddConsignmentStatus
 import graphql.codegen.GetConsignment.getConsignment
 import graphql.codegen.types.ConsignmentStatusInput
 import io.circe.Encoder
@@ -24,6 +25,7 @@ import uk.gov.nationalarchives.aggregate.processing.utilities.{KeycloakClient, N
 import uk.gov.nationalarchives.aws.utils.stepfunction.StepFunctionUtils
 import uk.gov.nationalarchives.tdr.keycloak.KeycloakUtils.UserDetails
 
+import java.time.ZonedDateTime
 import java.util.UUID
 import scala.concurrent.Future
 
@@ -132,6 +134,19 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     when(mockLogger.isInfoEnabled()).thenReturn(true)
     when(mockLogger.isErrorEnabled()).thenReturn(true)
     when(mockGraphQlApi.updateConsignmentStatus(any[ConsignmentStatusInput])).thenReturn(IO(Some(1)))
+    when(mockGraphQlApi.addConsignmentStatus(any[ConsignmentStatusInput]))
+      .thenReturn(
+        IO(
+          AddConsignmentStatus(
+            consignmentStatusId = UUID.randomUUID(),
+            consignmentId,
+            statusType = "DraftMetadata",
+            value = "InProgress",
+            createdDatetime = ZonedDateTime.now(),
+            modifiedDatetime = Some(ZonedDateTime.now())
+          )
+        )
+      )
     when(mockGraphQlApi.getConsignmentDetails(consignmentId)).thenReturn(consignmentDetailsResponseStub)
     when(sfnUtils.startExecution(any[String], any[BackendChecksStepFunctionInput], any[Option[String]])(any[Encoder[BackendChecksStepFunctionInput]]))
       .thenReturn(IO.pure(StartExecutionResponse.builder.build))
