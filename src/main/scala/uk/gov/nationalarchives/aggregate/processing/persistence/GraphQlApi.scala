@@ -105,5 +105,9 @@ object GraphQlApi {
   def apply()(implicit
       backend: SttpBackend[Identity, Any],
       keycloakDeployment: TdrKeycloakDeployment
-  ) = new GraphQlApi(keycloakUtils, updateConsignmentStatusClient, addConsignmentStatusClient, addFilesAndMetadataClient, getConsignmentClient, updateParentFolderClient)(logger, keycloakDeployment, backend)
+  ) = new GraphQlApi(keycloakUtils, updateConsignmentStatusClient, addConsignmentStatusClient, addFilesAndMetadataClient, getConsignmentClient, updateParentFolderClient)(
+    logger,
+    keycloakDeployment,
+    backend
+  )
 }
