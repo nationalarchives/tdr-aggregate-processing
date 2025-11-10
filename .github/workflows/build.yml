@@ -8,7 +8,7 @@ permissions:
   contents: write
 jobs:
   pre-deploy:
-    uses: nationalarchives/tdr-github-actions/.github/workflows/lambda_build.yml@f4766d435f6a5fbcf8ebbf64020b208c04ac2a2f # v0.0.9
+    uses: nationalarchives/tdr-github-actions/.github/workflows/lambda_build.yml@5d4fee21ed08f053613a7706e28623c0adc0f5f4 # v0.0.10
     with:
       lambda-name: aggregate-processing
       repo-name: tdr-aggregate-processing
