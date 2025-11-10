@@ -3,9 +3,9 @@ import sbt.*
 object Dependencies {
   private val circeVersion = "0.14.15"
   private val mockitoScalaVersion = "2.0.0"
-  private val awsUtilsVersion = "0.1.311"
+  private val awsUtilsVersion = "0.1.312"
 
-  lazy val authUtils = "uk.gov.nationalarchives" %% "tdr-auth-utils" % "0.0.260"
+  lazy val authUtils = "uk.gov.nationalarchives" %% "tdr-auth-utils" % "0.0.262"
   lazy val awsLambdaCore = "com.amazonaws" % "aws-lambda-java-core" % "1.4.0"
   lazy val awsLambdaEvents = "com.amazonaws" % "aws-lambda-java-events" % "3.16.1"
   lazy val awsSqs = "com.amazonaws" % "aws-java-sdk-sqs" % "1.12.793"
@@ -21,7 +21,7 @@ object Dependencies {
   lazy val logback = "ch.qos.logback" % "logback-classic" % "1.5.20"
   lazy val logstash = "net.logstash.logback" % "logstash-logback-encoder" % "9.0"
 
-  lazy val metadataSchema = "uk.gov.nationalarchives" % "da-metadata-schema_2.13" % "0.0.100"
+  lazy val metadataSchema = "uk.gov.nationalarchives" % "da-metadata-schema_2.13" % "0.0.101-SNAPSHOT"
   lazy val mockitoScala = "org.mockito" %% "mockito-scala" % mockitoScalaVersion
   lazy val mockitoScalaTest = "org.mockito" %% "mockito-scala-scalatest" % mockitoScalaVersion
 
