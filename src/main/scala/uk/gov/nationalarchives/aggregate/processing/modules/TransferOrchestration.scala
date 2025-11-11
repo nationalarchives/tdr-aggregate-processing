@@ -52,35 +52,15 @@ class TransferOrchestration(
     val userId = event.userId
     val consignmentStatusValue: ConsignmentStatusValue = if (errors) Failed else Completed
 
-    val triggerBackendChecksSfn =
-      if (errors) {
-        val transferError = TransferError(Some(consignmentId), s"$AggregateProcessing.$CompletedWithIssues", "One or more assets failed to process.")
-        IO(ErrorHandling.handleError(transferError, logger))
-      } else {
-        logger.info(s"Triggering file checks for consignment: $consignmentId")
-        triggerStepFunction(
-          arnKey = "sfn.backendChecksArn",
-          input = BackendChecksStepFunctionInput(consignmentId.toString, s"$userId/$SharePoint/$consignmentId/$Records"),
-          consignmentId = consignmentId
-        )
-      }
-    val triggerDraftMetadataSfn = if (event.suppliedMetadata) {
-      logger.info(s"Triggering draft metadata validation for consignment: $consignmentId")
-      val statusInput = ConsignmentStatusInput(consignmentId, ConsignmentStatusType.DraftMetadata.toString, Some(StateStatusValue.InProgress.toString), Some(event.userId))
-      for {
-        _ <- graphQlApi.addConsignmentStatus(statusInput)
-        _ <- triggerStepFunction(
-          arnKey = "sfn.metadataChecksArn",
-          input = MetadataChecksStepFunctionInput(consignmentId.toString),
-          consignmentId = consignmentId
-        )
-      } yield ()
-    } else IO.unit
-
     val statusInput = ConsignmentStatusInput(consignmentId, ConsignmentStatusType.Upload.toString, Some(consignmentStatusValue.toString), Some(event.userId))
     for {
-      _ <- triggerBackendChecksSfn
-      _ <- triggerDraftMetadataSfn
+      _ <-
+        if (event.processingErrors) {
+          val transferError = TransferError(Some(consignmentId), s"$AggregateProcessing.$CompletedWithIssues", "One or more assets failed to process.")
+          IO(ErrorHandling.handleError(transferError, logger))
+        } else {
+          triggerBackendChecksSfn(event) *> triggerDraftMetadataSfn(event)
+        }
       updateResult <- graphQlApi.updateConsignmentStatus(statusInput)
       success = updateResult.nonEmpty
       result = OrchestrationResult(Some(consignmentId), success = success)
@@ -115,6 +95,33 @@ class TransferOrchestration(
         )
       }
       .void
+  }
+
+  private def triggerBackendChecksSfn(event: AggregateProcessingEvent): IO[Unit] = {
+    val consignmentId = event.consignmentId
+    logger.info(s"Triggering file checks for consignment: $consignmentId")
+    triggerStepFunction(
+      arnKey = "sfn.backendChecksArn",
+      input = BackendChecksStepFunctionInput(consignmentId.toString, s"${event.userId}/$SharePoint/$consignmentId/$Records"),
+      consignmentId = consignmentId
+    )
+
+  }
+
+  private def triggerDraftMetadataSfn(event: AggregateProcessingEvent): IO[Unit] = {
+    val consignmentId = event.consignmentId
+    if (event.suppliedMetadata) {
+      logger.info(s"Triggering draft metadata validation for consignment: $consignmentId")
+      val statusInput = ConsignmentStatusInput(consignmentId, ConsignmentStatusType.DraftMetadata.toString, Some(StateStatusValue.InProgress.toString), Some(event.userId))
+      for {
+        _ <- graphQlApi.addConsignmentStatus(statusInput)
+        _ <- triggerStepFunction(
+          arnKey = "sfn.metadataChecksArn",
+          input = MetadataChecksStepFunctionInput(consignmentId.toString),
+          consignmentId = consignmentId
+        )
+      } yield ()
+    } else IO.unit
   }
 }
 
