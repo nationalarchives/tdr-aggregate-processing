@@ -18,10 +18,10 @@ object Dependencies {
   lazy val generatedGraphql = "uk.gov.nationalarchives" %% "tdr-generated-graphql" % "0.0.442"
   lazy val graphqlClient = "uk.gov.nationalarchives" %% "tdr-graphql-client" % "0.0.256"
 
-  lazy val logback = "ch.qos.logback" % "logback-classic" % "1.5.20"
+  lazy val logback = "ch.qos.logback" % "logback-classic" % "1.5.21"
   lazy val logstash = "net.logstash.logback" % "logstash-logback-encoder" % "9.0"
 
-  lazy val metadataSchema = "uk.gov.nationalarchives" % "da-metadata-schema_2.13" % "0.0.101-SNAPSHOT"
+  lazy val metadataSchema = "uk.gov.nationalarchives" % "da-metadata-schema_2.13" % "0.0.101"
   lazy val mockitoScala = "org.mockito" %% "mockito-scala" % mockitoScalaVersion
   lazy val mockitoScalaTest = "org.mockito" %% "mockito-scala-scalatest" % mockitoScalaVersion
 
