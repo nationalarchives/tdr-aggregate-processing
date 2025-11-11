@@ -105,7 +105,6 @@ class TransferOrchestration(
       input = BackendChecksStepFunctionInput(consignmentId.toString, s"${event.userId}/$SharePoint/$consignmentId/$Records"),
       consignmentId = consignmentId
     )
-
   }
 
   private def triggerDraftMetadataSfn(event: AggregateProcessingEvent): IO[Unit] = {
