@@ -106,15 +106,15 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
           for {
             _ <- persistenceApi.addParentFolder(updateParentFolderInput)
             _ <- persistenceApi.addClientSideMetadata(addFileAndMetadataInput)
+            _ <-
+              if (suppliedMetadata) {
+                logger.info("Creating draft-metadata.csv")
+                val draftMetadataCSVWriter = new DraftMetadataCSVWriter()
+                val metadataCSV = draftMetadataCSVWriter.createMetadataCSV(assetProcessingResults)
+                uploadToS3(metadataCSV.toPath, draftMetadataBucket, s"$consignmentId/draft-metadata.csv")
+              } else IO.unit
           } yield ()
         }
-      _ <-
-        if (suppliedMetadata) {
-          logger.info("Creating draft-metadata.csv")
-          val draftMetadataCSVWriter = new DraftMetadataCSVWriter()
-          val metadataCSV = draftMetadataCSVWriter.createMetadataCSV(assetProcessingResults)
-          uploadToS3(metadataCSV.toPath, draftMetadataBucket, s"$consignmentId/draft-metadata.csv")
-        } else IO.unit
     } yield AssetProcessingResult(assetProcessingErrors, suppliedMetadata)
   }
 
