@@ -51,6 +51,7 @@ object Common {
 
   object AssetSource extends Enumeration {
     type AssetSource = Value
+    val HardDrive: Value = Value("harddrive")
     val SharePoint: Value = Value("sharepoint")
   }
 

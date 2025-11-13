@@ -1,30 +1,20 @@
 package uk.gov.nationalarchives.aggregate.processing.modules
 
-import io.circe.parser
 import io.circe.syntax.EncoderOps
 import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper
 import uk.gov.nationalarchives.aggregate.processing.ExternalServiceSpec
 
 class SharePointMetadataHandlerSpec extends ExternalServiceSpec {
-  val handler: BaseMetadataHandler = SharePointMetadataHandler.metadataHandler
+  private val expectedFilePath = "sites/Retail/Shared Documents/file1.txt"
 
-  val validBaseMetadataJsonString: String =
-    """{
-      | "file_size": "12",
-      | "transferId": "consignmentId",
-      | "file_path": "sites/Retail/Shared Documents/file1.txt",
-      | "matchId": "matchId",
-      | "date_last_modified": "1751534387000",
-      | "file_name": "file1.txt",
-      | "client_side_checksum": "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2"
-      |}""".stripMargin
+  val handler: BaseMetadataHandler = SharePointMetadataHandler.metadataHandler
 
   "normaliseValues" should "normalise only specified property values" in {
     val filePathJson = "/sites/Retail/Shared Documents/file1.txt".asJson
     val dateLastModifiedJson = "2025-07-03T09:19:47Z".asJson
     val someOtherJson = "some other json value".asJson
 
-    handler.normaliseValues("file_path", filePathJson) shouldBe "sites/Retail/Shared Documents/file1.txt".asJson
+    handler.normaliseValues("file_path", filePathJson) shouldBe expectedFilePath.asJson
     handler.normaliseValues("date_last_modified", dateLastModifiedJson) shouldBe "1751534387000".asJson
     handler.normaliseValues("some_other_property", someOtherJson) shouldBe someOtherJson
   }
@@ -41,7 +31,7 @@ class SharePointMetadataHandlerSpec extends ExternalServiceSpec {
     }""".stripMargin
 
     val rawSharePointJson = convertStringToJson(rawSharePointJsonString)
-    val expectedJson = convertStringToJson(validBaseMetadataJsonString)
+    val expectedJson = convertStringToJson(validBaseMetadataJsonString(expectedFilePath))
 
     handler.convertToBaseMetadata(rawSharePointJson) shouldBe expectedJson
   }
@@ -54,7 +44,7 @@ class SharePointMetadataHandlerSpec extends ExternalServiceSpec {
   }
 
   "toClientSideMetadataInput" should "convert valid base metadata json to ClientSideMetadataInput" in {
-    val input = handler.toClientSideMetadataInput(convertStringToJson(validBaseMetadataJsonString))
+    val input = handler.toClientSideMetadataInput(convertStringToJson(validBaseMetadataJsonString(expectedFilePath)))
     input.isLeft shouldBe false
     input.map(i => {
       i.matchId shouldBe "matchId"
@@ -73,13 +63,9 @@ class SharePointMetadataHandlerSpec extends ExternalServiceSpec {
 
   "toMetadataProperties" should "return specified properties if exist in json" in {
     val properties = Seq("file_size", "file_name", "somePropertyNotInJson")
-    val selectedMetadata = handler.toMetadataProperties(convertStringToJson(validBaseMetadataJsonString), properties)
+    val selectedMetadata = handler.toMetadataProperties(convertStringToJson(validBaseMetadataJsonString(expectedFilePath)), properties)
     selectedMetadata.size shouldBe 2
     selectedMetadata.contains(MetadataProperty("file_size", "12")) shouldBe true
     selectedMetadata.contains(MetadataProperty("file_name", "file1.txt")) shouldBe true
-  }
-
-  private def convertStringToJson(jsonString: String) = {
-    parser.parse(jsonString).fold(err => throw new RuntimeException(err.getMessage()), j => j)
   }
 }
