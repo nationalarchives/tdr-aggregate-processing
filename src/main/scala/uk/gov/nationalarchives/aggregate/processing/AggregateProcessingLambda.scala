@@ -108,7 +108,7 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
             _ <- persistenceApi.addClientSideMetadata(addFileAndMetadataInput)
             _ <-
               if (suppliedMetadata) {
-                logger.info("Creating draft-metadata.csv")
+                logger.info("Creating draft metadata object")
                 val draftMetadataCSVWriter = new DraftMetadataCSVWriter()
                 val metadataCSV = draftMetadataCSVWriter.createMetadataCSV(assetProcessingResults)
                 uploadToS3(metadataCSV.toPath, draftMetadataBucket, s"$consignmentId/draft-metadata.csv")
