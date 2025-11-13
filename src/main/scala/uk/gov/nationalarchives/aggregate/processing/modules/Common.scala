@@ -46,10 +46,12 @@ object Common {
     val Completed: Value = Value("Completed")
     val CompletedWithIssues: Value = Value("CompletedWithIssues")
     val Failed: Value = Value("Failed")
+    val InProgress: Value = Value("InProgress")
   }
 
   object AssetSource extends Enumeration {
     type AssetSource = Value
+    val HardDrive: Value = Value("harddrive")
     val SharePoint: Value = Value("sharepoint")
   }
 

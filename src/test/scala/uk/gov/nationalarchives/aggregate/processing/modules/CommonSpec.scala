@@ -40,17 +40,17 @@ class CommonSpec extends AnyFlatSpec {
 
   "StateStatusValue" should "contain the correct enums" in {
     val stateStatusValue = Common.StateStatusValue
-    val expectedValues = List("Completed", "CompletedWithIssues", "Failed")
+    val expectedValues = List("Completed", "CompletedWithIssues", "Failed", "InProgress")
 
-    stateStatusValue.values.size shouldBe 3
+    stateStatusValue.values.size shouldBe 4
     stateStatusValue.values.map(_.toString).toList shouldEqual expectedValues
   }
 
   "AssetSource" should "contain the correct enums" in {
     val assetSourceValue = Common.AssetSource
-    val expectedValues = List("sharepoint")
+    val expectedValues = List("harddrive", "sharepoint")
 
-    assetSourceValue.values.size shouldBe 1
+    assetSourceValue.values.size shouldBe 2
     assetSourceValue.values.map(_.toString).toList shouldEqual expectedValues
   }
 

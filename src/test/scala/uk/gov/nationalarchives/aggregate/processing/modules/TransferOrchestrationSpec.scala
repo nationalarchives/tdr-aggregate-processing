@@ -4,6 +4,7 @@ import cats.effect.IO
 import cats.effect.unsafe.implicits.global
 import com.typesafe.config.ConfigFactory
 import com.typesafe.scalalogging.Logger
+import graphql.codegen.AddConsignmentStatus.addConsignmentStatus.AddConsignmentStatus
 import graphql.codegen.GetConsignment.getConsignment
 import graphql.codegen.types.ConsignmentStatusInput
 import io.circe.Encoder
@@ -24,6 +25,7 @@ import uk.gov.nationalarchives.aggregate.processing.utilities.{KeycloakClient, N
 import uk.gov.nationalarchives.aws.utils.stepfunction.StepFunctionUtils
 import uk.gov.nationalarchives.tdr.keycloak.KeycloakUtils.UserDetails
 
+import java.time.ZonedDateTime
 import java.util.UUID
 import scala.concurrent.Future
 
@@ -132,6 +134,19 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     when(mockLogger.isInfoEnabled()).thenReturn(true)
     when(mockLogger.isErrorEnabled()).thenReturn(true)
     when(mockGraphQlApi.updateConsignmentStatus(any[ConsignmentStatusInput])).thenReturn(IO(Some(1)))
+    when(mockGraphQlApi.addConsignmentStatus(any[ConsignmentStatusInput]))
+      .thenReturn(
+        IO(
+          AddConsignmentStatus(
+            consignmentStatusId = UUID.randomUUID(),
+            consignmentId,
+            statusType = "DraftMetadata",
+            value = "InProgress",
+            createdDatetime = ZonedDateTime.now(),
+            modifiedDatetime = Some(ZonedDateTime.now())
+          )
+        )
+      )
     when(mockGraphQlApi.getConsignmentDetails(consignmentId)).thenReturn(consignmentDetailsResponseStub)
     when(sfnUtils.startExecution(any[String], any[BackendChecksStepFunctionInput], any[Option[String]])(any[Encoder[BackendChecksStepFunctionInput]]))
       .thenReturn(IO.pure(StartExecutionResponse.builder.build))
@@ -150,14 +165,24 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     verify(mockLogger).info(s"Triggering file checks for consignment: {}", consignmentId)
     verify(mockLogger).info(s"Triggering draft metadata validation for consignment: {}", consignmentId)
     verify(mockLogger, never).isErrorEnabled()
-    verify(mockGraphQlApi).updateConsignmentStatus(consignmentStatusInputCaptor.capture())
-    consignmentStatusInputCaptor.getValue.consignmentId shouldBe consignmentId
-    consignmentStatusInputCaptor.getValue.statusType shouldBe "Upload"
-    consignmentStatusInputCaptor.getValue.statusValue.get shouldBe "Completed"
-    consignmentStatusInputCaptor.getValue.userIdOverride.get shouldBe userId
+    verify(mockGraphQlApi, times(1)).updateConsignmentStatus(consignmentStatusInputCaptor.capture())
+    verify(mockGraphQlApi, times(1)).addConsignmentStatus(consignmentStatusInputCaptor.capture())
+    val capturedStatuses = consignmentStatusInputCaptor.getAllValues
+    capturedStatuses.size() shouldBe 2
+
+    val uploadStatus = capturedStatuses.get(0)
+    uploadStatus.consignmentId shouldBe consignmentId
+    uploadStatus.statusType shouldBe "Upload"
+    uploadStatus.statusValue.get shouldBe "Completed"
+    uploadStatus.userIdOverride.get shouldBe userId
+
+    val draftMetadataStatus = capturedStatuses.get(1)
+    draftMetadataStatus.consignmentId shouldBe consignmentId
+    draftMetadataStatus.statusType shouldBe "DraftMetadata"
+    draftMetadataStatus.statusValue.get shouldBe "InProgress"
+    draftMetadataStatus.userIdOverride.get shouldBe userId
 
     verify(mockGraphQlApi).getConsignmentDetails(consignmentId)
-
     verify(keycloakConfigurations).userDetails(userId.toString)
 
     verify(sfnUtils, times(2)).startExecution(any[String], any, any[Option[String]])(any())
