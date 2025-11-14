@@ -99,6 +99,9 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
     val suppliedProperties: Seq[String] = metadataConfig.getPropertiesByPropertyType("Supplied").map(p => tdrDataLoadHeaderToPropertyMapper(p))
     val systemProperties: Seq[String] = metadataConfig.getPropertiesByPropertyType("System")
     val baseMetadataJson = metadataHandler.convertToBaseMetadata(sourceJson)
+    val allPropertyNames: Seq[String] = baseMetadataJson.asObject.map(_.keys.toSeq).getOrElse(Seq.empty)
+    val excludeProperties = suppliedProperties ++ systemProperties :+ MatchIdProperty.id :+ TransferIdProperty.id
+    val customProperties = allPropertyNames.diff(excludeProperties)
     metadataHandler
       .toClientSideMetadataInput(baseMetadataJson)
       .fold(
@@ -119,10 +122,11 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
           } else {
             val suppliedMetadata = metadataHandler.toMetadataProperties(baseMetadataJson, suppliedProperties)
             val systemMetadata = metadataHandler.toMetadataProperties(baseMetadataJson, systemProperties)
+            val customMetadata = metadataHandler.toMetadataProperties(baseMetadataJson, customProperties)
             logger.info(s"Asset metadata successfully processed for: $objectKey")
             val completedTags = Map(ptAp.toString -> Completed.toString)
             s3Utils.addObjectTags(event.s3SourceBucket, event.objectKey, completedTags)
-            AssetProcessingResult(Some(matchId), processingErrors = false, Some(input), systemMetadata, suppliedMetadata)
+            AssetProcessingResult(Some(matchId), processingErrors = false, Some(input), systemMetadata, suppliedMetadata, customMetadata)
           }
         }
       )
@@ -155,7 +159,8 @@ object AssetProcessing {
       processingErrors: Boolean,
       clientSideMetadataInput: Option[ClientSideMetadataInput],
       systemMetadata: List[MetadataProperty] = List(),
-      suppliedMetadata: List[MetadataProperty] = List()
+      suppliedMetadata: List[MetadataProperty] = List(),
+      customMetadata: List[MetadataProperty] = List()
   )
   case class AssetProcessingError(consignmentId: Option[String], matchId: Option[String], source: Option[String], errorCode: String, errorMsg: String) extends BaseError {
     override def toString: String = {

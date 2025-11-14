@@ -273,7 +273,6 @@ class AssetProcessingSpec extends ExternalServiceSpec {
       "sha256ClientSideChecksum": "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2",
       "matchId": "$matchId",
       "transferId": "$consignmentId",
-      "filepath": "file/Path/1",
       "description": "some kind of description"
     }""".stripMargin
 
@@ -300,6 +299,63 @@ class AssetProcessingSpec extends ExternalServiceSpec {
           MetadataProperty("client_side_checksum", "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2")
         ),
         suppliedMetadata = List(MetadataProperty("description", "some kind of description"))
+      )
+
+    when(mockLogger.isInfoEnabled()).thenReturn(true)
+    when(mockLogger.isErrorEnabled).thenReturn(true)
+    when(s3UtilsMock.getObjectAsStream(any[String], any[String]))
+      .thenReturn(new ByteArrayInputStream(jsonMetadataString.getBytes("UTF-8")))
+
+    val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
+    val result = assetProcessing.processAsset("s3Bucket", s"$userId/sharepoint/$consignmentId/metadata/$matchId.metadata")
+
+    result shouldEqual expectedResult
+
+    verify(mockLogger, times(0)).isErrorEnabled
+    verifyDefaultInfoLogging(mockLogger)
+    verify(mockLogger).info("Asset metadata successfully processed for: {}", s"$userId/sharepoint/$consignmentId/metadata/$matchId.metadata")
+  }
+
+  "processAsset" should "return asset processing result and not log errors when json contains custom metadata" in {
+    val mockLogger = mock[UnderlyingLogger]
+    val s3UtilsMock = mock[S3Utils]
+
+    val defaultMetadataWithSuppliedAndCustom = s"""{
+      "Length": "12",
+      "Modified": "2025-07-03T09:19:47Z",
+      "FileLeafRef": "file1.txt",
+      "FileRef": "/sites/Retail/Shared Documents/file1.txt",
+      "sha256ClientSideChecksum": "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2",
+      "matchId": "$matchId",
+      "transferId": "$consignmentId",
+      "description": "some kind of description",
+      "custom": "custom metadata value"
+    }""".stripMargin
+
+    val jsonMetadataString = defaultMetadataWithSuppliedAndCustom
+
+    val expectedInput = ClientSideMetadataInput(
+      "sites/Retail/Shared Documents/file1.txt",
+      "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2",
+      1751534387000L,
+      12L,
+      matchId
+    )
+
+    val expectedResult =
+      AssetProcessingResult(
+        Some(matchId),
+        processingErrors = false,
+        Some(expectedInput),
+        systemMetadata = List(
+          MetadataProperty("file_path", "sites/Retail/Shared Documents/file1.txt"),
+          MetadataProperty("file_name", "file1.txt"),
+          MetadataProperty("date_last_modified", "1751534387000"),
+          MetadataProperty("file_size", "12"),
+          MetadataProperty("client_side_checksum", "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2")
+        ),
+        suppliedMetadata = List(MetadataProperty("description", "some kind of description")),
+        customMetadata = List(MetadataProperty("custom", "custom metadata value"))
       )
 
     when(mockLogger.isInfoEnabled()).thenReturn(true)
