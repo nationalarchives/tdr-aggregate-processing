@@ -30,6 +30,10 @@ case object MatchIdProperty extends BaseProperty {
   val id: String = "matchId"
 }
 
+case object TransferIdProperty extends BaseProperty {
+  val id: String = "transferId"
+}
+
 trait MetadataHandler {
   val sourceToBasePropertiesMapper: String => String
 
