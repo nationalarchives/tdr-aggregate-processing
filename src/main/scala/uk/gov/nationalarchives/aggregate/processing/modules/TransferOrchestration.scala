@@ -6,7 +6,7 @@ import com.typesafe.scalalogging.Logger
 import graphql.codegen.types.ConsignmentStatusInput
 import io.circe.Encoder
 import io.circe.generic.semiauto.deriveEncoder
-import uk.gov.nationalarchives.aggregate.processing.modules.Common.AssetSource.{AssetSource, SharePoint}
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.AssetSource.AssetSource
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ObjectCategory.Records
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorType.EventError
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorValue.Invalid
