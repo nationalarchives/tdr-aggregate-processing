@@ -99,10 +99,11 @@ class TransferOrchestration(
 
   private def triggerBackendChecksSfn(event: AggregateProcessingEvent): IO[Unit] = {
     val consignmentId = event.consignmentId
+    val assetSource = event.assetSource.toString
     logger.info(s"Triggering file checks for consignment: $consignmentId")
     triggerStepFunction(
       arnKey = "sfn.backendChecksArn",
-      input = BackendChecksStepFunctionInput(consignmentId.toString, s"${event.userId}/$SharePoint/$consignmentId/$Records"),
+      input = BackendChecksStepFunctionInput(consignmentId.toString, s"${event.userId}/$assetSource/$consignmentId/$Records"),
       consignmentId = consignmentId
     )
   }
