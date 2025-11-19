@@ -6,7 +6,7 @@ import com.typesafe.scalalogging.Logger
 import graphql.codegen.types.ConsignmentStatusInput
 import io.circe.Encoder
 import io.circe.generic.semiauto.deriveEncoder
-import uk.gov.nationalarchives.aggregate.processing.modules.Common.AssetSource.{AssetSource, SharePoint}
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.AssetSource.AssetSource
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ObjectCategory.Records
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorType.EventError
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorValue.Invalid
@@ -99,10 +99,11 @@ class TransferOrchestration(
 
   private def triggerBackendChecksSfn(event: AggregateProcessingEvent): IO[Unit] = {
     val consignmentId = event.consignmentId
+    val assetSource = event.assetSource.toString
     logger.info(s"Triggering file checks for consignment: $consignmentId")
     triggerStepFunction(
       arnKey = "sfn.backendChecksArn",
-      input = BackendChecksStepFunctionInput(consignmentId.toString, s"${event.userId}/$SharePoint/$consignmentId/$Records"),
+      input = BackendChecksStepFunctionInput(consignmentId.toString, s"${event.userId}/$assetSource/$consignmentId/$Records"),
       consignmentId = consignmentId
     )
   }
