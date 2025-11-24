@@ -1,0 +1,34 @@
+package uk.gov.nationalarchives.aggregate.processing.modules.initialchecks
+
+import graphql.codegen.types.ClientSideMetadataInput
+import uk.gov.nationalarchives.aggregate.processing.modules.AssetProcessing.{AssetProcessingError, AssetProcessingEvent}
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorType.ObjectSizeError
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorValue.{TooBigError, TooSmallError}
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.InitialChecks
+
+class FileSizeCheck extends InitialCheck {
+  // TODO: value should come from configuration
+  private val maxIndividualFileSizeBytes = 2000L * 1000000L
+
+  private def error(errorCode: String, fileSize: Long, event: AssetProcessingEvent): AssetProcessingError = {
+    val transferId = event.consignmentId.toString
+    val source = event.source.toString
+    val matchId = event.matchId
+    val errorMsg = s"File size: $fileSize bytes"
+    AssetProcessingError(Some(transferId), Some(matchId), Some(source), errorCode, errorMsg)
+  }
+
+  def runCheck(event: AssetProcessingEvent, input: ClientSideMetadataInput): List[AssetProcessingError] = {
+    input.fileSize match {
+      case fs if fs == 0 =>
+        List(error(s"$InitialChecks.$ObjectSizeError.$TooSmallError", fs, event))
+      case fs if fs > maxIndividualFileSizeBytes =>
+        List(error(s"$InitialChecks.$ObjectSizeError.$TooBigError", fs, event))
+      case _ => List()
+    }
+  }
+}
+
+object FileSizeCheck {
+  def apply() = new FileSizeCheck()
+}
