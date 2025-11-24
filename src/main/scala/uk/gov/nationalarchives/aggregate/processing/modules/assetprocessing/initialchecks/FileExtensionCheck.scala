@@ -1,10 +1,10 @@
-package uk.gov.nationalarchives.aggregate.processing.modules.initialchecks
+package uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.initialchecks
 
 import graphql.codegen.types.ClientSideMetadataInput
-import uk.gov.nationalarchives.aggregate.processing.modules.AssetProcessing.{AssetProcessingError, AssetProcessingEvent}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorType.FileExtensionError
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorValue.Disallowed
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.InitialChecks
+import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.AssetProcessing.{AssetProcessingError, AssetProcessingEvent}
 
 //TODO: need list of suspect file extensions from config. See: TDRD-913
 class FileExtensionCheck extends InitialCheck {

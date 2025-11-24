@@ -14,14 +14,16 @@ import io.circe.generic.semiauto.deriveDecoder
 import io.circe.parser._
 import uk.gov.nationalarchives.aggregate.processing.AggregateProcessingLambda._
 import uk.gov.nationalarchives.aggregate.processing.config.ApplicationConfig.draftMetadataBucket
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.ObjectCategory
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ObjectCategory.ObjectCategory
-import uk.gov.nationalarchives.aggregate.processing.modules.Common.{ObjectCategory, ObjectType}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorType.{ClientDataLoadError, S3Error}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorValue.{Failure, ReadError}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.AggregateProcessing
 import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling.{BaseError, handleError}
-import uk.gov.nationalarchives.aggregate.processing.modules.TransferOrchestration.{AggregateProcessingEvent, OrchestrationResult}
-import uk.gov.nationalarchives.aggregate.processing.modules.{AssetProcessing, Common, TransferOrchestration}
+import uk.gov.nationalarchives.aggregate.processing.modules.orchestration.TransferOrchestration
+import uk.gov.nationalarchives.aggregate.processing.modules.orchestration.TransferOrchestration.{AggregateProcessingEvent, OrchestrationResult}
+import uk.gov.nationalarchives.aggregate.processing.modules.Common
+import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.AssetProcessing
 import uk.gov.nationalarchives.aggregate.processing.persistence.GraphQlApi
 import uk.gov.nationalarchives.aggregate.processing.persistence.GraphQlApi.{backend, keycloakDeployment}
 import uk.gov.nationalarchives.aggregate.processing.utilities.DraftMetadataCSVWriter

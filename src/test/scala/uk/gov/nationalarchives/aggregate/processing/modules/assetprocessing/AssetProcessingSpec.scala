@@ -1,4 +1,4 @@
-package uk.gov.nationalarchives.aggregate.processing.modules
+package uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing
 
 import com.typesafe.scalalogging.Logger
 import graphql.codegen.types.ClientSideMetadataInput
@@ -12,7 +12,8 @@ import software.amazon.awssdk.services.s3.S3AsyncClient
 import software.amazon.awssdk.services.s3.model.{GetObjectRequest, GetObjectResponse, GetObjectTaggingRequest, GetObjectTaggingResponse}
 import software.amazon.awssdk.utils.CompletableFutureUtils.failedFuture
 import uk.gov.nationalarchives.aggregate.processing.ExternalServiceSpec
-import uk.gov.nationalarchives.aggregate.processing.modules.AssetProcessing.AssetProcessingResult
+import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.AssetProcessing.AssetProcessingResult
+import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.metadata.MetadataProperty
 import uk.gov.nationalarchives.aws.utils.s3.S3Utils
 
 import java.io.ByteArrayInputStream

@@ -1,8 +1,7 @@
-package uk.gov.nationalarchives.aggregate.processing.modules
+package uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.metadata
 
 import io.circe.Json
 import io.circe.syntax.EncoderOps
-import uk.gov.nationalarchives.aggregate.processing.modules
 import uk.gov.nationalarchives.tdr.schemautils.ConfigUtils
 
 import java.sql.Timestamp
@@ -39,7 +38,7 @@ object SharePointMetadataHandler {
   }
 
   private case object SharePointFilePath extends SharePointProperty {
-    override val baseProperty: BaseProperty = modules.FilePathProperty
+    override val baseProperty: BaseProperty = FilePathProperty
     override def normaliseFunction: Json => Json = (value: Json) => {
       val originalValue = value.asString.get
       sharePointLocationPathToFilePath(originalValue).filePath.asJson
@@ -47,7 +46,7 @@ object SharePointMetadataHandler {
   }
 
   private case object SharePointDateLastModified extends SharePointProperty {
-    override val baseProperty: BaseProperty = modules.DateLastModifiedProperty
+    override val baseProperty: BaseProperty = DateLastModifiedProperty
     override def normaliseFunction: Json => Json = (value: Json) => {
       val originalValue = value.asString.get
       t"$originalValue".getTime.toString.asJson

@@ -1,10 +1,9 @@
-package uk.gov.nationalarchives.aggregate.processing.modules
+package uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.typesafe.scalalogging.Logger
 import graphql.codegen.types.ClientSideMetadataInput
 import io.circe.{Json, parser}
-import uk.gov.nationalarchives.aggregate.processing.modules.AssetProcessing._
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.AssetSource.AssetSource
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ObjectType.ObjectType
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorType.{EncodingError, JsonError, MatchIdError, ObjectKeyParsingError, S3Error => s3e}
@@ -13,7 +12,10 @@ import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.{
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.StateStatusValue.{Completed, CompletedWithIssues}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.{AssetSource, ObjectType}
 import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling.BaseError
-import uk.gov.nationalarchives.aggregate.processing.modules.initialchecks.{FileExtensionCheck, FileSizeCheck, InitialCheck}
+import uk.gov.nationalarchives.aggregate.processing.modules._
+import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.AssetProcessing.{AssetProcessingError, AssetProcessingEvent, AssetProcessingResult}
+import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.initialchecks.{FileExtensionCheck, FileSizeCheck, InitialCheck}
+import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.metadata._
 import uk.gov.nationalarchives.aggregate.processing.utilities.UTF8ValidationHandler
 import uk.gov.nationalarchives.aws.utils.s3.{S3Clients, S3Utils}
 import uk.gov.nationalarchives.tdr.schemautils.ConfigUtils

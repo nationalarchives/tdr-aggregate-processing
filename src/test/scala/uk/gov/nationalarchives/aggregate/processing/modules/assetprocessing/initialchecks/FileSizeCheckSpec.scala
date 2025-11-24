@@ -1,10 +1,10 @@
-package uk.gov.nationalarchives.aggregate.processing.modules.initialchecks
+package uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.initialchecks
 
 import graphql.codegen.types.ClientSideMetadataInput
 import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper
 import uk.gov.nationalarchives.aggregate.processing.ExternalServiceSpec
-import uk.gov.nationalarchives.aggregate.processing.modules.AssetProcessing.AssetProcessingEvent
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.{AssetSource, ObjectType}
+import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.AssetProcessing.AssetProcessingEvent
 
 import java.util.UUID
 

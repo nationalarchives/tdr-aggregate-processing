@@ -1,4 +1,4 @@
-package uk.gov.nationalarchives.aggregate.processing.modules
+package uk.gov.nationalarchives.aggregate.processing.modules.orchestration
 
 import cats.effect.IO
 import cats.effect.unsafe.implicits.global
@@ -18,7 +18,7 @@ import software.amazon.awssdk.services.sfn.model.StartExecutionResponse
 import software.amazon.awssdk.services.sns.model.PublishResponse
 import uk.gov.nationalarchives.aggregate.processing.ExternalServiceSpec
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.AssetSource._
-import uk.gov.nationalarchives.aggregate.processing.modules.TransferOrchestration.{AggregateProcessingEvent, BackendChecksStepFunctionInput, MetadataChecksStepFunctionInput}
+import uk.gov.nationalarchives.aggregate.processing.modules.orchestration.TransferOrchestration.{AggregateProcessingEvent, BackendChecksStepFunctionInput, MetadataChecksStepFunctionInput}
 import uk.gov.nationalarchives.aggregate.processing.persistence.GraphQlApi
 import uk.gov.nationalarchives.aggregate.processing.utilities.NotificationsClient.UploadEvent
 import uk.gov.nationalarchives.aggregate.processing.utilities.{KeycloakClient, NotificationsClient}
@@ -281,7 +281,7 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     result.success shouldBe false
     result.error.get.consignmentId shouldBe None
     result.error.get.errorCode shouldBe "ORCHESTRATION.EVENT.INVALID"
-    result.error.get.errorMessage shouldBe "Unrecognized orchestration event: uk.gov.nationalarchives.aggregate.processing.modules.TransferOrchestrationSpec$SomeRandomClass$1"
+    result.error.get.errorMessage shouldBe "Unrecognized orchestration event: uk.gov.nationalarchives.aggregate.processing.modules.orchestration.TransferOrchestrationSpec$SomeRandomClass$1"
 
     verify(sfnUtils, never).startExecution(
       any[String],
@@ -292,7 +292,7 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     verify(mockGraphQlApi, never).updateConsignmentStatus(any[ConsignmentStatusInput])
 
     verify(mockLogger).error(
-      s"TransferError: consignmentId: None, errorCode: ORCHESTRATION.EVENT.INVALID, errorMessage: Unrecognized orchestration event: uk.gov.nationalarchives.aggregate.processing.modules.TransferOrchestrationSpec$$SomeRandomClass$$1"
+      s"TransferError: consignmentId: None, errorCode: ORCHESTRATION.EVENT.INVALID, errorMessage: Unrecognized orchestration event: uk.gov.nationalarchives.aggregate.processing.modules.orchestration.TransferOrchestrationSpec$$SomeRandomClass$$1"
     )
   }
 

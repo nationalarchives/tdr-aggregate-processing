@@ -1,10 +1,10 @@
-package uk.gov.nationalarchives.aggregate.processing.modules.initialchecks
+package uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.initialchecks
 
 import graphql.codegen.types.ClientSideMetadataInput
-import uk.gov.nationalarchives.aggregate.processing.modules.AssetProcessing.{AssetProcessingError, AssetProcessingEvent}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorType.ObjectSizeError
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorValue.{TooBigError, TooSmallError}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.InitialChecks
+import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.AssetProcessing.{AssetProcessingError, AssetProcessingEvent}
 
 class FileSizeCheck extends InitialCheck {
   // TODO: value should come from configuration
