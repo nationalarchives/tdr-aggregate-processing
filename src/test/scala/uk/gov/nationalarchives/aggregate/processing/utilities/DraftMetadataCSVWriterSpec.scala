@@ -5,8 +5,8 @@ import graphql.codegen.types.ClientSideMetadataInput
 import org.mockito.MockitoSugar
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.matchers.should.Matchers
-import uk.gov.nationalarchives.aggregate.processing.modules.AssetProcessing.AssetProcessingResult
-import uk.gov.nationalarchives.aggregate.processing.modules.MetadataProperty
+import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.AssetProcessing.AssetProcessingResult
+import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.metadata.MetadataProperty
 
 class DraftMetadataCSVWriterSpec extends AnyFlatSpec with Matchers with MockitoSugar {
 

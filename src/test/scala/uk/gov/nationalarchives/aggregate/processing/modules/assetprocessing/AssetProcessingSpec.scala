@@ -1,4 +1,4 @@
-package uk.gov.nationalarchives.aggregate.processing.modules
+package uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing
 
 import com.typesafe.scalalogging.Logger
 import graphql.codegen.types.ClientSideMetadataInput
@@ -12,7 +12,8 @@ import software.amazon.awssdk.services.s3.S3AsyncClient
 import software.amazon.awssdk.services.s3.model.{GetObjectRequest, GetObjectResponse, GetObjectTaggingRequest, GetObjectTaggingResponse}
 import software.amazon.awssdk.utils.CompletableFutureUtils.failedFuture
 import uk.gov.nationalarchives.aggregate.processing.ExternalServiceSpec
-import uk.gov.nationalarchives.aggregate.processing.modules.AssetProcessing.AssetProcessingResult
+import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.AssetProcessing.AssetProcessingResult
+import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.metadata.MetadataProperty
 import uk.gov.nationalarchives.aws.utils.s3.S3Utils
 
 import java.io.ByteArrayInputStream
@@ -23,8 +24,8 @@ class AssetProcessingSpec extends ExternalServiceSpec {
   private val userId = UUID.randomUUID()
   private val consignmentId = UUID.randomUUID()
   private val matchId = UUID.randomUUID().toString
-  private val defaultMetadataJsonString = s"""{
-      "Length": "12",
+  private def defaultMetadataJsonString(fileSize: Long = 12) = s"""{
+      "Length": "$fileSize",
       "Modified": "2025-07-03T09:19:47Z",
       "FileLeafRef": "file1.txt",
       "FileRef": "/sites/Retail/Shared Documents/file1.txt",
@@ -61,7 +62,7 @@ class AssetProcessingSpec extends ExternalServiceSpec {
     when(mockLogger.isInfoEnabled()).thenReturn(true)
     when(mockLogger.isErrorEnabled).thenReturn(true)
     when(s3UtilsMock.getObjectAsStream(any[String], any[String]))
-      .thenReturn(new ByteArrayInputStream(defaultMetadataJsonString.getBytes("UTF-8")))
+      .thenReturn(new ByteArrayInputStream(defaultMetadataJsonString().getBytes("UTF-8")))
 
     val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
     val result = assetProcessing.processAsset("s3Bucket", s"$userId/sharepoint/$consignmentId/metadata/$matchId.metadata")
@@ -243,7 +244,7 @@ class AssetProcessingSpec extends ExternalServiceSpec {
     when(mockLogger.isErrorEnabled()).thenReturn(true)
     when(mockLogger.isInfoEnabled()).thenReturn(true)
     when(s3UtilsMock.getObjectAsStream(any[String], any[String]))
-      .thenReturn(new ByteArrayInputStream(defaultMetadataJsonString.getBytes("UTF-8")))
+      .thenReturn(new ByteArrayInputStream(defaultMetadataJsonString().getBytes("UTF-8")))
 
     val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
     val result = assetProcessing.processAsset("s3Bucket", s"$userId/sharepoint/$consignmentId/metadata/$differentMatchId.metadata")
@@ -258,6 +259,45 @@ class AssetProcessingSpec extends ExternalServiceSpec {
 
     verify(mockLogger).error(
       s"AssetProcessingError: consignmentId: Some($consignmentId), matchId: None, source: Some(sharepoint), errorCode: ASSET_PROCESSING.MATCH_ID.MISMATCH, errorMessage: Mismatched match ids: $differentMatchId and $matchId"
+    )
+  }
+
+  "processAsset" should "return asset processing result and an log error when metadata fails initial checks" in {
+    val mockLogger = mock[UnderlyingLogger]
+    val s3UtilsMock = mock[S3Utils]
+
+    val expectedInput = ClientSideMetadataInput(
+      "sites/Retail/Shared Documents/file1.txt",
+      "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2",
+      1751534387000L,
+      0L,
+      matchId
+    )
+
+    val expectedResult = AssetProcessingResult(
+      Some(matchId),
+      processingErrors = true,
+      Some(expectedInput)
+    )
+
+    when(mockLogger.isInfoEnabled()).thenReturn(true)
+    when(mockLogger.isErrorEnabled).thenReturn(true)
+    when(s3UtilsMock.getObjectAsStream(any[String], any[String]))
+      .thenReturn(new ByteArrayInputStream(defaultMetadataJsonString(fileSize = 0).getBytes("UTF-8")))
+
+    val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
+    val result = assetProcessing.processAsset("s3Bucket", s"$userId/sharepoint/$consignmentId/metadata/$matchId.metadata")
+
+    result shouldEqual expectedResult
+
+    verify(s3UtilsMock, times(1)).addObjectTags(
+      "s3Bucket",
+      s"$userId/sharepoint/$consignmentId/metadata/$matchId.metadata",
+      Map("ASSET_PROCESSING" -> "CompletedWithIssues")
+    )
+
+    verify(mockLogger).error(
+      s"AssetProcessingError: consignmentId: Some($consignmentId), matchId: Some($matchId), source: Some(sharepoint), errorCode: INITIAL_CHECKS.OBJECT_SIZE.TOO_SMALL, errorMessage: File size: 0 bytes"
     )
   }
 

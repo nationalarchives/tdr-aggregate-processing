@@ -1,7 +1,7 @@
 package uk.gov.nationalarchives.aggregate.processing.utilities
 
 import com.github.tototoshi.csv.CSVWriter
-import uk.gov.nationalarchives.aggregate.processing.modules.AssetProcessing
+import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.AssetProcessing
 import uk.gov.nationalarchives.tdr.schemautils.ConfigUtils
 
 import java.io.File

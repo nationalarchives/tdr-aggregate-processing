@@ -1,8 +1,7 @@
-package uk.gov.nationalarchives.aggregate.processing.modules
+package uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.metadata
 
 import io.circe.Json
 import io.circe.syntax.EncoderOps
-import uk.gov.nationalarchives.aggregate.processing.modules
 import uk.gov.nationalarchives.tdr.schemautils.ConfigUtils
 
 import java.sql.Timestamp
@@ -32,7 +31,7 @@ object DroidMetadataHandler {
   }
 
   private case object DroidFilePath extends DroidProperty {
-    override val baseProperty: BaseProperty = modules.FilePathProperty
+    override val baseProperty: BaseProperty = FilePathProperty
     override def normaliseFunction: Json => Json = (value: Json) => {
       val originalValue = value.asString.get
       val replaceBackSlashes = originalValue.replace("\\", "/")
@@ -41,7 +40,7 @@ object DroidMetadataHandler {
   }
 
   private case object DroidDateLastModified extends DroidProperty {
-    override val baseProperty: BaseProperty = modules.DateLastModifiedProperty
+    override val baseProperty: BaseProperty = DateLastModifiedProperty
     override def normaliseFunction: Json => Json = (value: Json) => {
       val originalValue = value.asString.get + "Z"
       t"$originalValue".getTime.toString.asJson
