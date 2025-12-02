@@ -10,12 +10,24 @@ sealed trait BaseProperty {
   val id: String
 }
 
+case object ClosurePeriodProperty extends BaseProperty {
+  val id: String = "closure_period"
+}
+
+case object DescriptionClosedProperty extends BaseProperty {
+  val id: String = "description_closed"
+}
+
 case object FilePathProperty extends BaseProperty {
   val id: String = "file_path"
 }
 
 case object ClientSideChecksumProperty extends BaseProperty {
   val id: String = "client_side_checksum"
+}
+
+case object ClosureTypeProperty extends BaseProperty {
+  val id: String = "closure_type"
 }
 
 case object DateLastModifiedProperty extends BaseProperty {
@@ -32,6 +44,10 @@ case object MatchIdProperty extends BaseProperty {
 
 case object TransferIdProperty extends BaseProperty {
   val id: String = "transferId"
+}
+
+case object TitleClosedProperty extends BaseProperty {
+  val id: String = "title_closed"
 }
 
 trait MetadataHandler {
