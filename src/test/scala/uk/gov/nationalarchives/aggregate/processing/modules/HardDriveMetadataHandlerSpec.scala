@@ -10,14 +10,14 @@ class HardDriveMetadataHandlerSpec extends ExternalServiceSpec {
   val hardDriveHandler: BaseMetadataHandler = HardDriveMetadataHandler.metadataHandler
 
   "normaliseValues" should "normalise only specified property values" in {
-    val hardDriveClosureTypeOpenJson = "open_on_transfer".asJson
     val hardDriveFilePathJson = """Z:\series\content\folder\file1.txt""".asJson
     val hardDriveDateLastModifiedJson = "2025-07-03T09:19:47".asJson
     val someOtherJson = "some other json value".asJson
 
     hardDriveHandler.normaliseValues("closure_period", "0".asJson) shouldBe "".asJson
     hardDriveHandler.normaliseValues("closure_period", "12".asJson) shouldBe "12".asJson
-    hardDriveHandler.normaliseValues("closure_type", hardDriveClosureTypeOpenJson) shouldBe "open".asJson
+    hardDriveHandler.normaliseValues("closure_type", "open_on_transfer".asJson) shouldBe "open".asJson
+    hardDriveHandler.normaliseValues("closure_type", "closed_on_transfer".asJson) shouldBe "closed".asJson
     hardDriveHandler.normaliseValues("description_closed", "true".asJson) shouldBe "false".asJson
     hardDriveHandler.normaliseValues("description_closed", "false".asJson) shouldBe "true".asJson
     hardDriveHandler.normaliseValues("file_path", hardDriveFilePathJson) shouldBe expectedFilePath.asJson
@@ -27,12 +27,12 @@ class HardDriveMetadataHandlerSpec extends ExternalServiceSpec {
     hardDriveHandler.normaliseValues("some_other_property", someOtherJson) shouldBe someOtherJson
   }
 
-  "convertToBaseMetadata" should "convert valid Droid json with no default properties to base metadata json" in {
+  "convertToBaseMetadata" should "convert valid hard drive json with no default properties to base metadata json" in {
     val rawHardDriveJsonString = """{
                                | "file_size": "12",
                                | "date_last_modified": "2025-07-03T09:19:47",
                                | "file_name": "file1.txt",
-                               | "file_path": "Z:\\year_batch\\batch_number\\series\\Content\\folder\\file1.txt",
+                               | "file_path": "Z:\\year_batch\\batch_number\\series\\content\\folder\\file1.txt",
                                | "checksum": "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2",
                                | "matchId": "matchId",
                                | "transferId": "consignmentId"
