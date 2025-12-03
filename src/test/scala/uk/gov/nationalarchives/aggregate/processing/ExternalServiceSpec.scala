@@ -4,7 +4,7 @@ import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.stubbing.StubMapping
 import graphql.codegen.GetConsignment.getConsignment
-import io.circe.Printer
+import io.circe.{Json, Printer, parser}
 import io.circe.generic.auto._
 import io.circe.syntax._
 import org.scalatest.concurrent.ScalaFutures
@@ -51,6 +51,21 @@ class ExternalServiceSpec extends AnyFlatSpec with BeforeAndAfterEach with Befor
       "copyright": "legal copyright",
       "custom": "random value"
     }""".stripMargin
+
+  def validBaseMetadataJsonString(filePath: String): String =
+    s"""{
+       | "file_size": "12",
+       | "transferId": "consignmentId",
+       | "file_path": "$filePath",
+       | "matchId": "matchId",
+       | "date_last_modified": "1751534387000",
+       | "file_name": "file1.txt",
+       | "client_side_checksum": "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2"
+       |}""".stripMargin
+
+  def convertStringToJson(jsonString: String): Json = {
+    parser.parse(jsonString).fold(err => throw new RuntimeException(err.getMessage()), j => j)
+  }
 
   def authOkJson(): StubMapping = wiremockAuthServer.stubFor(
     post(urlEqualTo(authPath))
@@ -129,6 +144,13 @@ class ExternalServiceSpec extends AnyFlatSpec with BeforeAndAfterEach with Befor
         .willReturn(ok(dataString))
     )
   }
+
+  def mockGraphQlUpdateParentFolderResponse: StubMapping =
+    wiremockGraphqlServer.stubFor(
+      post(urlEqualTo("/graphql"))
+        .withRequestBody(containing("updateParentFolder"))
+        .willReturn(ok("""{"data":{"updateParentFolder": 1}}"""))
+    )
 
   def mockGraphQlResponseError: StubMapping = wiremockGraphqlServer.stubFor(
     post(urlEqualTo(graphQlPath))

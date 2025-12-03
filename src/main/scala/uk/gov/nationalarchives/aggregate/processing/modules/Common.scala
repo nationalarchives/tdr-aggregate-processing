@@ -2,6 +2,7 @@ package uk.gov.nationalarchives.aggregate.processing.modules
 
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.AssetSource.AssetSource
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ObjectCategory.ObjectCategory
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.ObjectType.Value
 
 import java.util.UUID
 import scala.util.{Failure, Success, Try}
@@ -18,6 +19,7 @@ object Common {
     type ProcessType = Value
     val AggregateProcessing: Value = Value("AGGREGATE_PROCESSING")
     val AssetProcessing: Value = Value("ASSET_PROCESSING")
+    val InitialChecks: Value = Value("INITIAL_CHECKS")
     val Persistence: Value = Value("PERSISTENCE")
     val Orchestration: Value = Value("ORCHESTRATION")
   }
@@ -27,18 +29,23 @@ object Common {
     val ClientDataLoadError: Value = Value("CLIENT_DATA_LOAD")
     val EncodingError: Value = Value("ENCODING")
     val EventError: Value = Value("EVENT")
+    val FileExtensionError: Value = Value("FILE_EXTENSION")
     val JsonError: Value = Value("JSON")
     val MatchIdError: Value = Value("MATCH_ID")
     val ObjectKeyParsingError: Value = Value("OBJECT_KEY")
+    val ObjectSizeError: Value = Value("OBJECT_SIZE")
     val S3Error: Value = Value("S3")
   }
 
   object ProcessErrorValue extends Enumeration {
     type ProcessErrorValue = Value
+    val Disallowed: Value = Value("DISALLOWED")
     val Failure: Value = Value("FAILURE")
     val Invalid: Value = Value("INVALID")
     val Mismatch: Value = Value("MISMATCH")
     val ReadError: Value = Value("READ_ERROR")
+    val TooBigError: Value = Value("TOO_BIG")
+    val TooSmallError: Value = Value("TOO_SMALL")
   }
 
   object StateStatusValue extends Enumeration {
@@ -46,10 +53,12 @@ object Common {
     val Completed: Value = Value("Completed")
     val CompletedWithIssues: Value = Value("CompletedWithIssues")
     val Failed: Value = Value("Failed")
+    val InProgress: Value = Value("InProgress")
   }
 
   object AssetSource extends Enumeration {
     type AssetSource = Value
+    val HardDrive: Value = Value("harddrive")
     val SharePoint: Value = Value("sharepoint")
   }
 
@@ -60,6 +69,7 @@ object Common {
 
   object ObjectCategory extends Enumeration {
     type ObjectCategory = Value
+    val DryRunMetadata: Value = Value("dryrunmetadata")
     val Metadata: Value = Value("metadata")
     val Records: Value = Value("records")
   }

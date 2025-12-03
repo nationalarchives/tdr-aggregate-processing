@@ -16,41 +16,41 @@ class CommonSpec extends AnyFlatSpec {
 
   "ProcessType" should "contain the correct enums" in {
     val processType = Common.ProcessType
-    val expectedValues = List("AGGREGATE_PROCESSING", "ASSET_PROCESSING", "ORCHESTRATION", "PERSISTENCE")
+    val expectedValues = List("AGGREGATE_PROCESSING", "ASSET_PROCESSING", "INITIAL_CHECKS", "ORCHESTRATION", "PERSISTENCE")
 
-    processType.values.size shouldBe 4
+    processType.values.size shouldBe 5
     processType.values.map(_.toString).toList shouldEqual expectedValues
   }
 
   "ProcessErrorType" should "contain the correct enums" in {
     val processErrorType = Common.ProcessErrorType
-    val expectedValues = List("CLIENT_DATA_LOAD", "ENCODING", "EVENT", "JSON", "MATCH_ID", "OBJECT_KEY", "S3")
+    val expectedValues = List("CLIENT_DATA_LOAD", "ENCODING", "EVENT", "FILE_EXTENSION", "JSON", "MATCH_ID", "OBJECT_KEY", "OBJECT_SIZE", "S3")
 
-    processErrorType.values.size shouldBe 7
+    processErrorType.values.size shouldBe 9
     processErrorType.values.map(_.toString).toList shouldEqual expectedValues
   }
 
   "ProcessErrorValue" should "contain the correct enums" in {
     val processErrorValue = Common.ProcessErrorValue
-    val expectedValues = List("FAILURE", "INVALID", "MISMATCH", "READ_ERROR")
+    val expectedValues = List("DISALLOWED", "FAILURE", "INVALID", "MISMATCH", "READ_ERROR", "TOO_BIG", "TOO_SMALL")
 
-    processErrorValue.values.size shouldBe 4
+    processErrorValue.values.size shouldBe 7
     processErrorValue.values.map(_.toString).toList shouldEqual expectedValues
   }
 
   "StateStatusValue" should "contain the correct enums" in {
     val stateStatusValue = Common.StateStatusValue
-    val expectedValues = List("Completed", "CompletedWithIssues", "Failed")
+    val expectedValues = List("Completed", "CompletedWithIssues", "Failed", "InProgress")
 
-    stateStatusValue.values.size shouldBe 3
+    stateStatusValue.values.size shouldBe 4
     stateStatusValue.values.map(_.toString).toList shouldEqual expectedValues
   }
 
   "AssetSource" should "contain the correct enums" in {
     val assetSourceValue = Common.AssetSource
-    val expectedValues = List("sharepoint")
+    val expectedValues = List("harddrive", "sharepoint")
 
-    assetSourceValue.values.size shouldBe 1
+    assetSourceValue.values.size shouldBe 2
     assetSourceValue.values.map(_.toString).toList shouldEqual expectedValues
   }
 
@@ -64,9 +64,9 @@ class CommonSpec extends AnyFlatSpec {
 
   "ObjectCategory" should "contain the correct enums" in {
     val objectCategoryValue = Common.ObjectCategory
-    val expectedValues = List("metadata", "records")
+    val expectedValues = List("dryrunmetadata", "metadata", "records")
 
-    objectCategoryValue.values.size shouldBe 2
+    objectCategoryValue.values.size shouldBe 3
     objectCategoryValue.values.map(_.toString).toList shouldEqual expectedValues
   }
 

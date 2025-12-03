@@ -3,10 +3,12 @@ package uk.gov.nationalarchives.aggregate.processing.persistence
 import cats.effect.unsafe.implicits.global
 import com.nimbusds.oauth2.sdk.token.BearerAccessToken
 import com.typesafe.scalalogging.Logger
+import graphql.codegen.AddConsignmentStatus.{addConsignmentStatus => acs}
 import graphql.codegen.AddFilesAndMetadata.{addFilesAndMetadata => afm}
 import graphql.codegen.GetConsignment.{getConsignment => gc}
 import graphql.codegen.UpdateConsignmentStatus.{updateConsignmentStatus => ucs}
-import graphql.codegen.types.{AddFileAndMetadataInput, ClientSideMetadataInput, ConsignmentStatusInput}
+import graphql.codegen.UpdateParentFolder.{updateParentFolder => upf}
+import graphql.codegen.types.{AddFileAndMetadataInput, ClientSideMetadataInput, ConsignmentStatusInput, UpdateParentFolderInput}
 import org.mockito.ArgumentCaptor
 import org.mockito.ArgumentMatchers.any
 import org.mockito.MockitoSugar.{doAnswer, mock, times, verify, when}
@@ -30,14 +32,20 @@ class GraphQlApiSpec extends ExternalServiceSpec {
   implicit val backend: SttpBackend[Identity, Any] = HttpURLConnectionBackend()
 
   private val updateConsignmentStatusClient = mock[GraphQLClient[ucs.Data, ucs.Variables]]
+  private val addConsignmentStatusClient = mock[GraphQLClient[acs.Data, acs.Variables]]
   private val addFilesAndMetadataClient = mock[GraphQLClient[afm.Data, afm.Variables]]
   private val getConsignmentClient = mock[GraphQLClient[gc.Data, gc.Variables]]
+  private val updateParentFolderClient = mock[GraphQLClient[upf.Data, upf.Variables]]
 
   "addClientSideMetadata" should "add client side metadata with the given arguments" in {
     val mockLogger = mock[UnderlyingLogger]
     val mockApiResponse = List[afm.AddFilesAndMetadata]()
 
-    val api = new GraphQlApi(keycloak, updateConsignmentStatusClient, addFilesAndMetadataClient, getConsignmentClient)(Logger(mockLogger), tdrKeycloakDeployment, backend)
+    val api = new GraphQlApi(keycloak, updateConsignmentStatusClient, addConsignmentStatusClient, addFilesAndMetadataClient, getConsignmentClient, updateParentFolderClient)(
+      Logger(mockLogger),
+      tdrKeycloakDeployment,
+      backend
+    )
     val consignmentId = UUID.randomUUID()
     val overrideUserId = UUID.randomUUID()
     val inputVariablesCaptor: ArgumentCaptor[Option[afm.Variables]] = ArgumentCaptor.forClass(classOf[Option[afm.Variables]])
@@ -83,7 +91,11 @@ class GraphQlApiSpec extends ExternalServiceSpec {
 
     val input = AddFileAndMetadataInput(consignmentId, Nil, None, Some(overrideUserId))
 
-    val api = new GraphQlApi(keycloak, updateConsignmentStatusClient, addFilesAndMetadataClient, getConsignmentClient)(Logger(mockLogger), tdrKeycloakDeployment, backend)
+    val api = new GraphQlApi(keycloak, updateConsignmentStatusClient, addConsignmentStatusClient, addFilesAndMetadataClient, getConsignmentClient, updateParentFolderClient)(
+      Logger(mockLogger),
+      tdrKeycloakDeployment,
+      backend
+    )
 
     val exception = intercept[RuntimeException] {
       api.addClientSideMetadata(input).unsafeRunSync()
@@ -96,7 +108,11 @@ class GraphQlApiSpec extends ExternalServiceSpec {
   "updateConsignmentStatus" should "update the consignment status with the given arguments" in {
     val mockLogger = mock[UnderlyingLogger]
 
-    val api = new GraphQlApi(keycloak, updateConsignmentStatusClient, addFilesAndMetadataClient, getConsignmentClient)(Logger(mockLogger), tdrKeycloakDeployment, backend)
+    val api = new GraphQlApi(keycloak, updateConsignmentStatusClient, addConsignmentStatusClient, addFilesAndMetadataClient, getConsignmentClient, updateParentFolderClient)(
+      Logger(mockLogger),
+      tdrKeycloakDeployment,
+      backend
+    )
     val consignmentId = UUID.randomUUID()
     val overrideUserId = UUID.randomUUID()
     val inputVariablesCaptor: ArgumentCaptor[Option[ucs.Variables]] = ArgumentCaptor.forClass(classOf[Option[ucs.Variables]])
@@ -137,7 +153,11 @@ class GraphQlApiSpec extends ExternalServiceSpec {
       .when(updateConsignmentStatusClient)
       .getResult[Identity](any[BearerAccessToken], any[Document], any[Option[ucs.Variables]])(any[SttpBackend[Identity, Any]], any[ClassTag[Identity[_]]])
 
-    val api = new GraphQlApi(keycloak, updateConsignmentStatusClient, addFilesAndMetadataClient, getConsignmentClient)(Logger(mockLogger), tdrKeycloakDeployment, backend)
+    val api = new GraphQlApi(keycloak, updateConsignmentStatusClient, addConsignmentStatusClient, addFilesAndMetadataClient, getConsignmentClient, updateParentFolderClient)(
+      Logger(mockLogger),
+      tdrKeycloakDeployment,
+      backend
+    )
 
     val exception = intercept[RuntimeException] {
       api.updateConsignmentStatus(ConsignmentStatusInput(consignmentId, "Upload", Some("Completed"), Some(overrideUserId))).unsafeRunSync()
@@ -150,7 +170,11 @@ class GraphQlApiSpec extends ExternalServiceSpec {
   "getConsignmentDetails" should "return details for a consignment given a consignment id" in {
     val mockLogger = mock[UnderlyingLogger]
 
-    val api = new GraphQlApi(keycloak, updateConsignmentStatusClient, addFilesAndMetadataClient, getConsignmentClient)(Logger(mockLogger), tdrKeycloakDeployment, backend)
+    val api = new GraphQlApi(keycloak, updateConsignmentStatusClient, addConsignmentStatusClient, addFilesAndMetadataClient, getConsignmentClient, updateParentFolderClient)(
+      Logger(mockLogger),
+      tdrKeycloakDeployment,
+      backend
+    )
     val consignmentId = UUID.randomUUID()
     val overrideUserId = UUID.randomUUID()
     val inputVariablesCaptor: ArgumentCaptor[Option[gc.Variables]] = ArgumentCaptor.forClass(classOf[Option[gc.Variables]])
@@ -178,7 +202,11 @@ class GraphQlApiSpec extends ExternalServiceSpec {
   "getConsignmentDetails" should "throw an error when getting consignment fails" in {
     val mockLogger = mock[UnderlyingLogger]
 
-    val api = new GraphQlApi(keycloak, updateConsignmentStatusClient, addFilesAndMetadataClient, getConsignmentClient)(Logger(mockLogger), tdrKeycloakDeployment, backend)
+    val api = new GraphQlApi(keycloak, updateConsignmentStatusClient, addConsignmentStatusClient, addFilesAndMetadataClient, getConsignmentClient, updateParentFolderClient)(
+      Logger(mockLogger),
+      tdrKeycloakDeployment,
+      backend
+    )
     val consignmentId = UUID.randomUUID()
     val inputVariablesCaptor: ArgumentCaptor[Option[gc.Variables]] = ArgumentCaptor.forClass(classOf[Option[gc.Variables]])
 
@@ -200,5 +228,70 @@ class GraphQlApiSpec extends ExternalServiceSpec {
 
     verify(mockLogger).info(s"Getting consignment details for consignment: {}", consignmentId)
     exception.getMessage shouldBe s"Unable to get consignment details for consignment: $consignmentId"
+  }
+
+  "addParentFolder" should "add parent folder with the given arguments" in {
+    val mockLogger = mock[UnderlyingLogger]
+
+    val api = new GraphQlApi(keycloak, updateConsignmentStatusClient, addConsignmentStatusClient, addFilesAndMetadataClient, getConsignmentClient, updateParentFolderClient)(
+      Logger(mockLogger),
+      tdrKeycloakDeployment,
+      backend
+    )
+    val consignmentId = UUID.randomUUID()
+    val overrideUserId = UUID.randomUUID()
+    val parentFolder = "parentFolder"
+    val inputVariablesCaptor: ArgumentCaptor[Option[upf.Variables]] = ArgumentCaptor.forClass(classOf[Option[upf.Variables]])
+
+    when(mockLogger.isInfoEnabled()).thenReturn(true)
+
+    doAnswer(() => Future(new BearerAccessToken("token")))
+      .when(keycloak)
+      .serviceAccountToken[Identity](any[String], any[String])(any[SttpBackend[Identity, Any]], any[ClassTag[Identity[_]]], any[TdrKeycloakDeployment])
+
+    doAnswer(() => Future(GraphQlResponse[upf.Data](Option(upf.Data(Some(1))), Nil)))
+      .when(updateParentFolderClient)
+      .getResult[Identity](any[BearerAccessToken], any[Document], inputVariablesCaptor.capture())(any[SttpBackend[Identity, Any]], any[ClassTag[Identity[_]]])
+
+    val input = UpdateParentFolderInput(consignmentId, parentFolder, Some(overrideUserId))
+    api.addParentFolder(input).unsafeRunSync()
+    val inputArgs = inputVariablesCaptor.getValue.get.updateParentFolderInput
+    inputArgs.consignmentId shouldBe consignmentId
+    inputArgs.parentFolder shouldBe parentFolder
+
+    verify(mockLogger).info("Add parent folder for consignment: {}", consignmentId)
+    verify(mockLogger, times(0)).isErrorEnabled
+  }
+
+  "addParentFolder" should "throw an error when fails to update" in {
+    val consignmentId = UUID.randomUUID()
+    val overrideUserId = UUID.randomUUID()
+    val parentFolder = "parent/folder/path"
+    val mockLogger = mock[UnderlyingLogger]
+
+    when(mockLogger.isInfoEnabled()).thenReturn(true)
+
+    doAnswer(() => Future(new BearerAccessToken("token")))
+      .when(keycloak)
+      .serviceAccountToken[Identity](any[String], any[String])(any[SttpBackend[Identity, Any]], any[ClassTag[Identity[_]]], any[TdrKeycloakDeployment])
+
+    doAnswer(() => Future(GraphQlResponse[upf.Data](None, Nil)))
+      .when(updateParentFolderClient)
+      .getResult[Identity](any[BearerAccessToken], any[Document], any[Option[upf.Variables]])(any[SttpBackend[Identity, Any]], any[ClassTag[Identity[_]]])
+
+    val input = UpdateParentFolderInput(consignmentId, parentFolder, Some(overrideUserId))
+
+    val api = new GraphQlApi(keycloak, updateConsignmentStatusClient, addConsignmentStatusClient, addFilesAndMetadataClient, getConsignmentClient, updateParentFolderClient)(
+      Logger(mockLogger),
+      tdrKeycloakDeployment,
+      backend
+    )
+
+    val exception = intercept[RuntimeException] {
+      api.addParentFolder(input).unsafeRunSync()
+    }
+
+    verify(mockLogger).info("Add parent folder for consignment: {}", consignmentId)
+    exception.getMessage shouldBe s"Unable to add parent folder: $consignmentId"
   }
 }

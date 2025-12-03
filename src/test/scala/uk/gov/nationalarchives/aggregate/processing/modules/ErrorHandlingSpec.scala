@@ -5,7 +5,7 @@ import org.mockito.Mockito.verify
 import org.mockito.MockitoSugar.{mock, when}
 import org.scalatest.flatspec.AnyFlatSpec
 import org.slf4j.{Logger => UnderlyingLogger}
-import uk.gov.nationalarchives.aggregate.processing.modules.AssetProcessing.AssetProcessingError
+import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.AssetProcessing.AssetProcessingError
 
 class ErrorHandlingSpec extends AnyFlatSpec {
   "handleError" should "log the correct error message" in {

@@ -1,36 +1,10 @@
-package uk.gov.nationalarchives.aggregate.processing.modules
+package uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.metadata
 
 import graphql.codegen.types.ClientSideMetadataInput
 import io.circe.syntax.EncoderOps
 import io.circe.{Decoder, Json}
 
-case class MetadataProperty(propertyName: String, propertyValue: String)
-
-sealed trait BaseProperty {
-  val id: String
-}
-
-case object FilePathProperty extends BaseProperty {
-  val id: String = "file_path"
-}
-
-case object ClientSideChecksumProperty extends BaseProperty {
-  val id: String = "client_side_checksum"
-}
-
-case object DateLastModifiedProperty extends BaseProperty {
-  val id: String = "date_last_modified"
-}
-
-case object FileSizeProperty extends BaseProperty {
-  val id: String = "file_size"
-}
-
-case object MatchIdProperty extends BaseProperty {
-  val id: String = "matchId"
-}
-
-trait MetadataHandler {
+class BaseMetadataHandler(mapper: String => String, defaultProperties: Map[String, String], normaliseFunction: (String, Json) => Json) extends MetadataHandler {
   implicit val decodeClientSideInput: Decoder[ClientSideMetadataInput] =
     Decoder.instance[ClientSideMetadataInput] { c =>
       for {
@@ -44,9 +18,12 @@ trait MetadataHandler {
       }
     }
 
-  val sourceToBasePropertiesMapper: String => String
+  override val sourceToBasePropertiesMapper: String => String = mapper
+  override val defaultPropertyValues: Map[String, String] = defaultProperties
 
-  def toClientSideMetadataInput(baseMetadataJson: Json): Decoder.Result[ClientSideMetadataInput] = baseMetadataJson.as[ClientSideMetadataInput]
+  def normaliseValues(property: String, value: Json): Json = {
+    normaliseFunction(property, value)
+  }
 
   def toMetadataProperties(json: Json, properties: Seq[String]): List[MetadataProperty] = {
     for {
@@ -55,8 +32,6 @@ trait MetadataHandler {
       value <- obj(key).flatMap(_.asString)
     } yield MetadataProperty(key, value)
   }
-
-  def normaliseValues(str: String, json: Json): Json
 
   def convertToBaseMetadata(sourceJson: Json): Json = {
     sourceJson.asObject.get.toMap
@@ -67,4 +42,7 @@ trait MetadataHandler {
       })
       .asJson
   }
+
+  def toClientSideMetadataInput(baseMetadataJson: Json): Decoder.Result[ClientSideMetadataInput] =
+    baseMetadataJson.as[ClientSideMetadataInput]
 }
