@@ -1,4 +1,4 @@
-package uk.gov.nationalarchives.aggregate.processing.modules
+package uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.metadata
 
 import graphql.codegen.types.ClientSideMetadataInput
 import io.circe.syntax.EncoderOps

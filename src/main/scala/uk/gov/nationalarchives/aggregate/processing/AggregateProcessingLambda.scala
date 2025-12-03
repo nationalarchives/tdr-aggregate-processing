@@ -14,13 +14,16 @@ import io.circe.generic.semiauto.deriveDecoder
 import io.circe.parser._
 import uk.gov.nationalarchives.aggregate.processing.AggregateProcessingLambda._
 import uk.gov.nationalarchives.aggregate.processing.config.ApplicationConfig.draftMetadataBucket
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.ObjectCategory
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ObjectCategory.ObjectCategory
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorType.{ClientDataLoadError, S3Error}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorValue.{Failure, ReadError}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.AggregateProcessing
 import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling.{BaseError, handleError}
-import uk.gov.nationalarchives.aggregate.processing.modules.TransferOrchestration.{AggregateProcessingEvent, OrchestrationResult}
-import uk.gov.nationalarchives.aggregate.processing.modules.{AssetProcessing, Common, TransferOrchestration}
+import uk.gov.nationalarchives.aggregate.processing.modules.orchestration.TransferOrchestration
+import uk.gov.nationalarchives.aggregate.processing.modules.orchestration.TransferOrchestration.{AggregateProcessingEvent, OrchestrationResult}
+import uk.gov.nationalarchives.aggregate.processing.modules.Common
+import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.AssetProcessing
 import uk.gov.nationalarchives.aggregate.processing.persistence.GraphQlApi
 import uk.gov.nationalarchives.aggregate.processing.persistence.GraphQlApi.{backend, keycloakDeployment}
 import uk.gov.nationalarchives.aggregate.processing.utilities.DraftMetadataCSVWriter
@@ -61,6 +64,7 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
     val userId = objectKeyPrefixDetails.userId
     val dataLoadErrors = event.dataLoadErrors
     val assetSource = objectKeyPrefixDetails.assetSource
+    val dryRun = objectsPrefix.contains(ObjectCategory.DryRunMetadata.toString)
     logger.info(s"Starting processing consignment: $consignmentId")
     for {
       s3Objects <- IO(s3Utils.listAllObjectsWithPrefix(sourceBucket, objectsPrefix))
@@ -72,7 +76,7 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
         case _ if objectKeys.isEmpty =>
           handleError(noObjectsError(consignmentId, objectKeyPrefixDetails.category), logger)
           IO(errorProcessingResult)
-        case _ => processAssets(userId, consignmentId, sourceBucket, objectKeys)
+        case _ => processAssets(userId, consignmentId, sourceBucket, objectKeys, dryRun)
       }
       orchestrationEvent = AggregateProcessingEvent(
         assetSource,
@@ -91,13 +95,13 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
   private def noObjectsError(consignmentId: UUID, objectCategory: ObjectCategory) =
     AggregateProcessingError(consignmentId, s"$AggregateProcessing.$S3Error.$ReadError", s"No $objectCategory objects found for consignment: $consignmentId")
 
-  private def processAssets(userId: UUID, consignmentId: UUID, sourceBucket: String, objectKeys: List[String]): IO[AssetProcessingResult] = {
+  private def processAssets(userId: UUID, consignmentId: UUID, sourceBucket: String, objectKeys: List[String], dryRun: Boolean): IO[AssetProcessingResult] = {
     for {
       assetProcessingResults <- IO(objectKeys.map(assetProcessor.processAsset(sourceBucket, _)))
       assetProcessingErrors = assetProcessingResults.exists(_.processingErrors)
       suppliedMetadata = assetProcessingResults.exists(_.suppliedMetadata.nonEmpty)
       _ <-
-        if (assetProcessingErrors) {
+        if (assetProcessingErrors || dryRun) {
           IO.unit
         } else {
           val clientSideMetadataInput = assetProcessingResults.flatMap(_.clientSideMetadataInput)
