@@ -72,7 +72,6 @@ class AssetProcessingSpec extends ExternalServiceSpec {
     verify(s3UtilsMock, times(1)).addObjectTags("s3Bucket", s"$userId/sharepoint/$consignmentId/metadata/$matchId.metadata", Map("ASSET_PROCESSING" -> "Completed"))
 
     verify(mockLogger, times(0)).isErrorEnabled
-    verifyDefaultInfoLogging(mockLogger)
     verify(mockLogger).info("Asset metadata successfully processed for: {}", s"$userId/sharepoint/$consignmentId/metadata/$matchId.metadata")
   }
 
@@ -92,7 +91,6 @@ class AssetProcessingSpec extends ExternalServiceSpec {
 
     verify(s3UtilsMock, times(1)).addObjectTags("s3Bucket", "incorrect/object/key/format.txt", Map("ASSET_PROCESSING" -> "CompletedWithIssues"))
 
-    verify(mockLogger).info("Processing asset metadata for: {}", s"incorrect/object/key/format.txt")
     verify(mockLogger).error(
       s"AssetProcessingError: consignmentId: None, matchId: None, source: None, errorCode: ASSET_PROCESSING.OBJECT_KEY.INVALID, errorMessage: Invalid object key: incorrect/object/key/format.txt: Invalid UUID string: incorrect"
     )
@@ -123,7 +121,6 @@ class AssetProcessingSpec extends ExternalServiceSpec {
 
     verify(s3UtilsMock, times(1)).addObjectTags("s3Bucket", s"$userId/sharepoint/$consignmentId/metadata/$matchId.metadata", Map("ASSET_PROCESSING" -> "CompletedWithIssues"))
 
-    verifyDefaultInfoLogging(mockLogger)
     verify(mockLogger).error(
       s"AssetProcessingError: consignmentId: Some($consignmentId), matchId: Some($matchId), source: Some(sharepoint), errorCode: ASSET_PROCESSING.JSON.INVALID, errorMessage: DecodingFailure at .file_size: Missing required field"
     )
@@ -157,7 +154,6 @@ class AssetProcessingSpec extends ExternalServiceSpec {
         .build()
     )
 
-    verifyDefaultInfoLogging(mockLogger)
     verify(mockLogger).error(
       s"AssetProcessingError: consignmentId: Some($consignmentId), matchId: Some($matchId), source: Some(sharepoint), errorCode: ASSET_PROCESSING.S3.READ_ERROR, errorMessage: java.lang.RuntimeException: read failed"
     )
@@ -181,7 +177,6 @@ class AssetProcessingSpec extends ExternalServiceSpec {
 
     verify(s3UtilsMock, times(1)).addObjectTags("s3Bucket", s"$userId/sharepoint/$consignmentId/metadata/$matchId.metadata", Map("ASSET_PROCESSING" -> "CompletedWithIssues"))
 
-    verifyDefaultInfoLogging(mockLogger)
     verify(mockLogger).error(
       s"AssetProcessingError: consignmentId: Some($consignmentId), matchId: Some($matchId), source: Some(sharepoint), errorCode: ASSET_PROCESSING.ENCODING.INVALID, errorMessage: Invalid UTF-8 Sequence, expecting: 4bytes, but got: 3bytes - reached end of stream. @ byte position: -1"
     )
@@ -205,7 +200,6 @@ class AssetProcessingSpec extends ExternalServiceSpec {
 
     verify(s3UtilsMock, times(1)).addObjectTags("s3Bucket", s"$userId/sharepoint/$consignmentId/metadata/$matchId.metadata", Map("ASSET_PROCESSING" -> "CompletedWithIssues"))
 
-    verifyDefaultInfoLogging(mockLogger)
     verify(mockLogger).error(
       s"AssetProcessingError: consignmentId: Some($consignmentId), matchId: Some($matchId), source: Some(sharepoint), errorCode: ASSET_PROCESSING.JSON.INVALID, errorMessage: expected json value got 'some r...' (line 1, column 1)"
     )
@@ -229,7 +223,6 @@ class AssetProcessingSpec extends ExternalServiceSpec {
 
     verify(s3UtilsMock, times(1)).addObjectTags("s3Bucket", s"$userId/sharepoint/$consignmentId/metadata/$matchId.metadata", Map("ASSET_PROCESSING" -> "CompletedWithIssues"))
 
-    verifyDefaultInfoLogging(mockLogger)
     verify(mockLogger).error(
       s"AssetProcessingError: consignmentId: Some($consignmentId), matchId: Some($matchId), source: Some(sharepoint), errorCode: ASSET_PROCESSING.JSON.INVALID, errorMessage: exhausted input"
     )
@@ -352,7 +345,6 @@ class AssetProcessingSpec extends ExternalServiceSpec {
     result shouldEqual expectedResult
 
     verify(mockLogger, times(0)).isErrorEnabled
-    verifyDefaultInfoLogging(mockLogger)
     verify(mockLogger).info("Asset metadata successfully processed for: {}", s"$userId/sharepoint/$consignmentId/metadata/$matchId.metadata")
   }
 
@@ -409,11 +401,6 @@ class AssetProcessingSpec extends ExternalServiceSpec {
     result shouldEqual expectedResult
 
     verify(mockLogger, times(0)).isErrorEnabled
-    verifyDefaultInfoLogging(mockLogger)
     verify(mockLogger).info("Asset metadata successfully processed for: {}", s"$userId/sharepoint/$consignmentId/metadata/$matchId.metadata")
-  }
-
-  private def verifyDefaultInfoLogging(logger: UnderlyingLogger): Unit = {
-    verify(logger).info("Processing asset metadata for: {}", s"$userId/sharepoint/$consignmentId/metadata/$matchId.metadata")
   }
 }
