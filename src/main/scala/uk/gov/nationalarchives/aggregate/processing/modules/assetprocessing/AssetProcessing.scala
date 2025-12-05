@@ -45,11 +45,6 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
   }
 
   def processAsset(s3Bucket: String, objectKey: String): AssetProcessingResult = {
-    logger.info(s"Processing asset metadata for: $objectKey")
-    handleEvent(s3Bucket, objectKey)
-  }
-
-  private def handleEvent(s3Bucket: String, objectKey: String): AssetProcessingResult = {
     Try {
       val objectDetails = Common.objectKeyParser(objectKey)
       val objectElements = objectDetails.objectElements.get.split("\\.")

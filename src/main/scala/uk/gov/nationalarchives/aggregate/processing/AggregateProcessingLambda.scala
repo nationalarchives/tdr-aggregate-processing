@@ -1,5 +1,6 @@
 package uk.gov.nationalarchives.aggregate.processing
 
+import scala.collection.parallel.CollectionConverters._
 import cats.effect.IO
 import cats.effect.IO._
 import cats.effect.unsafe.implicits.global
@@ -97,7 +98,7 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
 
   private def processAssets(userId: UUID, consignmentId: UUID, sourceBucket: String, objectKeys: List[String], dryRun: Boolean): IO[AssetProcessingResult] = {
     for {
-      assetProcessingResults <- IO(objectKeys.map(assetProcessor.processAsset(sourceBucket, _)))
+      assetProcessingResults <- IO(objectKeys.par.map(assetProcessor.processAsset(sourceBucket, _)).toList)
       assetProcessingErrors = assetProcessingResults.exists(_.processingErrors)
       suppliedMetadata = assetProcessingResults.exists(_.suppliedMetadata.nonEmpty)
       _ <-
