@@ -29,6 +29,10 @@ case object DateLastModifiedProperty extends BaseProperty {
   val id: String = "date_last_modified"
 }
 
+case object FileNameProperty extends BaseProperty {
+  val id: String = "file_name"
+}
+
 case object FilePathProperty extends BaseProperty {
   val id: String = "file_path"
 }

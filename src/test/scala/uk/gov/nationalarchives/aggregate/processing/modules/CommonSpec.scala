@@ -48,9 +48,9 @@ class CommonSpec extends AnyFlatSpec {
 
   "AssetSource" should "contain the correct enums" in {
     val assetSourceValue = Common.AssetSource
-    val expectedValues = List("harddrive", "sharepoint")
+    val expectedValues = List("harddrive", "networkdrive", "sharepoint")
 
-    assetSourceValue.values.size shouldBe 2
+    assetSourceValue.values.size shouldBe 3
     assetSourceValue.values.map(_.toString).toList shouldEqual expectedValues
   }
 
