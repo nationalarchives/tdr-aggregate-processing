@@ -31,8 +31,9 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
 
   private def getMetadataHandler(assetSource: AssetSource): MetadataHandler = {
     assetSource match {
-      case AssetSource.HardDrive  => HardDriveMetadataHandler.metadataHandler
-      case AssetSource.SharePoint => SharePointMetadataHandler.metadataHandler
+      case AssetSource.HardDrive    => HardDriveMetadataHandler.metadataHandler
+      case AssetSource.NetworkDrive => NetworkDriveMetadataHandler.metadataHandler
+      case AssetSource.SharePoint   => SharePointMetadataHandler.metadataHandler
     }
   }
 

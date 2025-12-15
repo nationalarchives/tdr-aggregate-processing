@@ -4,7 +4,12 @@ import graphql.codegen.types.ClientSideMetadataInput
 import io.circe.syntax.EncoderOps
 import io.circe.{Decoder, Json}
 
-class BaseMetadataHandler(mapper: String => String, defaultProperties: Map[String, String], normaliseFunction: (String, Json) => Json) extends MetadataHandler {
+class BaseMetadataHandler(
+    mapper: String => String,
+    defaultProperties: Map[String, String],
+    normaliseFunction: (String, Json) => Json,
+    enrichMetadataFunction: Map[String, Json] => Json = (baseMetadata: Map[String, Json]) => baseMetadata.asJson
+) extends MetadataHandler {
   implicit val decodeClientSideInput: Decoder[ClientSideMetadataInput] =
     Decoder.instance[ClientSideMetadataInput] { c =>
       for {
@@ -34,13 +39,13 @@ class BaseMetadataHandler(mapper: String => String, defaultProperties: Map[Strin
   }
 
   def convertToBaseMetadata(sourceJson: Json): Json = {
-    sourceJson.asObject.get.toMap
+    val metadata = sourceJson.asObject.get.toMap
       .map(fv => {
         val originalField = fv._1
         val field = sourceToBasePropertiesMapper(originalField)
         field -> normaliseValues(field, fv._2)
       })
-      .asJson
+    enrichMetadataFunction(metadata)
   }
 
   def toClientSideMetadataInput(baseMetadataJson: Json): Decoder.Result[ClientSideMetadataInput] =
