@@ -1,7 +1,5 @@
 package uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.metadata
 
-import graphql.codegen.types
-import io.circe.Decoder.Result
 import io.circe.Json
 import io.circe.syntax.EncoderOps
 import uk.gov.nationalarchives.tdr.schemautils.ConfigUtils
