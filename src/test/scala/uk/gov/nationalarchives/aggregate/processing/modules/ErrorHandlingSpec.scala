@@ -35,7 +35,7 @@ class ErrorHandlingSpec extends AnyFlatSpec {
     val fileCaptor = ArgumentCaptor.forClass(classOf[java.nio.file.Path])
     verify(mockS3Utils, times(1)).upload(bucketCaptor.capture(), keyCaptor.capture(), fileCaptor.capture())
 
-    assert(bucketCaptor.getValue.contains("tdr-transfer-errors"))
+    assert(bucketCaptor.getValue.contains("transferErrorBucket"))
     assert(keyCaptor.getValue.contains(s"consignmentId123/AssetProcessingError"))
     assert(keyCaptor.getValue.endsWith(".error"))
   }
@@ -57,8 +57,10 @@ class ErrorHandlingSpec extends AnyFlatSpec {
       "AssetProcessingError: consignmentId: None, matchId: None, source: None, errorCode: ASSET_PROCESSING.TEST_ERROR, errorMessage: Test error message"
     )
 
+    val bucketCaptor = ArgumentCaptor.forClass(classOf[String])
     val keyCaptor = ArgumentCaptor.forClass(classOf[String])
-    verify(mockS3Utils).upload(org.mockito.ArgumentMatchers.any(), keyCaptor.capture(), org.mockito.ArgumentMatchers.any())
+    verify(mockS3Utils).upload(bucketCaptor.capture(), keyCaptor.capture(), org.mockito.ArgumentMatchers.any())
+    assert(bucketCaptor.getValue.contains("transferErrorBucket"))
     assert(keyCaptor.getValue.contains("unknown/AssetProcessingError"))
     assert(keyCaptor.getValue.endsWith(".error"))
   }
@@ -83,6 +85,7 @@ class ErrorHandlingSpec extends AnyFlatSpec {
     val keyCaptor = ArgumentCaptor.forClass(classOf[String])
     val fileCaptor = ArgumentCaptor.forClass(classOf[java.nio.file.Path])
     verify(mockS3Utils, times(1)).upload(bucketCaptor.capture(), keyCaptor.capture(), fileCaptor.capture())
+    assert(bucketCaptor.getValue.contains("transferErrorBucket"))
     assert(keyCaptor.getValue.contains(s"$consignmentId/AggregateProcessingError"))
     assert(keyCaptor.getValue.endsWith(".error"))
   }
@@ -107,6 +110,7 @@ class ErrorHandlingSpec extends AnyFlatSpec {
     val keyCaptor = ArgumentCaptor.forClass(classOf[String])
     val fileCaptor = ArgumentCaptor.forClass(classOf[java.nio.file.Path])
     verify(mockS3Utils, times(1)).upload(bucketCaptor.capture(), keyCaptor.capture(), fileCaptor.capture())
+    assert(bucketCaptor.getValue.contains("transferErrorBucket"))
     assert(keyCaptor.getValue.contains(s"$consignmentId/TransferError"))
     assert(keyCaptor.getValue.endsWith(".error"))
   }
