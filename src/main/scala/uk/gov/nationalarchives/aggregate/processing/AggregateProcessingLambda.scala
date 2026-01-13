@@ -49,7 +49,7 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
       processEvent(event).handleErrorWith(err => {
         val details = Common.objectKeyParser(event.metadataSourceObjectPrefix)
         val error = AggregateProcessingError(details.consignmentId, s"$AggregateProcessing", err.getMessage)
-        handleError(error, logger)
+        handleError(error, logger, s3Utils)
         IO.unit
       })
     )
@@ -72,10 +72,10 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
       objectKeys = s3Objects.map(_.key())
       assetProcessingResult <- dataLoadErrors match {
         case _ if dataLoadErrors =>
-          handleError(dataLoadError(consignmentId), logger)
+          handleError(dataLoadError(consignmentId), logger, s3Utils)
           IO(errorProcessingResult)
         case _ if objectKeys.isEmpty =>
-          handleError(noObjectsError(consignmentId, objectKeyPrefixDetails.category), logger)
+          handleError(noObjectsError(consignmentId, objectKeyPrefixDetails.category), logger, s3Utils)
           IO(errorProcessingResult)
         case _ => processAssets(userId, consignmentId, sourceBucket, objectKeys, dryRun)
       }
@@ -146,7 +146,7 @@ object AggregateProcessingLambda {
   private val configFactory: Config = ConfigFactory.load()
   val s3Utils: S3Utils = S3Utils(S3Clients.s3Async(configFactory.getString("s3.endpoint")))
 
-  private case class AggregateProcessingError(consignmentId: UUID, errorCode: String, errorMessage: String) extends BaseError {
+  case class AggregateProcessingError(consignmentId: UUID, errorCode: String, errorMessage: String) extends BaseError {
     override def toString: String = {
       s"${this.simpleName}: consignmentId: $consignmentId, errorCode: $errorCode, errorMessage: $errorMessage"
     }
