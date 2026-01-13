@@ -20,6 +20,7 @@ import uk.gov.nationalarchives.aggregate.processing.persistence.GraphQlApi
 import uk.gov.nationalarchives.aggregate.processing.persistence.GraphQlApi.{backend, keycloakDeployment}
 import uk.gov.nationalarchives.aggregate.processing.utilities.NotificationsClient.UploadEvent
 import uk.gov.nationalarchives.aggregate.processing.utilities.{KeycloakClient, NotificationsClient}
+import uk.gov.nationalarchives.aws.utils.s3.{S3Clients, S3Utils}
 import uk.gov.nationalarchives.aws.utils.stepfunction.StepFunctionClients.sfnAsyncClient
 import uk.gov.nationalarchives.aws.utils.stepfunction.StepFunctionUtils
 
@@ -42,7 +43,7 @@ class TransferOrchestration(
       case aggregateProcessingEvent: AggregateProcessingEvent => orchestrateProcessingEvent(aggregateProcessingEvent)
       case _ =>
         val error = TransferError(None, s"$Orchestration.$EventError.$Invalid", s"Unrecognized orchestration event: ${orchestrationEvent.getClass.getName}")
-        handleError(error, logger)
+        handleError(error, logger, s3Utils)
         IO(OrchestrationResult(None, success = false, Some(error)))
     }
   }
@@ -58,7 +59,7 @@ class TransferOrchestration(
       _ <-
         if (errors) {
           val transferError = TransferError(Some(consignmentId), s"$AggregateProcessing.$CompletedWithIssues", "One or more assets failed to process.")
-          IO(ErrorHandling.handleError(transferError, logger))
+          IO(ErrorHandling.handleError(transferError, logger, s3Utils))
         } else {
           triggerBackendChecksSfn(event) *> triggerDraftMetadataSfn(event)
         }
@@ -91,7 +92,8 @@ class TransferOrchestration(
         IO(logger.error(ex.getMessage)) *> IO(
           ErrorHandling.handleError(
             TransferError(Some(consignmentId), s"$AggregateProcessing.$CompletedWithIssues", s"Step function error: ${ex.getMessage}"),
-            logger
+            logger,
+            s3Utils
           )
         )
       }
@@ -149,6 +151,7 @@ object TransferOrchestration {
   val stepFunctionUtils = StepFunctionUtils(sfnAsyncClient(config.getString("sfn.endpoint")))
   val notificationsClient = NotificationsClient(config)
   val keycloakClient = KeycloakClient(config)
+  val s3Utils: S3Utils = S3Utils(S3Clients.s3Async(config.getString("s3.endpoint")))
 
   def apply() = new TransferOrchestration(GraphQlApi(), stepFunctionUtils, notificationsClient, keycloakClient, config)(logger)
 }

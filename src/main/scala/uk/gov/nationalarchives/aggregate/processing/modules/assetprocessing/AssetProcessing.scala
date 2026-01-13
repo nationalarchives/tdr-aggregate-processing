@@ -38,7 +38,7 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
   }
 
   private def handleProcessError(errors: List[AssetProcessingError], s3Bucket: String, s3ObjectKey: String): AssetProcessingResult = {
-    errors.foreach(ErrorHandling.handleError(_, logger))
+    errors.foreach(ErrorHandling.handleError(_, logger, s3Utils))
     val errorTags: Map[String, String] = Map(ptAp.toString -> CompletedWithIssues.toString)
     s3Utils.addObjectTags(s3Bucket, s3ObjectKey, errorTags)
     val matchId = errors.head.matchId
