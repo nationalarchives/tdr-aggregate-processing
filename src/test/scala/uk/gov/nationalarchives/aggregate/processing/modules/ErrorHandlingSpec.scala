@@ -36,7 +36,7 @@ class ErrorHandlingSpec extends AnyFlatSpec {
     verify(mockS3Utils, times(1)).upload(bucketCaptor.capture(), keyCaptor.capture(), fileCaptor.capture())
 
     assert(bucketCaptor.getValue.contains("tdr-transfer-errors"))
-    assert(keyCaptor.getValue.contains("consignmentId123"))
+    assert(keyCaptor.getValue.contains(s"consignmentId123/AssetProcessingError"))
     assert(keyCaptor.getValue.endsWith(".error"))
   }
 
@@ -59,7 +59,7 @@ class ErrorHandlingSpec extends AnyFlatSpec {
 
     val keyCaptor = ArgumentCaptor.forClass(classOf[String])
     verify(mockS3Utils).upload(org.mockito.ArgumentMatchers.any(), keyCaptor.capture(), org.mockito.ArgumentMatchers.any())
-    assert(keyCaptor.getValue.contains("unknown"))
+    assert(keyCaptor.getValue.contains("unknown/AssetProcessingError"))
     assert(keyCaptor.getValue.endsWith(".error"))
   }
 
@@ -83,7 +83,7 @@ class ErrorHandlingSpec extends AnyFlatSpec {
     val keyCaptor = ArgumentCaptor.forClass(classOf[String])
     val fileCaptor = ArgumentCaptor.forClass(classOf[java.nio.file.Path])
     verify(mockS3Utils, times(1)).upload(bucketCaptor.capture(), keyCaptor.capture(), fileCaptor.capture())
-    assert(keyCaptor.getValue.contains(consignmentId.toString))
+    assert(keyCaptor.getValue.contains(s"$consignmentId/AggregateProcessingError"))
     assert(keyCaptor.getValue.endsWith(".error"))
   }
 
@@ -107,7 +107,7 @@ class ErrorHandlingSpec extends AnyFlatSpec {
     val keyCaptor = ArgumentCaptor.forClass(classOf[String])
     val fileCaptor = ArgumentCaptor.forClass(classOf[java.nio.file.Path])
     verify(mockS3Utils, times(1)).upload(bucketCaptor.capture(), keyCaptor.capture(), fileCaptor.capture())
-    assert(keyCaptor.getValue.contains("unassociated/TransferError"))
+    assert(keyCaptor.getValue.contains(s"$consignmentId/TransferError"))
     assert(keyCaptor.getValue.endsWith(".error"))
   }
 }

@@ -53,7 +53,7 @@ object ErrorHandling {
         val errorJson = ErrorJson(Some(agpe.consignmentId.toString), None, None, errorId, agpe.errorCode, agpe.errorMessage)
         uploadErrorToS3(s3Utils, bucket, key, errorJson.asJson)
       case te: TransferError =>
-        val key = s"unassociated/${te.simpleName}/$errorId.error"
+        val key = s"${te.consignmentId.getOrElse("unknown")}/${te.simpleName}/$errorId.error"
         val errorJson = ErrorJson(te.consignmentId.map(_.toString), None, None, errorId, te.errorCode, te.errorMessage)
         uploadErrorToS3(s3Utils, bucket, key, errorJson.asJson)
       case error =>
