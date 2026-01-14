@@ -70,13 +70,13 @@ class CommonSpec extends AnyFlatSpec {
     objectCategoryValue.values.map(_.toString).toList shouldEqual expectedValues
   }
 
-  "objectKeyParser" should "parse a valid object key" in {
+  "objectKeyContextParser" should "parse a valid object key" in {
     val userId = UUID.randomUUID()
     val consignmentId = UUID.randomUUID()
     val matchId = UUID.randomUUID().toString
     val validObjectKey = s"$userId/sharepoint/$consignmentId/metadata/$matchId.metadata"
 
-    val result = Common.objectKeyParser(validObjectKey)
+    val result = Common.objectKeyContextParser(validObjectKey)
     result.userId shouldBe userId
     result.assetSource shouldBe Common.AssetSource.SharePoint
     result.consignmentId shouldBe consignmentId
@@ -84,12 +84,12 @@ class CommonSpec extends AnyFlatSpec {
     result.objectElements.get shouldBe s"$matchId.metadata"
   }
 
-  "objectKeyParser" should "parse a valid object prefix key" in {
+  "objectKeyContextParser" should "parse a valid object prefix key" in {
     val userId = UUID.randomUUID()
     val consignmentId = UUID.randomUUID()
     val validObjectPrefixKey = s"$userId/sharepoint/$consignmentId/metadata"
 
-    val result = Common.objectKeyParser(validObjectPrefixKey)
+    val result = Common.objectKeyContextParser(validObjectPrefixKey)
     result.userId shouldBe userId
     result.assetSource shouldBe Common.AssetSource.SharePoint
     result.consignmentId shouldBe consignmentId
@@ -97,13 +97,13 @@ class CommonSpec extends AnyFlatSpec {
     result.objectElements shouldBe None
   }
 
-  "objectKeyParser" should "throw a relevant exception when parsing an invalid object key" in {
+  "objectKeyContextParser" should "throw a relevant exception when parsing an invalid object key" in {
     val userId = UUID.randomUUID()
     val consignmentId = UUID.randomUUID()
     val invalidObjectKey = s"$userId/$consignmentId/metadata"
 
     val exception = intercept[NoSuchElementException] {
-      Common.objectKeyParser(invalidObjectKey)
+      Common.objectKeyContextParser(invalidObjectKey)
     }
 
     exception.getMessage shouldBe s"No value found for '$consignmentId'"

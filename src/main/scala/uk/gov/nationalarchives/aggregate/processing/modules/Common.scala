@@ -2,7 +2,6 @@ package uk.gov.nationalarchives.aggregate.processing.modules
 
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.AssetSource.AssetSource
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ObjectCategory.ObjectCategory
-import uk.gov.nationalarchives.aggregate.processing.modules.Common.ObjectType.Value
 
 import java.util.UUID
 import scala.util.{Failure, Success, Try}
@@ -32,7 +31,7 @@ object Common {
     val FileExtensionError: Value = Value("FILE_EXTENSION")
     val JsonError: Value = Value("JSON")
     val MatchIdError: Value = Value("MATCH_ID")
-    val ObjectKeyParsingError: Value = Value("OBJECT_KEY")
+    val ObjectKeyError: Value = Value("OBJECT_KEY")
     val ObjectSizeError: Value = Value("OBJECT_SIZE")
     val S3Error: Value = Value("S3")
   }
@@ -75,7 +74,7 @@ object Common {
     val Records: Value = Value("records")
   }
 
-  def objectKeyParser(objectKey: String): ObjectKeyDetails = {
+  def objectKeyContextParser(objectKey: String): ObjectKeyContext = {
     Try {
       val elements = objectKey.split('/')
       val userId = UUID.fromString(elements(0))
@@ -83,12 +82,12 @@ object Common {
       val consignmentId = UUID.fromString(elements(2))
       val objectCategory = ObjectCategory.withName(elements(3))
       val objectElements = if (elements.length > 4) Some(elements.last) else None
-      ObjectKeyDetails(userId, consignmentId, assetSource, objectCategory, objectElements)
+      ObjectKeyContext(userId, consignmentId, assetSource, objectCategory, objectElements)
     } match {
       case Failure(ex)               => throw ex
-      case Success(objectKeyDetails) => objectKeyDetails
+      case Success(objectKeyContext) => objectKeyContext
     }
   }
 
-  case class ObjectKeyDetails(userId: UUID, consignmentId: UUID, assetSource: AssetSource, category: ObjectCategory, objectElements: Option[String])
+  case class ObjectKeyContext(userId: UUID, consignmentId: UUID, assetSource: AssetSource, category: ObjectCategory, objectElements: Option[String])
 }
