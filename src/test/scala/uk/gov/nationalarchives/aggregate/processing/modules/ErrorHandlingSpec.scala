@@ -15,8 +15,10 @@ class ErrorHandlingSpec extends AnyFlatSpec {
   "handleError" should "log AssetProccessingError messages & upload the error to s3" in {
     val mockLogger = mock[UnderlyingLogger]
     val mockS3Utils = mock[S3Utils]
+    val consignmentId = java.util.UUID.randomUUID()
+    val errorHandling = new ErrorHandling(mockS3Utils)
     val error = AssetProcessingError(
-      consignmentId = Some("consignmentId123"),
+      consignmentId = Some(consignmentId),
       matchId = Some("matchId456"),
       source = Some("sourceSystem"),
       errorCode = "ASSET_PROCESSING.TEST_ERROR",
@@ -24,10 +26,10 @@ class ErrorHandlingSpec extends AnyFlatSpec {
     )
     when(mockLogger.isErrorEnabled()).thenReturn(true)
 
-    ErrorHandling.handleError(error, Logger(mockLogger), mockS3Utils)
+    errorHandling.handleError(error, Logger(mockLogger))
 
     verify(mockLogger).error(
-      "AssetProcessingError: consignmentId: Some(consignmentId123), matchId: Some(matchId456), source: Some(sourceSystem), errorCode: ASSET_PROCESSING.TEST_ERROR, errorMessage: Test error message"
+      s"AssetProcessingError: consignmentId: Some($consignmentId), matchId: Some(matchId456), source: Some(sourceSystem), errorCode: ASSET_PROCESSING.TEST_ERROR, errorMessage: Test error message"
     )
 
     val bucketCaptor = ArgumentCaptor.forClass(classOf[String])
@@ -36,13 +38,14 @@ class ErrorHandlingSpec extends AnyFlatSpec {
     verify(mockS3Utils, times(1)).upload(bucketCaptor.capture(), keyCaptor.capture(), fileCaptor.capture())
 
     assert(bucketCaptor.getValue.contains("transferErrorBucket"))
-    assert(keyCaptor.getValue.contains(s"consignmentId123/AssetProcessingError"))
+    assert(keyCaptor.getValue.contains(s"$consignmentId/AssetProcessingError"))
     assert(keyCaptor.getValue.endsWith(".error"))
   }
 
   it should "log an error when optional fields are None and upload to s3" in {
     val mockLogger = mock[UnderlyingLogger]
     val mockS3Utils = mock[S3Utils]
+    val errorHandling = new ErrorHandling(mockS3Utils)
     val error = AssetProcessingError(
       consignmentId = None,
       matchId = None,
@@ -52,7 +55,7 @@ class ErrorHandlingSpec extends AnyFlatSpec {
     )
     when(mockLogger.isErrorEnabled()).thenReturn(true)
 
-    ErrorHandling.handleError(error, Logger(mockLogger), mockS3Utils)
+    errorHandling.handleError(error, Logger(mockLogger))
     verify(mockLogger).error(
       "AssetProcessingError: consignmentId: None, matchId: None, source: None, errorCode: ASSET_PROCESSING.TEST_ERROR, errorMessage: Test error message"
     )
@@ -69,16 +72,17 @@ class ErrorHandlingSpec extends AnyFlatSpec {
     val mockLogger = mock[UnderlyingLogger]
     val mockS3Utils = mock[S3Utils]
     val consignmentId = java.util.UUID.randomUUID()
+    val errorHandling = new ErrorHandling(mockS3Utils)
     val error = AggregateProcessingError(
-      consignmentId = consignmentId,
+      consignmentId = Some(consignmentId),
       errorCode = "AGGREGATE_PROCESSING.TEST_ERROR",
       errorMessage = "Test error message"
     )
     when(mockLogger.isErrorEnabled()).thenReturn(true)
 
-    ErrorHandling.handleError(error, Logger(mockLogger), mockS3Utils)
+    errorHandling.handleError(error, Logger(mockLogger))
     verify(mockLogger).error(
-      s"AggregateProcessingError: consignmentId: $consignmentId, errorCode: AGGREGATE_PROCESSING.TEST_ERROR, errorMessage: Test error message"
+      s"AggregateProcessingError: consignmentId: Some($consignmentId), errorCode: AGGREGATE_PROCESSING.TEST_ERROR, errorMessage: Test error message"
     )
 
     val bucketCaptor = ArgumentCaptor.forClass(classOf[String])
@@ -94,6 +98,7 @@ class ErrorHandlingSpec extends AnyFlatSpec {
     val mockLogger = mock[UnderlyingLogger]
     val mockS3Utils = mock[S3Utils]
     val consignmentId = java.util.UUID.randomUUID()
+    val errorHandling = new ErrorHandling(mockS3Utils)
     val error = TransferError(
       consignmentId = Some(consignmentId),
       errorCode = "AGGREGATE_PROCESSING.TEST_ERROR",
@@ -101,7 +106,7 @@ class ErrorHandlingSpec extends AnyFlatSpec {
     )
     when(mockLogger.isErrorEnabled()).thenReturn(true)
 
-    ErrorHandling.handleError(error, Logger(mockLogger), mockS3Utils)
+    errorHandling.handleError(error, Logger(mockLogger))
     verify(mockLogger).error(
       s"TransferError: consignmentId: Some($consignmentId), errorCode: AGGREGATE_PROCESSING.TEST_ERROR, errorMessage: Test error message"
     )

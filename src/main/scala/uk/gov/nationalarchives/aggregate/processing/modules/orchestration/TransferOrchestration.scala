@@ -14,7 +14,7 @@ import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.{
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.StateStatusValue.{Completed, CompletedWithIssues, ConsignmentStatusValue, Failed}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.{ConsignmentStatusType, StateStatusValue}
 import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling
-import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling.{BaseError, handleError}
+import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling.BaseError
 import uk.gov.nationalarchives.aggregate.processing.modules.orchestration.TransferOrchestration._
 import uk.gov.nationalarchives.aggregate.processing.persistence.GraphQlApi
 import uk.gov.nationalarchives.aggregate.processing.persistence.GraphQlApi.{backend, keycloakDeployment}
@@ -43,7 +43,7 @@ class TransferOrchestration(
       case aggregateProcessingEvent: AggregateProcessingEvent => orchestrateProcessingEvent(aggregateProcessingEvent)
       case _ =>
         val error = TransferError(None, s"$Orchestration.$EventError.$Invalid", s"Unrecognized orchestration event: ${orchestrationEvent.getClass.getName}")
-        handleError(error, logger, s3Utils)
+        errorHandling.handleError(error, logger)
         IO(OrchestrationResult(None, success = false, Some(error)))
     }
   }
@@ -59,7 +59,7 @@ class TransferOrchestration(
       _ <-
         if (errors) {
           val transferError = TransferError(Some(consignmentId), s"$AggregateProcessing.$CompletedWithIssues", "One or more assets failed to process.")
-          IO(ErrorHandling.handleError(transferError, logger, s3Utils))
+          IO(errorHandling.handleError(transferError, logger))
         } else {
           triggerBackendChecksSfn(event) *> triggerDraftMetadataSfn(event)
         }
@@ -90,10 +90,9 @@ class TransferOrchestration(
       .startExecution(arn, input, Some(stepName))
       .handleErrorWith { ex =>
         IO(logger.error(ex.getMessage)) *> IO(
-          ErrorHandling.handleError(
+          errorHandling.handleError(
             TransferError(Some(consignmentId), s"$AggregateProcessing.$CompletedWithIssues", s"Step function error: ${ex.getMessage}"),
-            logger,
-            s3Utils
+            logger
           )
         )
       }
@@ -152,6 +151,7 @@ object TransferOrchestration {
   val notificationsClient = NotificationsClient(config)
   val keycloakClient = KeycloakClient(config)
   val s3Utils: S3Utils = S3Utils(S3Clients.s3Async(config.getString("s3.endpoint")))
+  val errorHandling = ErrorHandling()
 
   def apply() = new TransferOrchestration(GraphQlApi(), stepFunctionUtils, notificationsClient, keycloakClient, config)(logger)
 }
