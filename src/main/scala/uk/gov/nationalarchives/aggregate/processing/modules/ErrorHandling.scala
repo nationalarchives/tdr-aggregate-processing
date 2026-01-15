@@ -2,10 +2,11 @@ package uk.gov.nationalarchives.aggregate.processing.modules
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.typesafe.scalalogging.Logger
+import io.circe.generic.semiauto.deriveEncoder
 import io.circe.syntax.EncoderOps
 import io.circe.{Encoder, Json}
 import uk.gov.nationalarchives.aggregate.processing.AggregateProcessingLambda.AggregateProcessingError
-import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling.{BaseError, ErrorJson, config}
+import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling.{BaseError, config}
 import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.AssetProcessing.AssetProcessingError
 import uk.gov.nationalarchives.aggregate.processing.modules.orchestration.TransferOrchestration.TransferError
 import uk.gov.nationalarchives.aws.utils.s3.{S3Clients, S3Utils}
@@ -22,24 +23,8 @@ class ErrorHandling(s3Utils: S3Utils) {
     val errorMessage = error.toString
     logger.error(errorMessage)
 
-    error match {
-      case ape: AssetProcessingError =>
-        val key = s"${ape.consignmentId.getOrElse("unknown")}/${ape.simpleName}/$errorId.error"
-        val errorJson = ErrorJson(ape.consignmentId.map(_.toString), ape.matchId, ape.source, errorId, ape.errorCode, ape.errorMsg)
-        uploadErrorToS3(s3Utils, bucket, key, errorJson.asJson)
-      case agpe: AggregateProcessingError =>
-        val key = s"${agpe.consignmentId.getOrElse("unknown")}/${agpe.simpleName}/$errorId.error"
-        val errorJson = ErrorJson(agpe.consignmentId.map(_.toString), None, None, errorId, agpe.errorCode, agpe.errorMessage)
-        uploadErrorToS3(s3Utils, bucket, key, errorJson.asJson)
-      case te: TransferError =>
-        val key = s"${te.consignmentId.getOrElse("unknown")}/${te.simpleName}/$errorId.error"
-        val errorJson = ErrorJson(te.consignmentId.map(_.toString), None, None, errorId, te.errorCode, te.errorMessage)
-        uploadErrorToS3(s3Utils, bucket, key, errorJson.asJson)
-      case error =>
-        val key = s"unknown/${error.simpleName}/$errorId.error"
-        val errorJson = ErrorJson(None, None, None, errorId, "UNKNOWN_ERROR", errorMessage)
-        uploadErrorToS3(s3Utils, bucket, key, errorJson.asJson)
-    }
+    val errorKey = s"${error.consignmentId.getOrElse("unknown")}/${error.simpleName}/$errorId.error"
+    uploadErrorToS3(s3Utils, bucket, errorKey, error.asJson)
   }
 
   private def uploadErrorToS3(
@@ -48,7 +33,7 @@ class ErrorHandling(s3Utils: S3Utils) {
       key: String,
       json: Json
   ): Unit = {
-    val file: Path = Files.createTempFile("error-file", ".error")
+    val file: Path = Files.createTempFile(s"error-file-${key.substring(key.lastIndexOf("/") + 1)}", ".error")
     Files.write(file, json.spaces2.getBytes(StandardCharsets.UTF_8))
     s3Utils.upload(bucket, key, file)
   }
@@ -60,23 +45,16 @@ object ErrorHandling {
     val consignmentId: Option[UUID]
   }
 
-  case class ErrorJson(
-      transferId: Option[String],
-      matchId: Option[String],
-      source: Option[String],
-      errorId: String,
-      errorCode: String,
-      errorMessage: String
-  )
+  implicit val encodeAggregateProcessingError: Encoder[AggregateProcessingError] = deriveEncoder[AggregateProcessingError]
+  implicit val encodeAssetProcessingError: Encoder[AssetProcessingError] = deriveEncoder[AssetProcessingError]
+  implicit val encodeTransferError: Encoder[TransferError] = deriveEncoder[TransferError]
 
-  implicit val errorJsonEncoder: Encoder[ErrorJson] = Encoder.forProduct6(
-    "transferId",
-    "matchId",
-    "source",
-    "errorId",
-    "errorCode",
-    "errorMessage"
-  )(e => (e.transferId, e.matchId, e.source, e.errorId, e.errorCode, e.errorMessage))
+  implicit val encoderBaseError: Encoder[BaseError] = Encoder.instance {
+    case e: AggregateProcessingError => e.asJson
+    case e: AssetProcessingError     => e.asJson
+    case e: TransferError            => e.asJson
+    case _                           => throw new RuntimeException("Unknown BaseError type")
+  }
 
   val config: Config = ConfigFactory.load()
   val s3Utils: S3Utils = S3Utils(S3Clients.s3Async(config.getString("s3.endpoint")))
