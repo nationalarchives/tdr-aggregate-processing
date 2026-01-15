@@ -47,8 +47,8 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
 
     val resultsIO = events.map(event =>
       processEvent(event).handleErrorWith(err => {
-        val details = Common.objectKeyParser(event.metadataSourceObjectPrefix)
-        val error = AggregateProcessingError(details.consignmentId, s"$AggregateProcessing", err.getMessage)
+        val objectContext = Common.objectKeyContextParser(event.metadataSourceObjectPrefix)
+        val error = AggregateProcessingError(objectContext.consignmentId, s"$AggregateProcessing", err.getMessage)
         handleError(error, logger, s3Utils)
         IO.unit
       })
@@ -60,11 +60,11 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
   def processEvent(event: AggregateEvent): IO[OrchestrationResult] = {
     val sourceBucket = event.metadataSourceBucket
     val objectsPrefix = event.metadataSourceObjectPrefix
-    val objectKeyPrefixDetails = Common.objectKeyParser(objectsPrefix)
-    val consignmentId = objectKeyPrefixDetails.consignmentId
-    val userId = objectKeyPrefixDetails.userId
+    val objectContext = Common.objectKeyContextParser(objectsPrefix)
+    val consignmentId = objectContext.consignmentId
+    val userId = objectContext.userId
     val dataLoadErrors = event.dataLoadErrors
-    val assetSource = objectKeyPrefixDetails.assetSource
+    val assetSource = objectContext.assetSource
     val dryRun = objectsPrefix.contains(ObjectCategory.DryRunMetadata.toString)
     logger.info(s"Starting processing consignment: $consignmentId")
     for {
@@ -75,7 +75,7 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
           handleError(dataLoadError(consignmentId), logger, s3Utils)
           IO(errorProcessingResult)
         case _ if objectKeys.isEmpty =>
-          handleError(noObjectsError(consignmentId, objectKeyPrefixDetails.category), logger, s3Utils)
+          handleError(noObjectsError(consignmentId, objectContext.category), logger, s3Utils)
           IO(errorProcessingResult)
         case _ => processAssets(userId, consignmentId, sourceBucket, objectKeys, dryRun)
       }

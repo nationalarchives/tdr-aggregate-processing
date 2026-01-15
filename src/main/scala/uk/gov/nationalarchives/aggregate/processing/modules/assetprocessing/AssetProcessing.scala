@@ -6,7 +6,7 @@ import graphql.codegen.types.ClientSideMetadataInput
 import io.circe.{Json, parser}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.AssetSource.AssetSource
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ObjectType.ObjectType
-import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorType.{EncodingError, JsonError, MatchIdError, ObjectKeyParsingError, S3Error => s3e}
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorType.{EncodingError, JsonError, MatchIdError, ObjectKeyError, S3Error => s3e}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorValue.{Invalid, Mismatch, ReadError}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.{AssetProcessing => ptAp}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.StateStatusValue.{Completed, CompletedWithIssues}
@@ -47,14 +47,14 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
 
   def processAsset(s3Bucket: String, objectKey: String): AssetProcessingResult = {
     Try {
-      val objectDetails = Common.objectKeyParser(objectKey)
-      val objectElements = objectDetails.objectElements.get.split("\\.")
+      val objectContext = Common.objectKeyContextParser(objectKey)
+      val objectElements = objectContext.objectElements.get.split("\\.")
       val matchId = objectElements(0)
       val objectType = ObjectType.withName(objectElements(1))
-      AssetProcessingEvent(objectDetails.userId, objectDetails.consignmentId, matchId, objectDetails.assetSource, objectType, s3Bucket, objectKey)
+      AssetProcessingEvent(objectContext.userId, objectContext.consignmentId, matchId, objectContext.assetSource, objectType, s3Bucket, objectKey)
     } match {
       case Failure(ex) =>
-        val error = AssetProcessingError(None, None, None, s"$ptAp.$ObjectKeyParsingError.$Invalid", s"Invalid object key: $objectKey: ${ex.getMessage}")
+        val error = AssetProcessingError(None, None, None, s"$ptAp.$ObjectKeyError.$Invalid", s"Invalid object key: $objectKey: ${ex.getMessage}")
         handleProcessError(List(error), s3Bucket, objectKey)
       case Success(event) => parseMetadataObject(s3Utils, event)
     }
