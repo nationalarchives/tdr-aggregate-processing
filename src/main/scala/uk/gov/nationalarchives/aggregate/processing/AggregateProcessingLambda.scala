@@ -39,7 +39,7 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
   private val assetProcessor = AssetProcessing()
   private val persistenceApi = GraphQlApi()
   private val orchestrator = TransferOrchestration()
-  private val errorHandling = ErrorHandling()
+  private lazy val errorHandling = ErrorHandling()
   private lazy val errorProcessingResult = AssetProcessingResult(errors = true, suppliedMetadata = false)
 
   override def handleRequest(event: SQSEvent, context: Context): Unit = {

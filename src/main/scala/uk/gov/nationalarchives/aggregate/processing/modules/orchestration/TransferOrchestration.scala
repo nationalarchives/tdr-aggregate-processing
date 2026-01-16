@@ -34,6 +34,7 @@ class TransferOrchestration(
     keycloakConfigurations: KeycloakClient,
     config: Config
 )(implicit logger: Logger) {
+  private lazy val errorHandling = ErrorHandling()
 
   implicit val backendChecksStepFunctionInputEncoder: Encoder[BackendChecksStepFunctionInput] = deriveEncoder[BackendChecksStepFunctionInput]
   implicit val metadataChecksStepFunctionInputEncoder: Encoder[MetadataChecksStepFunctionInput] = deriveEncoder[MetadataChecksStepFunctionInput]
@@ -150,8 +151,6 @@ object TransferOrchestration {
   val stepFunctionUtils = StepFunctionUtils(sfnAsyncClient(config.getString("sfn.endpoint")))
   val notificationsClient = NotificationsClient(config)
   val keycloakClient = KeycloakClient(config)
-  val s3Utils: S3Utils = S3Utils(S3Clients.s3Async(config.getString("s3.endpoint")))
-  val errorHandling = ErrorHandling()
 
   def apply() = new TransferOrchestration(GraphQlApi(), stepFunctionUtils, notificationsClient, keycloakClient, config)(logger)
 }
