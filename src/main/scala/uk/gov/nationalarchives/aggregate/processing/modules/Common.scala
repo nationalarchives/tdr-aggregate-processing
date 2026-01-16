@@ -74,6 +74,11 @@ object Common {
     val Records: Value = Value("records")
   }
 
+  object MetadataClassification extends Enumeration {
+    type MetadataClassification = Value
+    val Supplied, System, Custom = Value
+  }
+
   def objectKeyContextParser(objectKey: String): ObjectKeyContext = {
     Try {
       val elements = objectKey.split('/')

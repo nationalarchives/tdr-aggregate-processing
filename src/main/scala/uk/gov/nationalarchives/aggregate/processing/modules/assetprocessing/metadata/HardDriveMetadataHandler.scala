@@ -24,6 +24,8 @@ object HardDriveMetadataHandler {
   private val metadataConfig: ConfigUtils.MetadataConfiguration = ConfigUtils.loadConfiguration
   private val mapper: String => String = metadataConfig.inputToPropertyMapper("hardDriveHeader")
   private val defaultPropertyValues: Map[String, String] = metadataConfig.getPropertiesWithDefaultValue
+  private val suppliedProperties: Seq[String] = metadataConfig.getPropertiesByPropertyType("Supplied")
+  private val systemProperties: Seq[String] = metadataConfig.getPropertiesByPropertyType("System")
 
   private sealed trait HardDriveProperty {
     val baseProperty: BaseProperty
@@ -77,5 +79,5 @@ object HardDriveMetadataHandler {
     alternateValueMapping.getOrElse(originalValue.toLowerCase, originalValue).asJson
   }
 
-  val metadataHandler = new BaseMetadataHandler(mapper, defaultPropertyValues, NormalisePropertyValue.normalise)
+  val metadataHandler = new BaseMetadataHandler(mapper, defaultPropertyValues, suppliedProperties, systemProperties, NormalisePropertyValue.normalise)
 }

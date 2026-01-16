@@ -8,6 +8,8 @@ object NetworkDriveMetadataHandler {
   private val metadataConfig: ConfigUtils.MetadataConfiguration = ConfigUtils.loadConfiguration
   private val mapper: String => String = metadataConfig.inputToPropertyMapper("networkDriveHeader")
   private val defaultPropertyValues: Map[String, String] = metadataConfig.getPropertiesWithDefaultValue
+  private val suppliedProperties: Seq[String] = metadataConfig.getPropertiesByPropertyType("Supplied")
+  private val systemProperties: Seq[String] = metadataConfig.getPropertiesByPropertyType("System")
 
   private sealed trait NetworkDriveProperty {
     val baseProperty: BaseProperty
@@ -39,5 +41,5 @@ object NetworkDriveMetadataHandler {
     filePath.split("/").last
   }
 
-  val metadataHandler = new BaseMetadataHandler(mapper, defaultPropertyValues, NormalisePropertyValue.normalise, enrichMetadata)
+  val metadataHandler = new BaseMetadataHandler(mapper, defaultPropertyValues, suppliedProperties, systemProperties, NormalisePropertyValue.normalise, enrichMetadata)
 }

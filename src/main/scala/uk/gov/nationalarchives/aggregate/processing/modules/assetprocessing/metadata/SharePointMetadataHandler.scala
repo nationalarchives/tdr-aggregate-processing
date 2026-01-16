@@ -15,6 +15,9 @@ object SharePointMetadataHandler {
   }
 
   private val metadataConfig: ConfigUtils.MetadataConfiguration = ConfigUtils.loadConfiguration
+  private lazy val tdrDataLoadHeaderToPropertyMapper: String => String = metadataConfig.propertyToOutputMapper("tdrFileHeader")
+  private val suppliedProperties: Seq[String] = metadataConfig.getPropertiesByPropertyType("Supplied").map(p => tdrDataLoadHeaderToPropertyMapper(p))
+  private val systemProperties: Seq[String] = metadataConfig.getPropertiesByPropertyType("System")
   private val mapper: String => String = metadataConfig.inputToPropertyMapper("sharePointTag")
   private val defaultPropertyValues: Map[String, String] = metadataConfig.getPropertiesWithDefaultValue
   private case class SharePointLocationPath(root: String, site: String, library: String, filePath: String)
@@ -53,5 +56,5 @@ object SharePointMetadataHandler {
     }
   }
 
-  val metadataHandler = new BaseMetadataHandler(mapper, defaultPropertyValues, NormalisePropertyValue.normalise)
+  val metadataHandler = new BaseMetadataHandler(mapper, defaultPropertyValues, suppliedProperties, systemProperties, NormalisePropertyValue.normalise)
 }
