@@ -2,6 +2,7 @@ package uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.met
 
 import io.circe.Json
 import io.circe.syntax.EncoderOps
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.MetadataClassification.{Supplied, System}
 import uk.gov.nationalarchives.tdr.schemautils.ConfigUtils
 
 import java.sql.Timestamp
@@ -24,8 +25,8 @@ object HardDriveMetadataHandler {
   private val metadataConfig: ConfigUtils.MetadataConfiguration = ConfigUtils.loadConfiguration
   private val mapper: String => String = metadataConfig.inputToPropertyMapper("hardDriveHeader")
   private val defaultPropertyValues: Map[String, String] = metadataConfig.getPropertiesWithDefaultValue
-  private val suppliedProperties: Seq[String] = metadataConfig.getPropertiesByPropertyType("Supplied")
-  private val systemProperties: Seq[String] = metadataConfig.getPropertiesByPropertyType("System")
+  private val suppliedProperties: Seq[String] = metadataConfig.getPropertiesByPropertyType(Supplied.toString)
+  private val systemProperties: Seq[String] = metadataConfig.getPropertiesByPropertyType(System.toString)
 
   private sealed trait HardDriveProperty {
     val baseProperty: BaseProperty
