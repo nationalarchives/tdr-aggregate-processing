@@ -14,12 +14,13 @@ import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.{
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.StateStatusValue.{Completed, CompletedWithIssues, ConsignmentStatusValue, Failed}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.{ConsignmentStatusType, StateStatusValue}
 import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling
-import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling.{BaseError, handleError}
+import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling.BaseError
 import uk.gov.nationalarchives.aggregate.processing.modules.orchestration.TransferOrchestration._
 import uk.gov.nationalarchives.aggregate.processing.persistence.GraphQlApi
 import uk.gov.nationalarchives.aggregate.processing.persistence.GraphQlApi.{backend, keycloakDeployment}
 import uk.gov.nationalarchives.aggregate.processing.utilities.NotificationsClient.UploadEvent
 import uk.gov.nationalarchives.aggregate.processing.utilities.{KeycloakClient, NotificationsClient}
+import uk.gov.nationalarchives.aws.utils.s3.{S3Clients, S3Utils}
 import uk.gov.nationalarchives.aws.utils.stepfunction.StepFunctionClients.sfnAsyncClient
 import uk.gov.nationalarchives.aws.utils.stepfunction.StepFunctionUtils
 
@@ -33,6 +34,7 @@ class TransferOrchestration(
     keycloakConfigurations: KeycloakClient,
     config: Config
 )(implicit logger: Logger) {
+  private lazy val errorHandling = ErrorHandling()
 
   implicit val backendChecksStepFunctionInputEncoder: Encoder[BackendChecksStepFunctionInput] = deriveEncoder[BackendChecksStepFunctionInput]
   implicit val metadataChecksStepFunctionInputEncoder: Encoder[MetadataChecksStepFunctionInput] = deriveEncoder[MetadataChecksStepFunctionInput]
@@ -42,7 +44,7 @@ class TransferOrchestration(
       case aggregateProcessingEvent: AggregateProcessingEvent => orchestrateProcessingEvent(aggregateProcessingEvent)
       case _ =>
         val error = TransferError(None, s"$Orchestration.$EventError.$Invalid", s"Unrecognized orchestration event: ${orchestrationEvent.getClass.getName}")
-        handleError(error, logger)
+        errorHandling.handleError(error, logger)
         IO(OrchestrationResult(None, success = false, Some(error)))
     }
   }
@@ -58,7 +60,7 @@ class TransferOrchestration(
       _ <-
         if (errors) {
           val transferError = TransferError(Some(consignmentId), s"$AggregateProcessing.$CompletedWithIssues", "One or more assets failed to process.")
-          IO(ErrorHandling.handleError(transferError, logger))
+          IO(errorHandling.handleError(transferError, logger))
         } else {
           triggerBackendChecksSfn(event) *> triggerDraftMetadataSfn(event)
         }
@@ -89,7 +91,7 @@ class TransferOrchestration(
       .startExecution(arn, input, Some(stepName))
       .handleErrorWith { ex =>
         IO(logger.error(ex.getMessage)) *> IO(
-          ErrorHandling.handleError(
+          errorHandling.handleError(
             TransferError(Some(consignmentId), s"$AggregateProcessing.$CompletedWithIssues", s"Step function error: ${ex.getMessage}"),
             logger
           )
