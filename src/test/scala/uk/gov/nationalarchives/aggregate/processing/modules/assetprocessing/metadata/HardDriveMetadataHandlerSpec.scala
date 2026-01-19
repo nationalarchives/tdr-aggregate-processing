@@ -3,6 +3,7 @@ package uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.met
 import io.circe.syntax.EncoderOps
 import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper
 import uk.gov.nationalarchives.aggregate.processing.ExternalServiceSpec
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.MetadataClassification
 
 class HardDriveMetadataHandlerSpec extends ExternalServiceSpec {
   private val expectedFilePath = "content/folder/file1.txt"
@@ -75,5 +76,13 @@ class HardDriveMetadataHandlerSpec extends ExternalServiceSpec {
     selectedMetadata.size shouldBe 2
     selectedMetadata.contains(MetadataProperty("file_size", "12")) shouldBe true
     selectedMetadata.contains(MetadataProperty("file_name", "file1.txt")) shouldBe true
+  }
+
+  "classifyMetadata" should "classify given metadata properties correctly" in {
+    val sourceJson = convertStringToJson(baseMetadataWithSuppliedAndCustom())
+    val classifiedMetadata = hardDriveHandler.classifyMetadata(sourceJson)
+    classifiedMetadata(MetadataClassification.Custom) shouldEqual expectedCustomMetadata
+    classifiedMetadata(MetadataClassification.Supplied) shouldEqual expectedSuppliedMetadata
+    classifiedMetadata(MetadataClassification.System) shouldEqual expectedSystemMetadata
   }
 }

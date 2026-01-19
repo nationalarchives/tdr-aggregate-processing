@@ -3,6 +3,9 @@ package uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.met
 import io.circe.syntax.EncoderOps
 import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper
 import uk.gov.nationalarchives.aggregate.processing.ExternalServiceSpec
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.MetadataClassification
+
+import java.util.UUID
 
 class SharePointMetadataHandlerSpec extends ExternalServiceSpec {
   private val expectedFilePath = "sites/Retail/Shared Documents/file1.txt"
@@ -67,5 +70,28 @@ class SharePointMetadataHandlerSpec extends ExternalServiceSpec {
     selectedMetadata.size shouldBe 2
     selectedMetadata.contains(MetadataProperty("file_size", "12")) shouldBe true
     selectedMetadata.contains(MetadataProperty("file_name", "file1.txt")) shouldBe true
+  }
+
+  "classifyMetadata" should "classify given metadata properties correctly" in {
+    val matchId = UUID.randomUUID()
+    val consignmentId = UUID.randomUUID()
+    val baseMetadataWithSuppliedAndCustom = s"""{
+      "file_size": "12",
+      "date_last_modified": "2025-07-03T09:19:47Z",
+      "file_name": "file1.txt",
+      "file_path": "sites/Retail/Shared Documents/file1.txt",
+      "client_side_checksum": "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2",
+      "matchId": "$matchId",
+      "transferId": "$consignmentId",
+      "description": "some kind of description",
+      "custom": "custom metadata value",
+      "closure status": "open"
+    }""".stripMargin
+
+    val sourceJson = convertStringToJson(baseMetadataWithSuppliedAndCustom)
+    val classifiedMetadata = handler.classifyMetadata(sourceJson)
+    classifiedMetadata(MetadataClassification.Custom) shouldEqual expectedCustomMetadata
+    classifiedMetadata(MetadataClassification.Supplied) shouldEqual expectedSuppliedMetadata
+    classifiedMetadata(MetadataClassification.System) shouldEqual expectedSystemMetadata
   }
 }

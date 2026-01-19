@@ -10,7 +10,7 @@ import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorT
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorValue.{Invalid, Mismatch, ReadError}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.{AssetProcessing => ptAp}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.StateStatusValue.{Completed, CompletedWithIssues}
-import uk.gov.nationalarchives.aggregate.processing.modules.Common.{AssetSource, ObjectType}
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.{AssetSource, MetadataClassification, ObjectType}
 import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling.BaseError
 import uk.gov.nationalarchives.aggregate.processing.modules._
 import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.AssetProcessing.{AssetProcessingError, AssetProcessingEvent, AssetProcessingResult}
@@ -26,7 +26,6 @@ import scala.util.{Failure, Success, Try}
 
 class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
   private lazy val metadataConfig: ConfigUtils.MetadataConfiguration = ConfigUtils.loadConfiguration
-  private lazy val tdrDataLoadHeaderToPropertyMapper: String => String = metadataConfig.propertyToOutputMapper("tdrFileHeader")
   private lazy val initialChecks: Set[InitialCheck] = Set(FileSizeCheck.apply(), FileExtensionCheck.apply())
   private lazy val errorHandling = ErrorHandling()
 
@@ -98,12 +97,7 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
     val matchId = event.matchId
     val objectKey = event.objectKey
     val s3Bucket = event.s3SourceBucket
-    val suppliedProperties: Seq[String] = metadataConfig.getPropertiesByPropertyType("Supplied").map(p => tdrDataLoadHeaderToPropertyMapper(p))
-    val systemProperties: Seq[String] = metadataConfig.getPropertiesByPropertyType("System")
     val baseMetadataJson = metadataHandler.convertToBaseMetadata(sourceJson)
-    val allPropertyNames: Seq[String] = baseMetadataJson.asObject.map(_.keys.toSeq).getOrElse(Seq.empty)
-    val excludeProperties = suppliedProperties ++ systemProperties :+ MatchIdProperty.id :+ TransferIdProperty.id
-    val customProperties = allPropertyNames.diff(excludeProperties)
     metadataHandler
       .toClientSideMetadataInput(baseMetadataJson)
       .fold(
@@ -127,9 +121,10 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
               handleProcessError(initialChecksErrors, s3Bucket, objectKey)
               AssetProcessingResult(Some(matchId), processingErrors = true, Some(input))
             } else {
-              val suppliedMetadata = metadataHandler.toMetadataProperties(baseMetadataJson, suppliedProperties)
-              val systemMetadata = metadataHandler.toMetadataProperties(baseMetadataJson, systemProperties)
-              val customMetadata = metadataHandler.toMetadataProperties(baseMetadataJson, customProperties)
+              val classifiedMetadata = metadataHandler.classifyMetadata(baseMetadataJson)
+              val suppliedMetadata = classifiedMetadata.getOrElse(MetadataClassification.Supplied, Nil)
+              val systemMetadata = classifiedMetadata.getOrElse(MetadataClassification.System, Nil)
+              val customMetadata = classifiedMetadata.getOrElse(MetadataClassification.Custom, Nil)
               logger.info(s"Asset metadata successfully processed for: $objectKey")
               val completedTags = Map(ptAp.toString -> Completed.toString)
               s3Utils.addObjectTags(event.s3SourceBucket, event.objectKey, completedTags)
