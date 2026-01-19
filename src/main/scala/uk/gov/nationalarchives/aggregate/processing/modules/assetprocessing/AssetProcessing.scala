@@ -28,6 +28,7 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
   private lazy val metadataConfig: ConfigUtils.MetadataConfiguration = ConfigUtils.loadConfiguration
   private lazy val tdrDataLoadHeaderToPropertyMapper: String => String = metadataConfig.propertyToOutputMapper("tdrFileHeader")
   private lazy val initialChecks: Set[InitialCheck] = Set(FileSizeCheck.apply(), FileExtensionCheck.apply())
+  private lazy val errorHandling = ErrorHandling()
 
   private def getMetadataHandler(assetSource: AssetSource): MetadataHandler = {
     assetSource match {
@@ -38,7 +39,7 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
   }
 
   private def handleProcessError(errors: List[AssetProcessingError], s3Bucket: String, s3ObjectKey: String): AssetProcessingResult = {
-    errors.foreach(ErrorHandling.handleError(_, logger))
+    errors.foreach(errorHandling.handleError(_, logger))
     val errorTags: Map[String, String] = Map(ptAp.toString -> CompletedWithIssues.toString)
     s3Utils.addObjectTags(s3Bucket, s3ObjectKey, errorTags)
     val matchId = errors.head.matchId
@@ -107,13 +108,13 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
       .toClientSideMetadataInput(baseMetadataJson)
       .fold(
         err => {
-          val error = AssetProcessingError(Some(event.consignmentId.toString), Some(event.matchId), Some(event.source.toString), s"$ptAp.$JsonError.$Invalid", err.getMessage())
+          val error = AssetProcessingError(Some(event.consignmentId), Some(event.matchId), Some(event.source.toString), s"$ptAp.$JsonError.$Invalid", err.getMessage())
           handleProcessError(List(error), s3Bucket, objectKey)
         },
         input => {
           if (event.matchId != input.matchId) {
             val error = AssetProcessingError(
-              Some(event.consignmentId.toString),
+              Some(event.consignmentId),
               None,
               Some(event.source.toString),
               s"$ptAp.$MatchIdError.$Mismatch",
@@ -141,7 +142,7 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
 
   private def generateErrorMessage(event: AssetProcessingEvent, errorCode: String, errorMessage: String): AssetProcessingError = {
     AssetProcessingError(
-      consignmentId = Some(event.consignmentId.toString),
+      consignmentId = Some(event.consignmentId),
       matchId = Some(event.matchId),
       source = Some(event.source.toString),
       errorCode = errorCode,
@@ -169,7 +170,7 @@ object AssetProcessing {
       suppliedMetadata: List[MetadataProperty] = List(),
       customMetadata: List[MetadataProperty] = List()
   )
-  case class AssetProcessingError(consignmentId: Option[String], matchId: Option[String], source: Option[String], errorCode: String, errorMsg: String) extends BaseError {
+  case class AssetProcessingError(consignmentId: Option[UUID], matchId: Option[String], source: Option[String], errorCode: String, errorMsg: String) extends BaseError {
     override def toString: String = {
       s"${this.simpleName}: consignmentId: $consignmentId, matchId: $matchId, source: $source, errorCode: $errorCode, errorMessage: $errorMsg"
     }

@@ -20,7 +20,7 @@ class FileSizeCheckSpec extends ExternalServiceSpec {
     val error = result.head
     error.matchId.get shouldBe "matchId-1"
     error.source.get shouldBe AssetSource.SharePoint.toString
-    error.consignmentId.get shouldBe transferId.toString
+    error.consignmentId.get shouldBe transferId
     error.errorCode shouldBe "INITIAL_CHECKS.OBJECT_SIZE.TOO_SMALL"
     error.errorMsg shouldBe "File size: 0 bytes"
   }
@@ -33,7 +33,7 @@ class FileSizeCheckSpec extends ExternalServiceSpec {
     val error = result.head
     error.matchId.get shouldBe "matchId-1"
     error.source.get shouldBe AssetSource.SharePoint.toString
-    error.consignmentId.get shouldBe transferId.toString
+    error.consignmentId.get shouldBe transferId
     error.errorCode shouldBe "INITIAL_CHECKS.OBJECT_SIZE.TOO_BIG"
     error.errorMsg shouldBe "File size: 3000000000 bytes"
   }
