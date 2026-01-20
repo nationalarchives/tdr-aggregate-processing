@@ -72,6 +72,21 @@ class DraftMetadataCSVWriterSpec extends AnyFlatSpec with Matchers with MockitoS
     csvContent(1) shouldBe List("", "", "2022-03-15", "", "", "", "Open", "", "", "", "", "No", "", "No", "", "English", "", "Crown copyright", "", "", "")
   }
 
+  "convertValue" should "return empty string where date value is empty" in {
+    val writer = new DraftMetadataCSVWriter
+    val assetProcessingResults = AssetProcessingResult(
+      matchId = Some("1"),
+      processingErrors = false,
+      clientSideMetadataInput = Some(ClientSideMetadataInput(originalPath = "path", checksum = "checksum", lastModified = 1L, fileSize = 123L, matchId = "matchID")),
+      systemMetadata = List(MetadataProperty(propertyName = "Modified", propertyValue = "")),
+      suppliedMetadata = Nil
+    )
+    val actual = writer.createMetadataCSV(List(assetProcessingResults))
+    val csvContent: List[List[String]] = CSVReader.open(actual).all()
+    checkHeaders(csvContent)
+    csvContent(1) shouldBe List("", "", "", "", "", "", "Open", "", "", "", "", "No", "", "No", "", "English", "", "Crown copyright", "", "", "")
+  }
+
   it should "convert boolean true -> Yes and false -> No" in {
     val writer = new DraftMetadataCSVWriter
     val assetProcessingResults = AssetProcessingResult(
