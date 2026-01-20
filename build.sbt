@@ -37,9 +37,6 @@ excludeDependencies ++= Seq(
   //Remove transitory dependencies to reduce overall jar size to allow deployment as lambda
   ExclusionRule("com.fasterxml.jackson.datatype"),
   ExclusionRule("com.fasterxml.jackson.dataformat"),
-  ExclusionRule("org.eclipse.jetty"),
-  ExclusionRule("org.eclipse.jetty.http2"),
-  ExclusionRule("org.eclipse.microprofile.openapi"),
   ExclusionRule("org.keycloak", "keycloak-server-spi"),
   ExclusionRule("org.keycloak", "keycloak-server-spi-private"),
   ExclusionRule("org.keycloak", "keycloak-crypto-default"),
