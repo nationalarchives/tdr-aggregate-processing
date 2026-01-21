@@ -16,8 +16,8 @@ object HardDriveMetadataHandler {
 
   private val alternateValueMapping: Map[String, String] = Map(
     "0" -> "",
-    "open_on_transfer" -> "open",
-    "closed_on_transfer" -> "closed",
+    "open_on_transfer" -> "Open",
+    "closed_on_transfer" -> "Closed",
     "true" -> "false",
     "false" -> "true"
   )

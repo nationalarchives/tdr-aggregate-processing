@@ -17,8 +17,8 @@ class HardDriveMetadataHandlerSpec extends ExternalServiceSpec {
 
     hardDriveHandler.normaliseValues("closure_period", "0".asJson) shouldBe "".asJson
     hardDriveHandler.normaliseValues("closure_period", "12".asJson) shouldBe "12".asJson
-    hardDriveHandler.normaliseValues("closure_type", "open_on_transfer".asJson) shouldBe "open".asJson
-    hardDriveHandler.normaliseValues("closure_type", "closed_on_transfer".asJson) shouldBe "closed".asJson
+    hardDriveHandler.normaliseValues("closure_type", "open_on_transfer".asJson) shouldBe "Open".asJson
+    hardDriveHandler.normaliseValues("closure_type", "closed_on_transfer".asJson) shouldBe "Closed".asJson
     hardDriveHandler.normaliseValues("description_closed", "true".asJson) shouldBe "false".asJson
     hardDriveHandler.normaliseValues("description_closed", "false".asJson) shouldBe "true".asJson
     hardDriveHandler.normaliseValues("file_path", hardDriveFilePathJson) shouldBe expectedFilePath.asJson
