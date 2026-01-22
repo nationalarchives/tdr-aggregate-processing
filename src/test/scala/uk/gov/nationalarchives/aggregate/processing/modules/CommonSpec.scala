@@ -48,9 +48,9 @@ class CommonSpec extends AnyFlatSpec {
 
   "AssetSource" should "contain the correct enums" in {
     val assetSourceValue = Common.AssetSource
-    val expectedValues = List("harddrive", "sharepoint")
+    val expectedValues = List("harddrive", "networkdrive", "sharepoint")
 
-    assetSourceValue.values.size shouldBe 2
+    assetSourceValue.values.size shouldBe 3
     assetSourceValue.values.map(_.toString).toList shouldEqual expectedValues
   }
 
@@ -70,13 +70,21 @@ class CommonSpec extends AnyFlatSpec {
     objectCategoryValue.values.map(_.toString).toList shouldEqual expectedValues
   }
 
-  "objectKeyParser" should "parse a valid object key" in {
+  "MetadataClassification" should "contain the correct enums" in {
+    val metadataClassificationValue = Common.MetadataClassification
+    val expectedValues = List("Custom", "Supplied", "System")
+
+    metadataClassificationValue.values.size shouldBe 3
+    metadataClassificationValue.values.map(_.toString).toList shouldEqual expectedValues
+  }
+
+  "objectKeyContextParser" should "parse a valid object key" in {
     val userId = UUID.randomUUID()
     val consignmentId = UUID.randomUUID()
     val matchId = UUID.randomUUID().toString
     val validObjectKey = s"$userId/sharepoint/$consignmentId/metadata/$matchId.metadata"
 
-    val result = Common.objectKeyParser(validObjectKey)
+    val result = Common.objectKeyContextParser(validObjectKey)
     result.userId shouldBe userId
     result.assetSource shouldBe Common.AssetSource.SharePoint
     result.consignmentId shouldBe consignmentId
@@ -84,12 +92,12 @@ class CommonSpec extends AnyFlatSpec {
     result.objectElements.get shouldBe s"$matchId.metadata"
   }
 
-  "objectKeyParser" should "parse a valid object prefix key" in {
+  "objectKeyContextParser" should "parse a valid object prefix key" in {
     val userId = UUID.randomUUID()
     val consignmentId = UUID.randomUUID()
     val validObjectPrefixKey = s"$userId/sharepoint/$consignmentId/metadata"
 
-    val result = Common.objectKeyParser(validObjectPrefixKey)
+    val result = Common.objectKeyContextParser(validObjectPrefixKey)
     result.userId shouldBe userId
     result.assetSource shouldBe Common.AssetSource.SharePoint
     result.consignmentId shouldBe consignmentId
@@ -97,13 +105,13 @@ class CommonSpec extends AnyFlatSpec {
     result.objectElements shouldBe None
   }
 
-  "objectKeyParser" should "throw a relevant exception when parsing an invalid object key" in {
+  "objectKeyContextParser" should "throw a relevant exception when parsing an invalid object key" in {
     val userId = UUID.randomUUID()
     val consignmentId = UUID.randomUUID()
     val invalidObjectKey = s"$userId/$consignmentId/metadata"
 
     val exception = intercept[NoSuchElementException] {
-      Common.objectKeyParser(invalidObjectKey)
+      Common.objectKeyContextParser(invalidObjectKey)
     }
 
     exception.getMessage shouldBe s"No value found for '$consignmentId'"

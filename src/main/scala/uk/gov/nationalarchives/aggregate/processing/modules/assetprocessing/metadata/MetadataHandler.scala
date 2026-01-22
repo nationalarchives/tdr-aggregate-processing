@@ -2,6 +2,7 @@ package uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.met
 
 import graphql.codegen.types.ClientSideMetadataInput
 import io.circe.{Decoder, Json}
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.MetadataClassification.MetadataClassification
 
 case class MetadataProperty(propertyName: String, propertyValue: String)
 
@@ -9,8 +10,16 @@ sealed trait BaseProperty {
   val id: String
 }
 
-case object FilePathProperty extends BaseProperty {
-  val id: String = "file_path"
+case object ClosurePeriodProperty extends BaseProperty {
+  val id: String = "closure_period"
+}
+
+case object ClosureTypeProperty extends BaseProperty {
+  val id: String = "closure_type"
+}
+
+case object DescriptionClosedProperty extends BaseProperty {
+  val id: String = "description_closed"
 }
 
 case object ClientSideChecksumProperty extends BaseProperty {
@@ -19,6 +28,14 @@ case object ClientSideChecksumProperty extends BaseProperty {
 
 case object DateLastModifiedProperty extends BaseProperty {
   val id: String = "date_last_modified"
+}
+
+case object FileNameProperty extends BaseProperty {
+  val id: String = "file_name"
+}
+
+case object FilePathProperty extends BaseProperty {
+  val id: String = "file_path"
 }
 
 case object FileSizeProperty extends BaseProperty {
@@ -33,6 +50,10 @@ case object TransferIdProperty extends BaseProperty {
   val id: String = "transferId"
 }
 
+case object TitleClosedProperty extends BaseProperty {
+  val id: String = "title_closed"
+}
+
 trait MetadataHandler {
   val sourceToBasePropertiesMapper: String => String
 
@@ -43,4 +64,6 @@ trait MetadataHandler {
   def toMetadataProperties(json: Json, properties: Seq[String]): List[MetadataProperty]
 
   def convertToBaseMetadata(sourceJson: Json): Json
+
+  def classifyMetadata(json: Json): Map[MetadataClassification, List[MetadataProperty]]
 }

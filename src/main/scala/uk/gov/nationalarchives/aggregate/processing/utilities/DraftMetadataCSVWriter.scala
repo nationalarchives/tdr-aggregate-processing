@@ -81,8 +81,12 @@ class DraftMetadataCSVWriter {
   }
 
   private def convertToLocalDateOrString(timestampString: String): String = {
-    val ts = timestampString.toLong
-    val df: SimpleDateFormat = new SimpleDateFormat("yyyy-MM-dd")
-    df.format(ts)
+    if (timestampString.isEmpty) {
+      timestampString
+    } else {
+      val ts = timestampString.toLong
+      val df: SimpleDateFormat = new SimpleDateFormat("yyyy-MM-dd")
+      df.format(ts)
+    }
   }
 }

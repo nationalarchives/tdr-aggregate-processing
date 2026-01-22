@@ -1,7 +1,7 @@
 import Dependencies._
 import sbt.Keys.fork
 
-ThisBuild / scalaVersion := "2.13.17"
+ThisBuild / scalaVersion := "2.13.18"
 ThisBuild / version := "0.1.0"
 ThisBuild / organization := "uk.gov.nationalarchives"
 ThisBuild / organizationName := "aggregate-processing"
@@ -10,7 +10,6 @@ libraryDependencies ++= Seq(
   authUtils,
   awsLambdaCore,
   awsLambdaEvents,
-  awsSqs,
   circeCore,
   circeGeneric,
   circeParser,
@@ -22,6 +21,7 @@ libraryDependencies ++= Seq(
   metadataSchema,
   mockitoScala % Test,
   mockitoScalaTest % Test,
+  parallelCollections,
   s3Utils,
   scalaLogging,
   scalaTest % Test,
@@ -31,6 +31,15 @@ libraryDependencies ++= Seq(
   typesafeConfig,
   utf8Validator,
   wiremock % Test
+)
+
+excludeDependencies ++= Seq(
+  //Remove transitory dependencies to reduce overall jar size to allow deployment as lambda
+  ExclusionRule("com.fasterxml.jackson.dataformat"),
+  ExclusionRule("org.keycloak", "keycloak-server-spi"),
+  ExclusionRule("org.keycloak", "keycloak-server-spi-private"),
+  ExclusionRule("org.keycloak", "keycloak-crypto-default"),
+  ExclusionRule("com.softwaremill")
 )
 
 (Test / fork) := true

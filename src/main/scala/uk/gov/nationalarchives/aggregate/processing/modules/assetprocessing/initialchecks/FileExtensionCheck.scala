@@ -20,7 +20,7 @@ class FileExtensionCheck extends InitialCheck {
     val extension = input.originalPath.split("\\.").last
     val sourceBucket = event.s3SourceBucket
     if (extensionNotAllowed(extension, sourceBucket)) {
-      val transferId = event.consignmentId.toString
+      val transferId = event.consignmentId
       val source = event.source.toString
       val matchId = event.matchId
       val errorMsg = s"File extension indicates disallowed file type: $extension"
