@@ -28,11 +28,15 @@ object StressTestSetup extends App {
   val numberOfAssets = 0
   val userId = "placeholder"
   val consignmentId = "placeholder"
-  val malwareScanTag = Tagging.builder()
-    .tagSet(Tag.builder()
-      .key("GuardDutyMalwareScanStatus")
-      .value("NO_THREATS_FOUND")
-      .build())
+  val malwareScanTag = Tagging
+    .builder()
+    .tagSet(
+      Tag
+        .builder()
+        .key("GuardDutyMalwareScanStatus")
+        .value("NO_THREATS_FOUND")
+        .build()
+    )
     .build()
 
   (1 to numberOfAssets).foreach { i =>
@@ -47,7 +51,8 @@ object StressTestSetup extends App {
     val fileSize = fileContent.getBytes().length
     val fileBody = RequestBody.fromString(fileContent)
     val fileRequest = PutObjectRequest.builder
-      .bucket(s3OutputBucket).key(s"$userId/sharepoint/$consignmentId/records/$matchId")
+      .bucket(s3OutputBucket)
+      .key(s"$userId/sharepoint/$consignmentId/records/$matchId")
       .tagging(malwareScanTag)
       .build
     s3Client.putObject(fileRequest, fileBody)
@@ -67,7 +72,8 @@ object StressTestSetup extends App {
 
     val metadataBody = RequestBody.fromString(metadataJsonString)
     val metadataRequest = PutObjectRequest.builder
-      .bucket(s3OutputBucket).key(s"$userId/sharepoint/$consignmentId/metadata/$matchId.metadata")
+      .bucket(s3OutputBucket)
+      .key(s"$userId/sharepoint/$consignmentId/metadata/$matchId.metadata")
       .tagging(malwareScanTag)
       .build
     s3Client.putObject(metadataRequest, metadataBody)
