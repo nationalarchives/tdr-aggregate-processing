@@ -3,6 +3,7 @@ package uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.met
 import io.circe.syntax.EncoderOps
 import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper
 import uk.gov.nationalarchives.aggregate.processing.ExternalServiceSpec
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.MetadataClassification
 
 class HardDriveMetadataHandlerSpec extends ExternalServiceSpec {
   private val expectedFilePath = "content/folder/file1.txt"
@@ -16,8 +17,8 @@ class HardDriveMetadataHandlerSpec extends ExternalServiceSpec {
 
     hardDriveHandler.normaliseValues("closure_period", "0".asJson) shouldBe "".asJson
     hardDriveHandler.normaliseValues("closure_period", "12".asJson) shouldBe "12".asJson
-    hardDriveHandler.normaliseValues("closure_type", "open_on_transfer".asJson) shouldBe "open".asJson
-    hardDriveHandler.normaliseValues("closure_type", "closed_on_transfer".asJson) shouldBe "closed".asJson
+    hardDriveHandler.normaliseValues("closure_type", "open_on_transfer".asJson) shouldBe "Open".asJson
+    hardDriveHandler.normaliseValues("closure_type", "closed_on_transfer".asJson) shouldBe "Closed".asJson
     hardDriveHandler.normaliseValues("description_closed", "true".asJson) shouldBe "false".asJson
     hardDriveHandler.normaliseValues("description_closed", "false".asJson) shouldBe "true".asJson
     hardDriveHandler.normaliseValues("file_path", hardDriveFilePathJson) shouldBe expectedFilePath.asJson
@@ -75,5 +76,13 @@ class HardDriveMetadataHandlerSpec extends ExternalServiceSpec {
     selectedMetadata.size shouldBe 2
     selectedMetadata.contains(MetadataProperty("file_size", "12")) shouldBe true
     selectedMetadata.contains(MetadataProperty("file_name", "file1.txt")) shouldBe true
+  }
+
+  "classifyMetadata" should "classify given metadata properties correctly" in {
+    val sourceJson = convertStringToJson(baseMetadataWithSuppliedAndCustom())
+    val classifiedMetadata = hardDriveHandler.classifyMetadata(sourceJson)
+    classifiedMetadata(MetadataClassification.Custom) shouldEqual expectedCustomMetadata
+    classifiedMetadata(MetadataClassification.Supplied) shouldEqual expectedSuppliedMetadata
+    classifiedMetadata(MetadataClassification.System) shouldEqual expectedSystemMetadata
   }
 }

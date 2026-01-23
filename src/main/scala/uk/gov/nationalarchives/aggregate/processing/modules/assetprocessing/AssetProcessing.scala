@@ -10,7 +10,7 @@ import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorT
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorValue.{Invalid, Mismatch, ReadError}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.{AssetProcessing => ptAp}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.StateStatusValue.{Completed, CompletedWithIssues}
-import uk.gov.nationalarchives.aggregate.processing.modules.Common.{AssetSource, ObjectType}
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.{AssetSource, MetadataClassification, ObjectType}
 import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling.BaseError
 import uk.gov.nationalarchives.aggregate.processing.modules._
 import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.AssetProcessing.{AssetProcessingError, AssetProcessingEvent, AssetProcessingResult}
@@ -26,8 +26,8 @@ import scala.util.{Failure, Success, Try}
 
 class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
   private lazy val metadataConfig: ConfigUtils.MetadataConfiguration = ConfigUtils.loadConfiguration
-  private lazy val tdrDataLoadHeaderToPropertyMapper: String => String = metadataConfig.propertyToOutputMapper("tdrFileHeader")
   private lazy val initialChecks: Set[InitialCheck] = Set(FileSizeCheck.apply(), FileExtensionCheck.apply())
+  private lazy val errorHandling = ErrorHandling()
 
   private def getMetadataHandler(assetSource: AssetSource): MetadataHandler = {
     assetSource match {
@@ -38,7 +38,7 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
   }
 
   private def handleProcessError(errors: List[AssetProcessingError], s3Bucket: String, s3ObjectKey: String): AssetProcessingResult = {
-    errors.foreach(ErrorHandling.handleError(_, logger))
+    errors.foreach(errorHandling.handleError(_, logger))
     val errorTags: Map[String, String] = Map(ptAp.toString -> CompletedWithIssues.toString)
     s3Utils.addObjectTags(s3Bucket, s3ObjectKey, errorTags)
     val matchId = errors.head.matchId
@@ -97,23 +97,18 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
     val matchId = event.matchId
     val objectKey = event.objectKey
     val s3Bucket = event.s3SourceBucket
-    val suppliedProperties: Seq[String] = metadataConfig.getPropertiesByPropertyType("Supplied").map(p => tdrDataLoadHeaderToPropertyMapper(p))
-    val systemProperties: Seq[String] = metadataConfig.getPropertiesByPropertyType("System")
     val baseMetadataJson = metadataHandler.convertToBaseMetadata(sourceJson)
-    val allPropertyNames: Seq[String] = baseMetadataJson.asObject.map(_.keys.toSeq).getOrElse(Seq.empty)
-    val excludeProperties = suppliedProperties ++ systemProperties :+ MatchIdProperty.id :+ TransferIdProperty.id
-    val customProperties = allPropertyNames.diff(excludeProperties)
     metadataHandler
       .toClientSideMetadataInput(baseMetadataJson)
       .fold(
         err => {
-          val error = AssetProcessingError(Some(event.consignmentId.toString), Some(event.matchId), Some(event.source.toString), s"$ptAp.$JsonError.$Invalid", err.getMessage())
+          val error = AssetProcessingError(Some(event.consignmentId), Some(event.matchId), Some(event.source.toString), s"$ptAp.$JsonError.$Invalid", err.getMessage())
           handleProcessError(List(error), s3Bucket, objectKey)
         },
         input => {
           if (event.matchId != input.matchId) {
             val error = AssetProcessingError(
-              Some(event.consignmentId.toString),
+              Some(event.consignmentId),
               None,
               Some(event.source.toString),
               s"$ptAp.$MatchIdError.$Mismatch",
@@ -126,9 +121,10 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
               handleProcessError(initialChecksErrors, s3Bucket, objectKey)
               AssetProcessingResult(Some(matchId), processingErrors = true, Some(input))
             } else {
-              val suppliedMetadata = metadataHandler.toMetadataProperties(baseMetadataJson, suppliedProperties)
-              val systemMetadata = metadataHandler.toMetadataProperties(baseMetadataJson, systemProperties)
-              val customMetadata = metadataHandler.toMetadataProperties(baseMetadataJson, customProperties)
+              val classifiedMetadata = metadataHandler.classifyMetadata(baseMetadataJson)
+              val suppliedMetadata = classifiedMetadata.getOrElse(MetadataClassification.Supplied, Nil)
+              val systemMetadata = classifiedMetadata.getOrElse(MetadataClassification.System, Nil)
+              val customMetadata = classifiedMetadata.getOrElse(MetadataClassification.Custom, Nil)
               logger.info(s"Asset metadata successfully processed for: $objectKey")
               val completedTags = Map(ptAp.toString -> Completed.toString)
               s3Utils.addObjectTags(event.s3SourceBucket, event.objectKey, completedTags)
@@ -141,7 +137,7 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
 
   private def generateErrorMessage(event: AssetProcessingEvent, errorCode: String, errorMessage: String): AssetProcessingError = {
     AssetProcessingError(
-      consignmentId = Some(event.consignmentId.toString),
+      consignmentId = Some(event.consignmentId),
       matchId = Some(event.matchId),
       source = Some(event.source.toString),
       errorCode = errorCode,
@@ -169,7 +165,7 @@ object AssetProcessing {
       suppliedMetadata: List[MetadataProperty] = List(),
       customMetadata: List[MetadataProperty] = List()
   )
-  case class AssetProcessingError(consignmentId: Option[String], matchId: Option[String], source: Option[String], errorCode: String, errorMsg: String) extends BaseError {
+  case class AssetProcessingError(consignmentId: Option[UUID], matchId: Option[String], source: Option[String], errorCode: String, errorMsg: String) extends BaseError {
     override def toString: String = {
       s"${this.simpleName}: consignmentId: $consignmentId, matchId: $matchId, source: $source, errorCode: $errorCode, errorMessage: $errorMsg"
     }

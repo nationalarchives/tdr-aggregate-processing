@@ -2,6 +2,7 @@ package uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.met
 
 import graphql.codegen.types.ClientSideMetadataInput
 import io.circe.{Decoder, Json}
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.MetadataClassification.MetadataClassification
 
 case class MetadataProperty(propertyName: String, propertyValue: String)
 
@@ -63,4 +64,6 @@ trait MetadataHandler {
   def toMetadataProperties(json: Json, properties: Seq[String]): List[MetadataProperty]
 
   def convertToBaseMetadata(sourceJson: Json): Json
+
+  def classifyMetadata(json: Json): Map[MetadataClassification, List[MetadataProperty]]
 }

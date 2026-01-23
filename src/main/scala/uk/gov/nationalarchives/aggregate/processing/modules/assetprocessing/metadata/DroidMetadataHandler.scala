@@ -2,6 +2,7 @@ package uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.met
 
 import io.circe.Json
 import io.circe.syntax.EncoderOps
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.MetadataClassification.{Supplied, System}
 import uk.gov.nationalarchives.tdr.schemautils.ConfigUtils
 
 import java.sql.Timestamp
@@ -16,6 +17,8 @@ object DroidMetadataHandler {
   private val metadataConfig: ConfigUtils.MetadataConfiguration = ConfigUtils.loadConfiguration
   private val mapper: String => String = metadataConfig.inputToPropertyMapper("droidHeader")
   private val defaultPropertyValues: Map[String, String] = metadataConfig.getPropertiesWithDefaultValue
+  private val suppliedProperties: Seq[String] = metadataConfig.getPropertiesByPropertyType(Supplied.toString)
+  private val systemProperties: Seq[String] = metadataConfig.getPropertiesByPropertyType(System.toString)
 
   private sealed trait DroidProperty {
     val baseProperty: BaseProperty
@@ -47,5 +50,5 @@ object DroidMetadataHandler {
     }
   }
 
-  val metadataHandler = new BaseMetadataHandler(mapper, defaultPropertyValues, NormalisePropertyValue.normalise)
+  val metadataHandler = new BaseMetadataHandler(mapper, defaultPropertyValues, suppliedProperties, systemProperties, NormalisePropertyValue.normalise)
 }

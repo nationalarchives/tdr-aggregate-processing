@@ -361,7 +361,8 @@ class AssetProcessingSpec extends ExternalServiceSpec {
       "matchId": "$matchId",
       "transferId": "$consignmentId",
       "description": "some kind of description",
-      "custom": "custom metadata value"
+      "custom": "custom metadata value",
+      "closure status": "open"
     }""".stripMargin
 
     val jsonMetadataString = defaultMetadataWithSuppliedAndCustom
@@ -386,7 +387,7 @@ class AssetProcessingSpec extends ExternalServiceSpec {
           MetadataProperty("file_size", "12"),
           MetadataProperty("client_side_checksum", "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2")
         ),
-        suppliedMetadata = List(MetadataProperty("description", "some kind of description")),
+        suppliedMetadata = List(MetadataProperty("description", "some kind of description"), MetadataProperty("closure status", "open")),
         customMetadata = List(MetadataProperty("custom", "custom metadata value"))
       )
 

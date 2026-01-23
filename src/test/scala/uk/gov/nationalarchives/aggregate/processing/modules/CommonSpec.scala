@@ -70,6 +70,14 @@ class CommonSpec extends AnyFlatSpec {
     objectCategoryValue.values.map(_.toString).toList shouldEqual expectedValues
   }
 
+  "MetadataClassification" should "contain the correct enums" in {
+    val metadataClassificationValue = Common.MetadataClassification
+    val expectedValues = List("Custom", "Supplied", "System")
+
+    metadataClassificationValue.values.size shouldBe 3
+    metadataClassificationValue.values.map(_.toString).toList shouldEqual expectedValues
+  }
+
   "objectKeyContextParser" should "parse a valid object key" in {
     val userId = UUID.randomUUID()
     val consignmentId = UUID.randomUUID()

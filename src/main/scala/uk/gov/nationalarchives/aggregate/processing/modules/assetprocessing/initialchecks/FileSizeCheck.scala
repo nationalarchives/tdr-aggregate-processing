@@ -11,7 +11,7 @@ class FileSizeCheck extends InitialCheck {
   private val maxIndividualFileSizeBytes = 2000L * 1000000L
 
   private def error(errorCode: String, fileSize: Long, event: AssetProcessingEvent): AssetProcessingError = {
-    val transferId = event.consignmentId.toString
+    val transferId = event.consignmentId
     val source = event.source.toString
     val matchId = event.matchId
     val errorMsg = s"File size: $fileSize bytes"

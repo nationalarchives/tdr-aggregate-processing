@@ -2,12 +2,15 @@ package uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.met
 
 import io.circe.Json
 import io.circe.syntax.EncoderOps
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.MetadataClassification.{Supplied, System}
 import uk.gov.nationalarchives.tdr.schemautils.ConfigUtils
 
 object NetworkDriveMetadataHandler {
   private val metadataConfig: ConfigUtils.MetadataConfiguration = ConfigUtils.loadConfiguration
   private val mapper: String => String = metadataConfig.inputToPropertyMapper("networkDriveHeader")
   private val defaultPropertyValues: Map[String, String] = metadataConfig.getPropertiesWithDefaultValue
+  private val suppliedProperties: Seq[String] = metadataConfig.getPropertiesByPropertyType(Supplied.toString)
+  private val systemProperties: Seq[String] = metadataConfig.getPropertiesByPropertyType(System.toString)
 
   private sealed trait NetworkDriveProperty {
     val baseProperty: BaseProperty
@@ -39,5 +42,5 @@ object NetworkDriveMetadataHandler {
     filePath.split("/").last
   }
 
-  val metadataHandler = new BaseMetadataHandler(mapper, defaultPropertyValues, NormalisePropertyValue.normalise, enrichMetadata)
+  val metadataHandler = new BaseMetadataHandler(mapper, defaultPropertyValues, suppliedProperties, systemProperties, NormalisePropertyValue.normalise, enrichMetadata)
 }

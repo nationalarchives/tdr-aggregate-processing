@@ -10,7 +10,6 @@ libraryDependencies ++= Seq(
   authUtils,
   awsLambdaCore,
   awsLambdaEvents,
-  awsSqs,
   circeCore,
   circeGeneric,
   circeParser,
@@ -32,6 +31,15 @@ libraryDependencies ++= Seq(
   typesafeConfig,
   utf8Validator,
   wiremock % Test
+)
+
+excludeDependencies ++= Seq(
+  //Remove transitory dependencies to reduce overall jar size to allow deployment as lambda
+  ExclusionRule("com.fasterxml.jackson.dataformat"),
+  ExclusionRule("org.keycloak", "keycloak-server-spi"),
+  ExclusionRule("org.keycloak", "keycloak-server-spi-private"),
+  ExclusionRule("org.keycloak", "keycloak-crypto-default"),
+  ExclusionRule("com.softwaremill")
 )
 
 (Test / fork) := true
