@@ -79,6 +79,11 @@ object Common {
     val Supplied, System, Custom = Value
   }
 
+  object TransferFunction extends Enumeration {
+    type TransferFunction = Value
+    val Load: Value = Value("load")
+  }
+
   def objectKeyContextParser(objectKey: String): ObjectKeyContext = {
     Try {
       val elements = objectKey.split('/')
