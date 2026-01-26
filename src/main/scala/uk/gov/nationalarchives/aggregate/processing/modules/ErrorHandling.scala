@@ -6,6 +6,7 @@ import io.circe.generic.semiauto.deriveEncoder
 import io.circe.syntax.EncoderOps
 import io.circe.{Encoder, Json}
 import uk.gov.nationalarchives.aggregate.processing.AggregateProcessingLambda.AggregateProcessingError
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.TransferFunction.Load
 import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling.{BaseError, config}
 import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.AssetProcessing.AssetProcessingError
 import uk.gov.nationalarchives.aggregate.processing.modules.orchestration.TransferOrchestration.TransferError
@@ -22,7 +23,7 @@ class ErrorHandling(s3Utils: S3Utils) {
     val errorMessage = error.toString
     logger.error(errorMessage)
 
-    val errorKey = s"${error.consignmentId.getOrElse("unknown")}/${error.simpleName}/$errorId.error"
+    val errorKey = s"${error.consignmentId.getOrElse("unknown")}/$Load/${error.simpleName}/$errorId.error"
     uploadErrorToS3(bucket, errorKey, error.asJson)
   }
 
