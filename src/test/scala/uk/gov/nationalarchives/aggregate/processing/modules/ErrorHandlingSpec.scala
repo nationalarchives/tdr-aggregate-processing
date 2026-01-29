@@ -45,7 +45,7 @@ class ErrorHandlingSpec extends AnyFlatSpec {
 
     assert(bucketCaptor.getValue.contains("transferErrorBucket"))
     assert(bytesCaptor.getValue sameElements expectedErrorBytes)
-    assert(keyCaptor.getValue.contains(s"$consignmentId/AssetProcessingError"))
+    assert(keyCaptor.getValue.contains(s"$consignmentId/load/AssetProcessingError"))
     assert(keyCaptor.getValue.endsWith(".error"))
   }
 
@@ -77,7 +77,7 @@ class ErrorHandlingSpec extends AnyFlatSpec {
 
     assert(bucketCaptor.getValue.contains("transferErrorBucket"))
     assert(bytesCaptor.getValue sameElements expectedErrorBytes)
-    assert(keyCaptor.getValue.contains("unknown/AssetProcessingError"))
+    assert(keyCaptor.getValue.contains("unknown/load/AssetProcessingError"))
     assert(keyCaptor.getValue.endsWith(".error"))
   }
 
@@ -108,7 +108,7 @@ class ErrorHandlingSpec extends AnyFlatSpec {
 
     assert(bucketCaptor.getValue.contains("transferErrorBucket"))
     assert(bytesCaptor.getValue sameElements expectedErrorBytes)
-    assert(keyCaptor.getValue.contains(s"$consignmentId/AggregateProcessingError"))
+    assert(keyCaptor.getValue.contains(s"$consignmentId/load/AggregateProcessingError"))
     assert(keyCaptor.getValue.endsWith(".error"))
   }
 
@@ -139,7 +139,7 @@ class ErrorHandlingSpec extends AnyFlatSpec {
 
     assert(bucketCaptor.getValue.contains("transferErrorBucket"))
     assert(bytesCaptor.getValue sameElements expectedErrorBytes)
-    assert(keyCaptor.getValue.contains(s"$consignmentId/TransferError"))
+    assert(keyCaptor.getValue.contains(s"$consignmentId/load/TransferError"))
     assert(keyCaptor.getValue.endsWith(".error"))
   }
 }
