@@ -34,6 +34,7 @@ object Common {
     val ObjectKeyError: Value = Value("OBJECT_KEY")
     val ObjectSizeError: Value = Value("OBJECT_SIZE")
     val S3Error: Value = Value("S3")
+    val MalwareScan: Value = Value("MALWARE_SCAN")
   }
 
   object ProcessErrorValue extends Enumeration {
@@ -45,6 +46,7 @@ object Common {
     val ReadError: Value = Value("READ_ERROR")
     val TooBigError: Value = Value("TOO_BIG")
     val TooSmallError: Value = Value("TOO_SMALL")
+    val ThreatFound: Value = Value("THREAT_FOUND")
   }
 
   object StateStatusValue extends Enumeration {

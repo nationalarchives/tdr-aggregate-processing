@@ -4,10 +4,11 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.typesafe.scalalogging.Logger
 import graphql.codegen.types.ClientSideMetadataInput
 import io.circe.{Json, parser}
+import uk.gov.nationalarchives.aggregate.processing.config.ApplicationConfig.{malwareScanKey, malwareScanThreatFound}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.AssetSource.AssetSource
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ObjectType.ObjectType
-import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorType.{EncodingError, JsonError, MatchIdError, ObjectKeyError, S3Error => s3e}
-import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorValue.{Invalid, Mismatch, ReadError}
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorType.{EncodingError, JsonError, MalwareScan, MatchIdError, ObjectKeyError, S3Error => s3e}
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorValue.{Invalid, Mismatch, ReadError, ThreatFound}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.{AssetProcessing => ptAp}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.StateStatusValue.{Completed, CompletedWithIssues}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.{AssetSource, MetadataClassification, ObjectType}
@@ -61,14 +62,33 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
   }
 
   private def parseMetadataObject(s3Utils: S3Utils, event: AssetProcessingEvent): AssetProcessingResult = {
-    // TODO: check for threat found
     val s3Bucket = event.s3SourceBucket
     val objectKey = event.objectKey
-    Try(s3Utils.getObjectAsStream(s3Bucket, objectKey)) match {
-      case Failure(ex) =>
-        val error = generateErrorMessage(event, s"$ptAp.$s3e.$ReadError", ex.getMessage)
-        handleProcessError(List(error), s3Bucket, objectKey)
-      case Success(inputStream) => validUTF8(inputStream, event)
+    val objectTags = s3Utils.getObjectTags(s3Bucket, objectKey)
+
+    checkGuardDutyScan(objectTags, s3Bucket, objectKey, event) match {
+      case Some(result) => result
+      case None =>
+        Try(s3Utils.getObjectAsStream(s3Bucket, objectKey)) match {
+          case Failure(ex) =>
+            val error = generateErrorMessage(event, s"$ptAp.$s3e.$ReadError", ex.getMessage)
+            handleProcessError(List(error), s3Bucket, objectKey)
+          case Success(inputStream) => validUTF8(inputStream, event)
+        }
+    }
+  }
+
+  private def checkGuardDutyScan(
+      objectTags: Map[String, String],
+      s3Bucket: String,
+      objectKey: String,
+      event: AssetProcessingEvent
+  ): Option[AssetProcessingResult] = {
+    objectTags.get(malwareScanKey) match {
+      case Some(value) if value == malwareScanThreatFound =>
+        val error = generateErrorMessage(event, s"$ptAp.$MalwareScan.$ThreatFound", "malware scan threat found")
+        Some(handleProcessError(List(error), s3Bucket, objectKey))
+      case _ => None
     }
   }
 

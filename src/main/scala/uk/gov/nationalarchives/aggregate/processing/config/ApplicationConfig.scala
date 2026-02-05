@@ -18,6 +18,8 @@ object ApplicationConfig {
   val s3Endpoint: String = configFactory.getString("s3.endpoint")
   val timeToLiveSecs: Int = 60
   val draftMetadataBucket: String = configFactory.getString("s3.draftMetadataBucket")
+  val malwareScanKey: String = configFactory.getString("guardDuty.malware_scan_tag_key")
+  val malwareScanThreatFound: String = configFactory.getString("guardDuty.malware_scan_threat_found_value")
 
   def getClientSecret(secretPath: String = authClientSecretPath): String = {
     val ssmClient = SSMClients.ssm(ssmEndpoint)
