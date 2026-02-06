@@ -9,9 +9,10 @@ import org.slf4j.{Logger => UnderlyingLogger}
 import software.amazon.awssdk.core.ResponseBytes
 import software.amazon.awssdk.core.async.AsyncResponseTransformer
 import software.amazon.awssdk.services.s3.S3AsyncClient
-import software.amazon.awssdk.services.s3.model.{GetObjectRequest, GetObjectResponse, GetObjectTaggingRequest, GetObjectTaggingResponse}
+import software.amazon.awssdk.services.s3.model._
 import software.amazon.awssdk.utils.CompletableFutureUtils.failedFuture
 import uk.gov.nationalarchives.aggregate.processing.ExternalServiceSpec
+import uk.gov.nationalarchives.aggregate.processing.config.ApplicationConfig.malwareScanKey
 import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.AssetProcessing.AssetProcessingResult
 import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.metadata.MetadataProperty
 import uk.gov.nationalarchives.aws.utils.s3.S3Utils
@@ -63,6 +64,8 @@ class AssetProcessingSpec extends ExternalServiceSpec {
     when(mockLogger.isErrorEnabled).thenReturn(true)
     when(s3UtilsMock.getObjectAsStream(any[String], any[String]))
       .thenReturn(new ByteArrayInputStream(defaultMetadataJsonString().getBytes("UTF-8")))
+    when(s3UtilsMock.getObjectTags(any[String], any[String]))
+      .thenReturn(Map(malwareScanKey -> "NO_THREATS_FOUND"))
 
     val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
     val result = assetProcessing.processAsset("s3Bucket", s"$userId/sharepoint/$consignmentId/metadata/$matchId.metadata")
@@ -82,6 +85,8 @@ class AssetProcessingSpec extends ExternalServiceSpec {
 
     when(mockLogger.isInfoEnabled()).thenReturn(true)
     when(mockLogger.isErrorEnabled()).thenReturn(true)
+    when(s3UtilsMock.getObjectTags(any[String], any[String]))
+      .thenReturn(Map(malwareScanKey -> "NO_THREATS_FOUND"))
 
     val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
 
@@ -111,6 +116,8 @@ class AssetProcessingSpec extends ExternalServiceSpec {
 
     when(mockLogger.isErrorEnabled()).thenReturn(true)
     when(mockLogger.isInfoEnabled()).thenReturn(true)
+    when(s3UtilsMock.getObjectTags(any[String], any[String]))
+      .thenReturn(Map(malwareScanKey -> "NO_THREATS_FOUND"))
     when(s3UtilsMock.getObjectAsStream(any[String], any[String]))
       .thenReturn(new ByteArrayInputStream(missingFieldJson.getBytes("UTF-8")))
 
@@ -130,14 +137,23 @@ class AssetProcessingSpec extends ExternalServiceSpec {
     val mockLogger = mock[UnderlyingLogger]
     val s3AsyncClient = mock[S3AsyncClient]
     val s3UtilsMock = S3Utils(s3AsyncClient)
-    val objectTaggingResponse = GetObjectTaggingResponse.builder().build()
+
+    val tag = Tag.builder().key(malwareScanKey).value("NO_THREATS_FOUND").build()
+    val objectTaggingResponse = GetObjectTaggingResponse
+      .builder()
+      .tagSet(tag)
+      .build()
 
     when(mockLogger.isErrorEnabled()).thenReturn(true)
     when(mockLogger.isInfoEnabled()).thenReturn(true)
-    when(s3AsyncClient.getObject(any[GetObjectRequest], any[AsyncResponseTransformer[GetObjectResponse, ResponseBytes[GetObjectResponse]]]))
-      .thenReturn(failedFuture(new RuntimeException("read failed")))
     when(s3AsyncClient.getObjectTagging(any[GetObjectTaggingRequest]))
       .thenReturn(CompletableFuture.completedFuture(objectTaggingResponse))
+    when(
+      s3AsyncClient.getObject(
+        any(classOf[GetObjectRequest]),
+        any(classOf[AsyncResponseTransformer[GetObjectResponse, ResponseBytes[GetObjectResponse]]])
+      )
+    ).thenReturn(failedFuture(new RuntimeException("read failed")))
 
     val expectedResult = AssetProcessingResult(Some(matchId), processingErrors = true, None)
 
@@ -146,7 +162,7 @@ class AssetProcessingSpec extends ExternalServiceSpec {
 
     result shouldEqual expectedResult
 
-    verify(s3AsyncClient, times(1)).getObjectTagging(
+    verify(s3AsyncClient, times(2)).getObjectTagging(
       GetObjectTaggingRequest
         .builder()
         .bucket("s3Bucket")
@@ -167,6 +183,8 @@ class AssetProcessingSpec extends ExternalServiceSpec {
 
     when(mockLogger.isErrorEnabled()).thenReturn(true)
     when(mockLogger.isInfoEnabled()).thenReturn(true)
+    when(s3UtilsMock.getObjectTags(any[String], any[String]))
+      .thenReturn(Map(malwareScanKey -> "NO_THREATS_FOUND"))
     when(s3UtilsMock.getObjectAsStream(any[String], any[String]))
       .thenReturn(new ByteArrayInputStream(invalidUtf8))
 
@@ -190,6 +208,8 @@ class AssetProcessingSpec extends ExternalServiceSpec {
 
     when(mockLogger.isErrorEnabled()).thenReturn(true)
     when(mockLogger.isInfoEnabled()).thenReturn(true)
+    when(s3UtilsMock.getObjectTags(any[String], any[String]))
+      .thenReturn(Map(malwareScanKey -> "NO_THREATS_FOUND"))
     when(s3UtilsMock.getObjectAsStream(any[String], any[String]))
       .thenReturn(new ByteArrayInputStream(nonJsonString))
 
@@ -213,6 +233,8 @@ class AssetProcessingSpec extends ExternalServiceSpec {
 
     when(mockLogger.isErrorEnabled()).thenReturn(true)
     when(mockLogger.isInfoEnabled()).thenReturn(true)
+    when(s3UtilsMock.getObjectTags(any[String], any[String]))
+      .thenReturn(Map(malwareScanKey -> "NO_THREATS_FOUND"))
     when(s3UtilsMock.getObjectAsStream(any[String], any[String]))
       .thenReturn(new ByteArrayInputStream(unknownJsonString.getBytes("UTF-8")))
 
@@ -236,6 +258,8 @@ class AssetProcessingSpec extends ExternalServiceSpec {
 
     when(mockLogger.isErrorEnabled()).thenReturn(true)
     when(mockLogger.isInfoEnabled()).thenReturn(true)
+    when(s3UtilsMock.getObjectTags(any[String], any[String]))
+      .thenReturn(Map(malwareScanKey -> "NO_THREATS_FOUND"))
     when(s3UtilsMock.getObjectAsStream(any[String], any[String]))
       .thenReturn(new ByteArrayInputStream(defaultMetadataJsonString().getBytes("UTF-8")))
 
@@ -252,6 +276,34 @@ class AssetProcessingSpec extends ExternalServiceSpec {
 
     verify(mockLogger).error(
       s"AssetProcessingError: consignmentId: Some($consignmentId), matchId: None, source: Some(sharepoint), errorCode: ASSET_PROCESSING.MATCH_ID.MISMATCH, errorMessage: Mismatched match ids: $differentMatchId and $matchId"
+    )
+  }
+
+  "processAsset" should "log an error and return asset processing result when malware threat is found" in {
+    val mockLogger = mock[UnderlyingLogger]
+    val s3UtilsMock = mock[S3Utils]
+
+    import uk.gov.nationalarchives.aggregate.processing.config.ApplicationConfig.malwareScanThreatFound
+
+    when(mockLogger.isErrorEnabled()).thenReturn(true)
+    when(mockLogger.isInfoEnabled()).thenReturn(true)
+    when(s3UtilsMock.getObjectTags(any[String], any[String]))
+      .thenReturn(Map(malwareScanKey -> malwareScanThreatFound))
+
+    val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
+    val result = assetProcessing.processAsset("s3Bucket", s"$userId/sharepoint/$consignmentId/metadata/$matchId.metadata")
+
+    val expectedResult = AssetProcessingResult(Some(matchId), processingErrors = true, None)
+    result shouldEqual expectedResult
+
+    verify(s3UtilsMock, times(1)).addObjectTags(
+      "s3Bucket",
+      s"$userId/sharepoint/$consignmentId/metadata/$matchId.metadata",
+      Map("ASSET_PROCESSING" -> "CompletedWithIssues")
+    )
+
+    verify(mockLogger).error(
+      s"AssetProcessingError: consignmentId: Some($consignmentId), matchId: Some($matchId), source: Some(sharepoint), errorCode: ASSET_PROCESSING.MALWARE_SCAN.THREAT_FOUND, errorMessage: malware scan threat found"
     )
   }
 
@@ -275,6 +327,8 @@ class AssetProcessingSpec extends ExternalServiceSpec {
 
     when(mockLogger.isInfoEnabled()).thenReturn(true)
     when(mockLogger.isErrorEnabled).thenReturn(true)
+    when(s3UtilsMock.getObjectTags(any[String], any[String]))
+      .thenReturn(Map(malwareScanKey -> "NO_THREATS_FOUND"))
     when(s3UtilsMock.getObjectAsStream(any[String], any[String]))
       .thenReturn(new ByteArrayInputStream(defaultMetadataJsonString(fileSize = 0).getBytes("UTF-8")))
 
@@ -336,6 +390,8 @@ class AssetProcessingSpec extends ExternalServiceSpec {
 
     when(mockLogger.isInfoEnabled()).thenReturn(true)
     when(mockLogger.isErrorEnabled).thenReturn(true)
+    when(s3UtilsMock.getObjectTags(any[String], any[String]))
+      .thenReturn(Map(malwareScanKey -> "NO_THREATS_FOUND"))
     when(s3UtilsMock.getObjectAsStream(any[String], any[String]))
       .thenReturn(new ByteArrayInputStream(jsonMetadataString.getBytes("UTF-8")))
 
@@ -393,6 +449,8 @@ class AssetProcessingSpec extends ExternalServiceSpec {
 
     when(mockLogger.isInfoEnabled()).thenReturn(true)
     when(mockLogger.isErrorEnabled).thenReturn(true)
+    when(s3UtilsMock.getObjectTags(any[String], any[String]))
+      .thenReturn(Map(malwareScanKey -> "NO_THREATS_FOUND"))
     when(s3UtilsMock.getObjectAsStream(any[String], any[String]))
       .thenReturn(new ByteArrayInputStream(jsonMetadataString.getBytes("UTF-8")))
 

@@ -61,7 +61,7 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec {
     )
 
     wiremockS3.verify(
-      exactly(2),
+      exactly(4),
       getRequestedFor(anyUrl())
         .withUrl(s"/$objectKey?tagging")
     )

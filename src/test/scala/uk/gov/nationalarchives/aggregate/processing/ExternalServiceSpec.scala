@@ -200,7 +200,15 @@ class ExternalServiceSpec extends AnyFlatSpec with BeforeAndAfterEach with Befor
   }
 
   def mockS3GetObjectTagging(key: String): StubMapping = {
-    val response = <Tagging><TagSet/></Tagging>
+    val response = <Tagging>
+      <TagSet>
+        <Tag>
+          <Key>GuardDutyMalwareScanStatus</Key>
+          <Value>NO_THREATS_FOUND</Value>
+        </Tag>
+      </TagSet>
+    </Tagging>
+
     wiremockS3.stubFor(
       get(urlEqualTo(s"/$key?tagging"))
         .willReturn(okXml(response.toString()))

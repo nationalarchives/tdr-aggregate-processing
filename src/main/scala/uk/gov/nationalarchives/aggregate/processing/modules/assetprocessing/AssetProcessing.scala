@@ -4,10 +4,11 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.typesafe.scalalogging.Logger
 import graphql.codegen.types.ClientSideMetadataInput
 import io.circe.{Json, parser}
+import uk.gov.nationalarchives.aggregate.processing.config.ApplicationConfig.{malwareScanKey, malwareScanThreatFound}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.AssetSource.AssetSource
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ObjectType.ObjectType
-import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorType.{EncodingError, JsonError, MatchIdError, ObjectKeyError, S3Error => s3e}
-import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorValue.{Invalid, Mismatch, ReadError}
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorType.{EncodingError, JsonError, MalwareScanError, MatchIdError, ObjectKeyError, S3Error => s3e}
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorValue.{Invalid, Mismatch, ReadError, ThreatFound}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.{AssetProcessing => ptAp}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.StateStatusValue.{Completed, CompletedWithIssues}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.{AssetSource, MetadataClassification, ObjectType}
@@ -18,14 +19,12 @@ import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.init
 import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.metadata._
 import uk.gov.nationalarchives.aggregate.processing.utilities.UTF8ValidationHandler
 import uk.gov.nationalarchives.aws.utils.s3.{S3Clients, S3Utils}
-import uk.gov.nationalarchives.tdr.schemautils.ConfigUtils
 import uk.gov.nationalarchives.utf8.validator.Utf8Validator
 
 import java.util.UUID
 import scala.util.{Failure, Success, Try}
 
 class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
-  private lazy val metadataConfig: ConfigUtils.MetadataConfiguration = ConfigUtils.loadConfiguration
   private lazy val initialChecks: Set[InitialCheck] = Set(FileSizeCheck.apply(), FileExtensionCheck.apply())
   private lazy val errorHandling = ErrorHandling()
 
@@ -61,14 +60,33 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
   }
 
   private def parseMetadataObject(s3Utils: S3Utils, event: AssetProcessingEvent): AssetProcessingResult = {
-    // TODO: check for threat found
     val s3Bucket = event.s3SourceBucket
     val objectKey = event.objectKey
-    Try(s3Utils.getObjectAsStream(s3Bucket, objectKey)) match {
-      case Failure(ex) =>
-        val error = generateErrorMessage(event, s"$ptAp.$s3e.$ReadError", ex.getMessage)
-        handleProcessError(List(error), s3Bucket, objectKey)
-      case Success(inputStream) => validUTF8(inputStream, event)
+    val objectTags = s3Utils.getObjectTags(s3Bucket, objectKey)
+
+    checkMalwareScan(objectTags, s3Bucket, objectKey, event) match {
+      case Some(result) => result
+      case None =>
+        Try(s3Utils.getObjectAsStream(s3Bucket, objectKey)) match {
+          case Failure(ex) =>
+            val error = generateErrorMessage(event, s"$ptAp.$s3e.$ReadError", ex.getMessage)
+            handleProcessError(List(error), s3Bucket, objectKey)
+          case Success(inputStream) => validUTF8(inputStream, event)
+        }
+    }
+  }
+
+  private def checkMalwareScan(
+      objectTags: Map[String, String],
+      s3Bucket: String,
+      objectKey: String,
+      event: AssetProcessingEvent
+  ): Option[AssetProcessingResult] = {
+    objectTags.get(malwareScanKey) match {
+      case Some(value) if value == malwareScanThreatFound =>
+        val error = generateErrorMessage(event, s"$ptAp.$MalwareScanError.$ThreatFound", "malware scan threat found")
+        Some(handleProcessError(List(error), s3Bucket, objectKey))
+      case _ => None
     }
   }
 
