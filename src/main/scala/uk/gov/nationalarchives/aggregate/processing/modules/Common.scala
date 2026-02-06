@@ -34,7 +34,7 @@ object Common {
     val ObjectKeyError: Value = Value("OBJECT_KEY")
     val ObjectSizeError: Value = Value("OBJECT_SIZE")
     val S3Error: Value = Value("S3")
-    val MalwareScan: Value = Value("MALWARE_SCAN")
+    val MalwareScanError: Value = Value("MALWARE_SCAN")
   }
 
   object ProcessErrorValue extends Enumeration {
