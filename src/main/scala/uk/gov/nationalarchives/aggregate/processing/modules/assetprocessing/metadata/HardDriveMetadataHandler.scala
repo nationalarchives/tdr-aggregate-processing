@@ -36,6 +36,7 @@ object HardDriveMetadataHandler {
     def normalise(id: String, value: Json): Json = id match {
       case HardDriveDateLastModified.baseProperty.id => HardDriveDateLastModified.normaliseFunction.apply(value)
       case HardDriveFilePath.baseProperty.id         => HardDriveFilePath.normaliseFunction.apply(value)
+      case HardDriveFoiExemptionCode.baseProperty.id => HardDriveFoiExemptionCode.normaliseFunction.apply(value)
       case HardDriveClosureType.baseProperty.id | HardDriveTitleClosed.baseProperty.id | HardDriveDescriptionClosed.baseProperty.id | HardDriveClosurePeriod.baseProperty.id =>
         switchToAlternateValue(value)
       case _ => value
@@ -72,6 +73,16 @@ object HardDriveMetadataHandler {
     def normaliseFunction: Json => Json = (value: Json) => {
       val originalValue = value.asString.get + "Z"
       t"$originalValue".getTime.toString.asJson
+    }
+  }
+
+  private case object HardDriveFoiExemptionCode extends HardDriveProperty {
+    override val baseProperty: BaseProperty = FoiExemptionCodeProperty
+    def normaliseFunction: Json => Json = (value: Json) => {
+      val originalValue = value.asString.get
+      if (originalValue.toLowerCase == "open") {
+        "".asJson
+      } else originalValue.asJson
     }
   }
 

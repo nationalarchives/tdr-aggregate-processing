@@ -42,6 +42,10 @@ case object FileSizeProperty extends BaseProperty {
   val id: String = "file_size"
 }
 
+case object FoiExemptionCodeProperty extends BaseProperty {
+  val id: String = "foi_exemption_code"
+}
+
 case object MatchIdProperty extends BaseProperty {
   val id: String = "matchId"
 }

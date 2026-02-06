@@ -25,6 +25,8 @@ class HardDriveMetadataHandlerSpec extends ExternalServiceSpec {
     hardDriveHandler.normaliseValues("date_last_modified", hardDriveDateLastModifiedJson) shouldBe "1751534387000".asJson
     hardDriveHandler.normaliseValues("title_closed", "true".asJson) shouldBe "false".asJson
     hardDriveHandler.normaliseValues("title_closed", "false".asJson) shouldBe "true".asJson
+    hardDriveHandler.normaliseValues("foi_exemption_code", "Open".asJson) shouldBe "".asJson
+    hardDriveHandler.normaliseValues("foi_exemption_code", "30".asJson) shouldBe "30".asJson
     hardDriveHandler.normaliseValues("some_other_property", someOtherJson) shouldBe someOtherJson
   }
 
