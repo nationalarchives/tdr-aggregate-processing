@@ -72,7 +72,7 @@ class SharePointMetadataHandlerSpec extends ExternalServiceSpec {
     selectedMetadata.contains(MetadataProperty("file_name", "file1.txt")) shouldBe true
   }
 
-  "classifyMetadata" should "classify given metadata properties correctly" in {
+  "classifyBaseMetadata" should "classify given metadata properties correctly" in {
     val matchId = UUID.randomUUID()
     val consignmentId = UUID.randomUUID()
     val baseMetadataWithSuppliedAndCustom = s"""{
@@ -85,11 +85,11 @@ class SharePointMetadataHandlerSpec extends ExternalServiceSpec {
       "transferId": "$consignmentId",
       "description": "some kind of description",
       "custom": "custom metadata value",
-      "closure status": "open"
+      "closure_type": "open"
     }""".stripMargin
 
     val sourceJson = convertStringToJson(baseMetadataWithSuppliedAndCustom)
-    val classifiedMetadata = handler.classifyMetadata(sourceJson)
+    val classifiedMetadata = handler.classifyBaseMetadata(sourceJson)
     classifiedMetadata(MetadataClassification.Custom) shouldEqual expectedCustomMetadata
     classifiedMetadata(MetadataClassification.Supplied) shouldEqual expectedSuppliedMetadata
     classifiedMetadata(MetadataClassification.System) shouldEqual expectedSystemMetadata
