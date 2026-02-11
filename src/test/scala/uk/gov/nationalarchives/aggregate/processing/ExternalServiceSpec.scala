@@ -29,29 +29,6 @@ class ExternalServiceSpec extends AnyFlatSpec with BeforeAndAfterEach with Befor
   val graphQlPath = "/graphql"
   def graphQlUrl: String = wiremockGraphqlServer.url(graphQlPath)
 
-  private def defaultMetadataJsonString(matchId: String, consignmentId: String) = s"""{
-      "Length": "12",
-      "Modified": "2025-07-03T09:19:47Z",
-      "FileLeafRef": "file1.txt",
-      "FileRef": "/sites/Retail/Shared Documents/file1.txt",
-      "sha256ClientSideChecksum": "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2",
-      "matchId": "$matchId",
-      "transferId": "$consignmentId"
-    }""".stripMargin
-
-  private def defaultAndSuppliedMetadataJsonString(matchId: String, consignmentId: String) = s"""{
-      "Length": "12",
-      "Modified": "2025-07-03T09:19:47Z",
-      "FileLeafRef": "file1.txt",
-      "FileRef": "/sites/Retail/Shared Documents/file1.txt",
-      "sha256ClientSideChecksum": "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2",
-      "matchId": "$matchId",
-      "transferId": "$consignmentId",
-      "description": "some kind of description",
-      "copyright": "legal copyright",
-      "custom": "random value"
-    }""".stripMargin
-
   def authOkJson(): StubMapping = wiremockAuthServer.stubFor(
     post(urlEqualTo(authPath))
       .willReturn(okJson("""{"access_token": "abcde"}"""))
@@ -142,12 +119,8 @@ class ExternalServiceSpec extends AnyFlatSpec with BeforeAndAfterEach with Befor
       .willReturn(aResponse().withStatus(500).withBody("internal server error"))
   )
 
-  def mockS3GetObjectStream(key: String, consignmentId: String, matchId: String, suppliedMetadata: Boolean = false): StubMapping = {
-    val bytes = if (suppliedMetadata) {
-      defaultAndSuppliedMetadataJsonString(matchId, consignmentId).getBytes("UTF-8")
-    } else {
-      defaultMetadataJsonString(matchId, consignmentId).getBytes("UTF-8")
-    }
+  def mockS3GetObjectStream(key: String, metadataJsonString: String): StubMapping = {
+    val bytes = metadataJsonString.getBytes("UTF-8")
     wiremockS3.stubFor(
       get(urlEqualTo(s"/$key"))
         .willReturn(aResponse().withStatus(200).withBody(bytes))
@@ -177,12 +150,12 @@ class ExternalServiceSpec extends AnyFlatSpec with BeforeAndAfterEach with Befor
     )
   }
 
-  def mockS3ListBucketResponse(userId: UUID, consignmentId: UUID, matchIds: List[String]): StubMapping = {
-    val params = Map("list-type" -> equalTo("2"), "prefix" -> equalTo(s"$userId/sharepoint/$consignmentId/metadata")).asJava
+  def mockS3ListBucketResponse(userId: UUID, consignmentId: UUID, matchIds: List[String], assetSource: String): StubMapping = {
+    val params = Map("list-type" -> equalTo("2"), "prefix" -> equalTo(s"$userId/$assetSource/$consignmentId/metadata")).asJava
     val response = <ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
       {
       matchIds.map(matchId => <Contents>
-          <Key>{userId}/sharepoint/{consignmentId}/metadata/{matchId}.metadata</Key>
+          <Key>{userId}/{assetSource}/{consignmentId}/metadata/{matchId}.metadata</Key>
           <LastModified>2009-10-12T17:50:30.000Z</LastModified>
           <ETag>"fba9dede5f27731c9771645a39863328"</ETag>
           <Size>1</Size>
@@ -196,8 +169,8 @@ class ExternalServiceSpec extends AnyFlatSpec with BeforeAndAfterEach with Befor
     )
   }
 
-  def mockS3ListBucketResponseEmpty(userId: UUID, consignmentId: UUID): StubMapping = {
-    val params = Map("list-type" -> equalTo("2"), "prefix" -> equalTo(s"$userId/sharepoint/$consignmentId/metadata")).asJava
+  def mockS3ListBucketResponseEmpty(userId: UUID, consignmentId: UUID, assetSource: String): StubMapping = {
+    val params = Map("list-type" -> equalTo("2"), "prefix" -> equalTo(s"$userId/$assetSource/$consignmentId/metadata")).asJava
     val response = <ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
     </ListBucketResult>
     wiremockS3.stubFor(
@@ -207,8 +180,8 @@ class ExternalServiceSpec extends AnyFlatSpec with BeforeAndAfterEach with Befor
     )
   }
 
-  def mockS3ListBucketResponseError(userId: UUID, consignmentId: UUID): StubMapping = {
-    val params = Map("list-type" -> equalTo("2"), "prefix" -> equalTo(s"$userId/sharepoint/$consignmentId/metadata")).asJava
+  def mockS3ListBucketResponseError(userId: UUID, consignmentId: UUID, assetSource: String): StubMapping = {
+    val params = Map("list-type" -> equalTo("2"), "prefix" -> equalTo(s"$userId/$assetSource/$consignmentId/metadata")).asJava
     wiremockS3.stubFor(
       get(anyUrl())
         .withQueryParams(params)
