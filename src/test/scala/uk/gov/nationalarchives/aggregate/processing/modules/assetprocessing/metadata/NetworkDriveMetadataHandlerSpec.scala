@@ -69,9 +69,9 @@ class NetworkDriveMetadataHandlerSpec extends ExternalServiceSpec {
     selectedMetadata.contains(MetadataProperty("file_name", "file1.txt")) shouldBe true
   }
 
-  "classifyMetadata" should "classify given metadata properties correctly" in {
+  "classifyBaseMetadata" should "classify given metadata properties correctly" in {
     val sourceJson = convertStringToJson(baseMetadataWithSuppliedAndCustom())
-    val classifiedMetadata = networkDriveHandler.classifyMetadata(sourceJson)
+    val classifiedMetadata = networkDriveHandler.classifyBaseMetadata(sourceJson)
     classifiedMetadata(MetadataClassification.Custom) shouldEqual expectedCustomMetadata
     classifiedMetadata(MetadataClassification.Supplied) shouldEqual expectedSuppliedMetadata
     classifiedMetadata(MetadataClassification.System) shouldEqual expectedSystemMetadata

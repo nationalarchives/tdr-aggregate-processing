@@ -69,5 +69,5 @@ trait MetadataHandler {
 
   def convertToBaseMetadata(sourceJson: Json): Json
 
-  def classifyMetadata(json: Json): Map[MetadataClassification, List[MetadataProperty]]
+  def classifyBaseMetadata(baseMetadataJson: Json): Map[MetadataClassification, List[MetadataProperty]]
 }

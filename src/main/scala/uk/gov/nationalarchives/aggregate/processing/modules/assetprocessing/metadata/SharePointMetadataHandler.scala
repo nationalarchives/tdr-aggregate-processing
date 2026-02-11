@@ -16,8 +16,7 @@ object SharePointMetadataHandler {
   }
 
   private val metadataConfig: ConfigUtils.MetadataConfiguration = ConfigUtils.loadConfiguration
-  private lazy val tdrDataLoadHeaderToPropertyMapper: String => String = metadataConfig.propertyToOutputMapper("tdrFileHeader")
-  private val suppliedProperties: Seq[String] = metadataConfig.getPropertiesByPropertyType(Supplied.toString).map(p => tdrDataLoadHeaderToPropertyMapper(p))
+  private val suppliedProperties: Seq[String] = metadataConfig.getPropertiesByPropertyType(Supplied.toString)
   private val systemProperties: Seq[String] = metadataConfig.getPropertiesByPropertyType(System.toString)
   private val mapper: String => String = metadataConfig.inputToPropertyMapper("sharePointTag")
   private val defaultPropertyValues: Map[String, String] = metadataConfig.getPropertiesWithDefaultValue

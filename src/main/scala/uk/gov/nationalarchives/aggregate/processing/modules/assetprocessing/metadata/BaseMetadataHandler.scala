@@ -60,12 +60,12 @@ class BaseMetadataHandler(
   def toClientSideMetadataInput(baseMetadataJson: Json): Decoder.Result[ClientSideMetadataInput] =
     baseMetadataJson.as[ClientSideMetadataInput]
 
-  def classifyMetadata(json: Json): Map[MetadataClassification, List[MetadataProperty]] = {
-    val allPropertyNames: Seq[String] = json.asObject.map(_.keys.toSeq).getOrElse(Seq.empty)
+  def classifyBaseMetadata(baseMetadataJson: Json): Map[MetadataClassification, List[MetadataProperty]] = {
+    val allPropertyNames: Seq[String] = baseMetadataJson.asObject.map(_.keys.toSeq).getOrElse(Seq.empty)
     val customProperties = allPropertyNames.diff(excludeProperties)
-    val suppliedMetadata = toMetadataProperties(json, suppliedProperties)
-    val systemMetadata = toMetadataProperties(json, systemProperties)
-    val customMetadata = toMetadataProperties(json, customProperties)
+    val suppliedMetadata = toMetadataProperties(baseMetadataJson, suppliedProperties)
+    val systemMetadata = toMetadataProperties(baseMetadataJson, systemProperties)
+    val customMetadata = toMetadataProperties(baseMetadataJson, customProperties)
     Map(
       MetadataClassification.Custom -> customMetadata,
       MetadataClassification.Supplied -> convertBaseSuppliedToTdrHeaders(suppliedMetadata),

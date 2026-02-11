@@ -418,7 +418,7 @@ class AssetProcessingSpec extends ExternalServiceSpec {
       "transferId": "$consignmentId",
       "description": "some kind of description",
       "custom": "custom metadata value",
-      "closure status": "open"
+      "closure_x0020_status": "open"
     }""".stripMargin
 
     val jsonMetadataString = defaultMetadataWithSuppliedAndCustom
