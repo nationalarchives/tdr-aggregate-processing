@@ -64,7 +64,7 @@ class SharePointMetadataHandlerSpec extends ExternalServiceSpec with MetadataHel
     selectedMetadata.contains(MetadataProperty("file_name", "file1.txt")) shouldBe true
   }
 
-  "classifyMetadata" should "classify given metadata properties correctly" in {
+  "classifyBaseMetadata" should "classify given metadata properties correctly" in {
     val sourceJson = convertStringToJson(validBaseMetadataWithSuppliedAndCustom(matchId, consignmentId, expectedFilePath))
     val classifiedMetadata = handler.classifyMetadata(sourceJson)
     classifiedMetadata(MetadataClassification.Custom) shouldEqual expectedCustomMetadata

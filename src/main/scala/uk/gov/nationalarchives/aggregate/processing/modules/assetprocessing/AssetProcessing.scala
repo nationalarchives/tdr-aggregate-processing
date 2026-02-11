@@ -139,7 +139,7 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
               handleProcessError(initialChecksErrors, s3Bucket, objectKey)
               AssetProcessingResult(Some(matchId), processingErrors = true, Some(input))
             } else {
-              val classifiedMetadata = metadataHandler.classifyMetadata(baseMetadataJson)
+              val classifiedMetadata = metadataHandler.classifyBaseMetadata(baseMetadataJson)
               val suppliedMetadata = classifiedMetadata.getOrElse(MetadataClassification.Supplied, Nil)
               val systemMetadata = classifiedMetadata.getOrElse(MetadataClassification.System, Nil)
               val customMetadata = classifiedMetadata.getOrElse(MetadataClassification.Custom, Nil)
