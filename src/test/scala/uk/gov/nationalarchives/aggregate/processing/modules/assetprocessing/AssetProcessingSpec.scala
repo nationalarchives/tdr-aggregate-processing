@@ -38,7 +38,14 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
       defaultSuppliedFields,
       customFieldJsonString
     ),
-    (AssetSource.NetworkDrive.toString.toLowerCase, networkDriveJsonString, "top-level/Retail/Shared Documents/file1.txt", "fileSize", defaultSuppliedFields, customFieldJsonString),
+    (
+      AssetSource.NetworkDrive.toString.toLowerCase,
+      networkDriveJsonString,
+      "top-level/Retail/Shared Documents/file1.txt",
+      "fileSize",
+      defaultSuppliedFields,
+      customFieldJsonString
+    ),
     (
       AssetSource.SharePoint.toString.toLowerCase,
       sharePointMetadataJsonString,
