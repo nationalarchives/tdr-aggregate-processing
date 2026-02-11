@@ -6,7 +6,7 @@ import com.amazonaws.services.lambda.runtime.events.SQSEvent.SQSMessage
 import com.github.tomakehurst.wiremock.client.WireMock._
 import org.mockito.MockitoSugar.mock
 import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper
-import org.scalatest.prop.{TableDrivenPropertyChecks, TableFor1, TableFor2}
+import org.scalatest.prop.{TableDrivenPropertyChecks, TableFor1, TableFor2, TableFor3}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.AssetSource
 
@@ -28,14 +28,14 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
     }
     """.stripMargin
 
-  val assetSources: TableFor2[String, (String, Long, UUID, Option[String], Option[String]) => String] = Table(
-    ("Asset Source", "Metadata Json String"),
-    (AssetSource.HardDrive.toString.toLowerCase, hardDriveMetadataJsonString),
-    (AssetSource.NetworkDrive.toString.toLowerCase, networkDriveJsonString),
-    (AssetSource.SharePoint.toString.toLowerCase, sharePointMetadataJsonString)
+  val assetSources: TableFor3[String, (String, Long, UUID, Option[String], Option[String]) => String, String] = Table(
+    ("Asset Source", "Metadata Json String", "Expected File Path"),
+    (AssetSource.HardDrive.toString.toLowerCase, hardDriveMetadataJsonString, "content/Retail/Shared Documents/file1.txt"),
+    (AssetSource.NetworkDrive.toString.toLowerCase, networkDriveJsonString, ""),
+    (AssetSource.SharePoint.toString.toLowerCase, sharePointMetadataJsonString, "")
   )
 
-  forAll(assetSources) { (assetSource, metadataJsonString) =>
+  forAll(assetSources) { (assetSource, metadataJsonString, expectedFilePath) =>
     val objectKey = s"$userId/$assetSource/$consignmentId/$category/$matchId.metadata"
 
     s"'handleRequest' with asset source $assetSource" should "process all valid messages in SQS event" in {
@@ -295,7 +295,7 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
 
     s"'handleRequest' with asset source $assetSource" should
       "upload a draft-metadata.csv to S3 when supplied metadata present in uploaded metadata" in {
-        val metadata = metadataJsonString(matchId, defaultFileSize, consignmentId, Some(defaultSuppliedField), None)
+        val metadata = metadataJsonString(matchId, defaultFileSize, consignmentId, Some(defaultSuppliedFields), None)
         authOkJson()
         mockS3GetObjectTagging(objectKey)
         mockS3GetObjectStream(objectKey, metadata)
@@ -334,7 +334,7 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
                 "filepath,filename,date last modified,date of the record,description,former reference,closure status,closure start date,closure period,foi exemption code,foi schedule date,is filename closed,alternate filename,is description closed,alternate description,language,translated filename,copyright,related material,restrictions on use,evidence provided by"
               )
             )
-            .withRequestBody(containing("sites/Retail/Shared Documents/file1.txt,file1.txt,2025-07-03,,some kind of description,,Open,,,,,No,,No,,English,,Crown copyright,,,"))
+            .withRequestBody(containing(s"$expectedFilePath,file1.txt,2025-07-03,,some kind of description,,Open,,,,,No,,No,,English,,Crown copyright,,,"))
         )
       }
   }

@@ -8,17 +8,18 @@ import java.util.UUID
 trait MetadataHelper {
   val defaultFileSize: Long = 12L
   val customFieldJsonString: String = """"customField": "custom metadata value""""
-  val defaultSuppliedField: String = """"closure_type": "open","description": "some kind of description""""
+  val defaultSuppliedFields: String = """"closure_type": "Open","description": "some kind of description""""
 
   def expectedSystemMetadata(filePath: String): List[MetadataProperty] = List(
     MetadataProperty("file_path", s"$filePath"),
     MetadataProperty("file_name", "file1.txt"),
-    MetadataProperty("date_last_modified", "2025-07-03T09:19:47Z"),
+    MetadataProperty("date_last_modified", "1751534387000"),
     MetadataProperty("file_size", s"$defaultFileSize"),
     MetadataProperty("client_side_checksum", "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2")
   )
 
-  val expectedSuppliedMetadata: List[MetadataProperty] = List(MetadataProperty("description", "some kind of description"), MetadataProperty("closure status", "open"))
+  val expectedSuppliedMetadata: List[MetadataProperty] =
+    List(MetadataProperty("description", "some kind of description"), MetadataProperty("closure status", "Open"))
 
   val expectedCustomMetadata: List[MetadataProperty] = List(MetadataProperty("customField", "custom metadata value"))
 
@@ -34,18 +35,8 @@ trait MetadataHelper {
        |}""".stripMargin
 
   def validBaseMetadataWithSuppliedAndCustom(matchId: String, consignmentId: UUID, filePath: String): String = {
-    s"""{
-      "file_size": "$defaultFileSize",
-      "date_last_modified": "2025-07-03T09:19:47Z",
-      "file_name": "file1.txt",
-      "file_path": "$filePath",
-      "client_side_checksum": "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2",
-      "matchId": "$matchId",
-      "transferId": "$consignmentId",
-      "description": "some kind of description",
-      "customField": "custom metadata value",
-      "closure_type": "open"
-    }""".stripMargin
+    val baseJsonString = validBaseMetadataJsonString(matchId, consignmentId, filePath)
+    addOptionalMetadataJsonString(baseJsonString, Some(defaultSuppliedFields), Some(customFieldJsonString))
   }
 
   def addOptionalMetadataJsonString(defaultJsonString: String, suppliedMetadataJson: Option[String], customMetadataJson: Option[String]): String = {
@@ -92,7 +83,6 @@ trait MetadataHelper {
   }
 
   def networkDriveJsonString(matchId: String, fileSize: Long, consignmentId: UUID, suppliedMetadataJson: Option[String], customMetadataJson: Option[String]): String = {
-
     val defaultJsonString = s"""{
       "fileSize": "$fileSize",
       "transferId": "$consignmentId",

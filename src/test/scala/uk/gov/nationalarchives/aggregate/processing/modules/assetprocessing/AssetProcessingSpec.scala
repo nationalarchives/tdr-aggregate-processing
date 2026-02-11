@@ -35,16 +35,16 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
       hardDriveMetadataJsonString,
       "content/Retail/Shared Documents/file1.txt",
       "file_size",
-      defaultSuppliedField,
+      defaultSuppliedFields,
       customFieldJsonString
     ),
-    (AssetSource.NetworkDrive.toString.toLowerCase, networkDriveJsonString, "top-level/Retail/Shared Documents/file1.txt", "fileSize", defaultSuppliedField, customFieldJsonString),
+    (AssetSource.NetworkDrive.toString.toLowerCase, networkDriveJsonString, "top-level/Retail/Shared Documents/file1.txt", "fileSize", defaultSuppliedFields, customFieldJsonString),
     (
       AssetSource.SharePoint.toString.toLowerCase,
       sharePointMetadataJsonString,
       "sites/Retail/Shared Documents/file1.txt",
       "Length",
-      """"closure_x0020_status": "open"""",
+      """"closure_x0020_status": "Open","description": "some kind of description"""",
       customFieldJsonString
     )
   )

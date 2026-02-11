@@ -76,7 +76,7 @@ class HardDriveMetadataHandlerSpec extends ExternalServiceSpec with MetadataHelp
 
   "classifyBaseMetadata" should "classify given metadata properties correctly" in {
     val sourceJson = convertStringToJson(validBaseMetadataWithSuppliedAndCustom(matchId, consignmentId, expectedFilePath))
-    val classifiedMetadata = hardDriveHandler.classifyMetadata(sourceJson)
+    val classifiedMetadata = hardDriveHandler.classifyBaseMetadata(sourceJson)
     classifiedMetadata(MetadataClassification.Custom) shouldEqual expectedCustomMetadata
     classifiedMetadata(MetadataClassification.Supplied) shouldEqual expectedSuppliedMetadata
     classifiedMetadata(MetadataClassification.System) shouldEqual expectedSystemMetadata(expectedFilePath)

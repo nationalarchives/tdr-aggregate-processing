@@ -66,7 +66,7 @@ class DroidMetadataHandlerSpec extends ExternalServiceSpec with MetadataHelper {
 
   "classifyBaseMetadata" should "classify given metadata properties correctly" in {
     val sourceJson = convertStringToJson(validBaseMetadataWithSuppliedAndCustom(matchId, consignmentId, expectedFilePath))
-    val classifiedMetadata = droidHandler.classifyMetadata(sourceJson)
+    val classifiedMetadata = droidHandler.classifyBaseMetadata(sourceJson)
     classifiedMetadata(MetadataClassification.Custom) shouldEqual expectedCustomMetadata
     classifiedMetadata(MetadataClassification.Supplied) shouldEqual expectedSuppliedMetadata
     classifiedMetadata(MetadataClassification.System) shouldEqual expectedSystemMetadata(expectedFilePath)
