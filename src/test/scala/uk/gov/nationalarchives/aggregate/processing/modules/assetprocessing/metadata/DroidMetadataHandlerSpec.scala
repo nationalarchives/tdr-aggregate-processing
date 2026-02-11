@@ -2,16 +2,20 @@ package uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.met
 
 import io.circe.syntax.EncoderOps
 import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper
-import uk.gov.nationalarchives.aggregate.processing.ExternalServiceSpec
+import uk.gov.nationalarchives.aggregate.processing.{ExternalServiceSpec, MetadataHelper}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.MetadataClassification
 
-class DroidMetadataHandlerSpec extends ExternalServiceSpec {
-  private val expectedFilePath = "Content/folder/file1.txt"
+import java.util.UUID
+
+class DroidMetadataHandlerSpec extends ExternalServiceSpec with MetadataHelper {
+  private val expectedFilePath = "Content/Retail/Shared Documents/file1.txt"
+  private val matchId = "matchId"
+  private val consignmentId = UUID.randomUUID()
 
   val droidHandler: BaseMetadataHandler = DroidMetadataHandler.metadataHandler
 
   "normaliseValues" should "normalise only specified property values" in {
-    val droidFilePathJson = """Z:\year_batch\batch_number\series\Content\folder\file1.txt""".asJson
+    val droidFilePathJson = """Z:\year_batch\batch_number\series\Content\Retail\Shared Documents\file1.txt""".asJson
     val droidDateLastModifiedJson = "2025-07-03T09:19:47".asJson
     val someOtherJson = "some other json value".asJson
 
@@ -21,18 +25,8 @@ class DroidMetadataHandlerSpec extends ExternalServiceSpec {
   }
 
   "convertToBaseMetadata" should "convert valid Droid json with no default properties to base metadata json" in {
-    val rawDroidJsonString = """{
-                               | "SIZE": "12",
-                               | "LAST_MODIFIED": "2025-07-03T09:19:47",
-                               | "NAME": "file1.txt",
-                               | "FILE_PATH": "Z:\\year_batch\\batch_number\\series\\Content\\folder\\file1.txt",
-                               | "SHA256_HASH": "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2",
-                               | "matchId": "matchId",
-                               | "transferId": "consignmentId"
-    }""".stripMargin
-
-    val rawSharePointJson = convertStringToJson(rawDroidJsonString)
-    val expectedJson = convertStringToJson(validBaseMetadataJsonString(expectedFilePath))
+    val rawSharePointJson = convertStringToJson(droidMetadataJsonString(matchId, defaultFileSize, consignmentId, None, None))
+    val expectedJson = convertStringToJson(validBaseMetadataJsonString(matchId, consignmentId, expectedFilePath))
 
     droidHandler.convertToBaseMetadata(rawSharePointJson) shouldBe expectedJson
   }
@@ -45,14 +39,14 @@ class DroidMetadataHandlerSpec extends ExternalServiceSpec {
   }
 
   "toClientSideMetadataInput" should "convert valid base metadata json to ClientSideMetadataInput" in {
-    val input = droidHandler.toClientSideMetadataInput(convertStringToJson(validBaseMetadataJsonString(expectedFilePath)))
+    val input = droidHandler.toClientSideMetadataInput(convertStringToJson(validBaseMetadataJsonString(matchId, consignmentId, expectedFilePath)))
     input.isLeft shouldBe false
     input.map(i => {
       i.matchId shouldBe "matchId"
       i.checksum shouldBe "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2"
       i.fileSize shouldBe 12L
       i.lastModified shouldBe 1751534387000L
-      i.originalPath shouldBe "Content/folder/file1.txt"
+      i.originalPath shouldBe expectedFilePath
     })
   }
 
@@ -64,17 +58,17 @@ class DroidMetadataHandlerSpec extends ExternalServiceSpec {
 
   "toMetadataProperties" should "return specified properties if exist in json" in {
     val properties = Seq("file_size", "file_name", "somePropertyNotInJson")
-    val selectedMetadata = droidHandler.toMetadataProperties(convertStringToJson(validBaseMetadataJsonString(expectedFilePath)), properties)
+    val selectedMetadata = droidHandler.toMetadataProperties(convertStringToJson(validBaseMetadataJsonString(matchId, consignmentId, expectedFilePath)), properties)
     selectedMetadata.size shouldBe 2
     selectedMetadata.contains(MetadataProperty("file_size", "12")) shouldBe true
     selectedMetadata.contains(MetadataProperty("file_name", "file1.txt")) shouldBe true
   }
 
   "classifyMetadata" should "classify given metadata properties correctly" in {
-    val sourceJson = convertStringToJson(baseMetadataWithSuppliedAndCustom())
+    val sourceJson = convertStringToJson(validBaseMetadataWithSuppliedAndCustom(matchId, consignmentId, expectedFilePath))
     val classifiedMetadata = droidHandler.classifyMetadata(sourceJson)
     classifiedMetadata(MetadataClassification.Custom) shouldEqual expectedCustomMetadata
     classifiedMetadata(MetadataClassification.Supplied) shouldEqual expectedSuppliedMetadata
-    classifiedMetadata(MetadataClassification.System) shouldEqual expectedSystemMetadata
+    classifiedMetadata(MetadataClassification.System) shouldEqual expectedSystemMetadata(expectedFilePath)
   }
 }

@@ -2,13 +2,15 @@ package uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.met
 
 import io.circe.syntax.EncoderOps
 import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper
-import uk.gov.nationalarchives.aggregate.processing.ExternalServiceSpec
+import uk.gov.nationalarchives.aggregate.processing.{ExternalServiceSpec, MetadataHelper}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.MetadataClassification
 
 import java.util.UUID
 
-class SharePointMetadataHandlerSpec extends ExternalServiceSpec {
+class SharePointMetadataHandlerSpec extends ExternalServiceSpec with MetadataHelper {
   private val expectedFilePath = "sites/Retail/Shared Documents/file1.txt"
+  private val matchId = "matchId"
+  private val consignmentId = UUID.randomUUID()
 
   val handler: BaseMetadataHandler = SharePointMetadataHandler.metadataHandler
 
@@ -23,18 +25,8 @@ class SharePointMetadataHandlerSpec extends ExternalServiceSpec {
   }
 
   "convertToBaseMetadata" should "convert valid SharePoint json to base metadata json" in {
-    val rawSharePointJsonString = """{
-      | "Length": "12",
-      | "Modified": "2025-07-03T09:19:47Z",
-      | "FileLeafRef": "file1.txt",
-      | "FileRef": "/sites/Retail/Shared Documents/file1.txt",
-      | "sha256ClientSideChecksum": "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2",
-      | "matchId": "matchId",
-      | "transferId": "consignmentId"
-    }""".stripMargin
-
-    val rawSharePointJson = convertStringToJson(rawSharePointJsonString)
-    val expectedJson = convertStringToJson(validBaseMetadataJsonString(expectedFilePath))
+    val rawSharePointJson = convertStringToJson(sharePointMetadataJsonString(matchId, defaultFileSize, consignmentId, None, None))
+    val expectedJson = convertStringToJson(validBaseMetadataJsonString(matchId, consignmentId, expectedFilePath))
 
     handler.convertToBaseMetadata(rawSharePointJson) shouldBe expectedJson
   }
@@ -47,7 +39,7 @@ class SharePointMetadataHandlerSpec extends ExternalServiceSpec {
   }
 
   "toClientSideMetadataInput" should "convert valid base metadata json to ClientSideMetadataInput" in {
-    val input = handler.toClientSideMetadataInput(convertStringToJson(validBaseMetadataJsonString(expectedFilePath)))
+    val input = handler.toClientSideMetadataInput(convertStringToJson(validBaseMetadataJsonString(matchId, consignmentId, expectedFilePath)))
     input.isLeft shouldBe false
     input.map(i => {
       i.matchId shouldBe "matchId"
@@ -66,32 +58,17 @@ class SharePointMetadataHandlerSpec extends ExternalServiceSpec {
 
   "toMetadataProperties" should "return specified properties if exist in json" in {
     val properties = Seq("file_size", "file_name", "somePropertyNotInJson")
-    val selectedMetadata = handler.toMetadataProperties(convertStringToJson(validBaseMetadataJsonString(expectedFilePath)), properties)
+    val selectedMetadata = handler.toMetadataProperties(convertStringToJson(validBaseMetadataJsonString(matchId, consignmentId, expectedFilePath)), properties)
     selectedMetadata.size shouldBe 2
     selectedMetadata.contains(MetadataProperty("file_size", "12")) shouldBe true
     selectedMetadata.contains(MetadataProperty("file_name", "file1.txt")) shouldBe true
   }
 
   "classifyMetadata" should "classify given metadata properties correctly" in {
-    val matchId = UUID.randomUUID()
-    val consignmentId = UUID.randomUUID()
-    val baseMetadataWithSuppliedAndCustom = s"""{
-      "file_size": "12",
-      "date_last_modified": "2025-07-03T09:19:47Z",
-      "file_name": "file1.txt",
-      "file_path": "sites/Retail/Shared Documents/file1.txt",
-      "client_side_checksum": "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2",
-      "matchId": "$matchId",
-      "transferId": "$consignmentId",
-      "description": "some kind of description",
-      "custom": "custom metadata value",
-      "closure status": "open"
-    }""".stripMargin
-
-    val sourceJson = convertStringToJson(baseMetadataWithSuppliedAndCustom)
+    val sourceJson = convertStringToJson(validBaseMetadataWithSuppliedAndCustom(matchId, consignmentId, expectedFilePath))
     val classifiedMetadata = handler.classifyMetadata(sourceJson)
     classifiedMetadata(MetadataClassification.Custom) shouldEqual expectedCustomMetadata
     classifiedMetadata(MetadataClassification.Supplied) shouldEqual expectedSuppliedMetadata
-    classifiedMetadata(MetadataClassification.System) shouldEqual expectedSystemMetadata
+    classifiedMetadata(MetadataClassification.System) shouldEqual expectedSystemMetadata(expectedFilePath)
   }
 }
