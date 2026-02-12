@@ -2,16 +2,20 @@ package uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.met
 
 import io.circe.syntax.EncoderOps
 import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper
-import uk.gov.nationalarchives.aggregate.processing.ExternalServiceSpec
+import uk.gov.nationalarchives.aggregate.processing.{ExternalServiceSpec, MetadataHelper}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.MetadataClassification
 
-class HardDriveMetadataHandlerSpec extends ExternalServiceSpec {
-  private val expectedFilePath = "content/folder/file1.txt"
+import java.util.UUID
+
+class HardDriveMetadataHandlerSpec extends ExternalServiceSpec with MetadataHelper {
+  private val expectedFilePath = "content/Retail/Shared Documents/file1.txt"
+  private val matchId = "matchId"
+  private val consignmentId = UUID.randomUUID()
 
   val hardDriveHandler: BaseMetadataHandler = HardDriveMetadataHandler.metadataHandler
 
   "normaliseValues" should "normalise only specified property values" in {
-    val hardDriveFilePathJson = """Z:\series\content\folder\file1.txt""".asJson
+    val hardDriveFilePathJson = """Z:\series\content\Retail\Shared Documents\file1.txt""".asJson
     val hardDriveDateLastModifiedJson = "2025-07-03T09:19:47".asJson
     val someOtherJson = "some other json value".asJson
 
@@ -31,18 +35,8 @@ class HardDriveMetadataHandlerSpec extends ExternalServiceSpec {
   }
 
   "convertToBaseMetadata" should "convert valid hard drive json with no default properties to base metadata json" in {
-    val rawHardDriveJsonString = """{
-                                   | "file_size": "12",
-                                   | "date_last_modified": "2025-07-03T09:19:47",
-                                   | "file_name": "file1.txt",
-                                   | "file_path": "Z:\\year_batch\\batch_number\\series\\content\\folder\\file1.txt",
-                                   | "checksum": "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2",
-                                   | "matchId": "matchId",
-                                   | "transferId": "consignmentId"
-    }""".stripMargin
-
-    val rawSharePointJson = convertStringToJson(rawHardDriveJsonString)
-    val expectedJson = convertStringToJson(validBaseMetadataJsonString(expectedFilePath))
+    val rawSharePointJson = convertStringToJson(hardDriveMetadataJsonString(matchId, defaultFileSize, consignmentId, None, None))
+    val expectedJson = convertStringToJson(validBaseMetadataJsonString(matchId, consignmentId, expectedFilePath))
 
     hardDriveHandler.convertToBaseMetadata(rawSharePointJson) shouldBe expectedJson
   }
@@ -55,14 +49,14 @@ class HardDriveMetadataHandlerSpec extends ExternalServiceSpec {
   }
 
   "toClientSideMetadataInput" should "convert valid base metadata json to ClientSideMetadataInput" in {
-    val input = hardDriveHandler.toClientSideMetadataInput(convertStringToJson(validBaseMetadataJsonString(expectedFilePath)))
+    val input = hardDriveHandler.toClientSideMetadataInput(convertStringToJson(validBaseMetadataJsonString(matchId, consignmentId, expectedFilePath)))
     input.isLeft shouldBe false
     input.map(i => {
       i.matchId shouldBe "matchId"
       i.checksum shouldBe "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2"
       i.fileSize shouldBe 12L
       i.lastModified shouldBe 1751534387000L
-      i.originalPath shouldBe "content/folder/file1.txt"
+      i.originalPath shouldBe expectedFilePath
     })
   }
 
@@ -74,17 +68,17 @@ class HardDriveMetadataHandlerSpec extends ExternalServiceSpec {
 
   "toMetadataProperties" should "return specified properties if exist in json" in {
     val properties = Seq("file_size", "file_name", "somePropertyNotInJson")
-    val selectedMetadata = hardDriveHandler.toMetadataProperties(convertStringToJson(validBaseMetadataJsonString(expectedFilePath)), properties)
+    val selectedMetadata = hardDriveHandler.toMetadataProperties(convertStringToJson(validBaseMetadataJsonString(matchId, consignmentId, expectedFilePath)), properties)
     selectedMetadata.size shouldBe 2
     selectedMetadata.contains(MetadataProperty("file_size", "12")) shouldBe true
     selectedMetadata.contains(MetadataProperty("file_name", "file1.txt")) shouldBe true
   }
 
   "classifyBaseMetadata" should "classify given metadata properties correctly" in {
-    val sourceJson = convertStringToJson(baseMetadataWithSuppliedAndCustom())
+    val sourceJson = convertStringToJson(validBaseMetadataWithSuppliedAndCustom(matchId, consignmentId, expectedFilePath))
     val classifiedMetadata = hardDriveHandler.classifyBaseMetadata(sourceJson)
     classifiedMetadata(MetadataClassification.Custom) shouldEqual expectedCustomMetadata
     classifiedMetadata(MetadataClassification.Supplied) shouldEqual expectedSuppliedMetadata
-    classifiedMetadata(MetadataClassification.System) shouldEqual expectedSystemMetadata
+    classifiedMetadata(MetadataClassification.System) shouldEqual expectedSystemMetadata(expectedFilePath)
   }
 }
