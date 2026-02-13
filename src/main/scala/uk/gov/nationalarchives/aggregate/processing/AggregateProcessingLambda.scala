@@ -1,6 +1,5 @@
 package uk.gov.nationalarchives.aggregate.processing
 
-import scala.collection.parallel.CollectionConverters._
 import cats.effect.IO
 import cats.effect.IO._
 import cats.effect.unsafe.implicits.global
@@ -21,10 +20,10 @@ import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorT
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorValue.{Failure, ReadError}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.AggregateProcessing
 import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling.BaseError
+import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.AssetProcessing
 import uk.gov.nationalarchives.aggregate.processing.modules.orchestration.TransferOrchestration
 import uk.gov.nationalarchives.aggregate.processing.modules.orchestration.TransferOrchestration.{AggregateProcessingEvent, OrchestrationResult}
 import uk.gov.nationalarchives.aggregate.processing.modules.{Common, ErrorHandling}
-import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.AssetProcessing
 import uk.gov.nationalarchives.aggregate.processing.persistence.GraphQlApi
 import uk.gov.nationalarchives.aggregate.processing.persistence.GraphQlApi.{backend, keycloakDeployment}
 import uk.gov.nationalarchives.aggregate.processing.utilities.DraftMetadataCSVWriter
@@ -32,6 +31,7 @@ import uk.gov.nationalarchives.aws.utils.s3.{S3Clients, S3Utils}
 
 import java.nio.file.Path
 import java.util.UUID
+import scala.collection.parallel.CollectionConverters._
 import scala.jdk.CollectionConverters.CollectionHasAsScala
 
 class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
@@ -98,7 +98,7 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
     AggregateProcessingError(Some(consignmentId), s"$AggregateProcessing.$S3Error.$ReadError", s"No $objectCategory objects found for consignment: $consignmentId")
 
   private def processAssets(userId: UUID, consignmentId: UUID, sourceBucket: String, objectKeys: List[String], dryRun: Boolean): IO[AssetProcessingResult] = {
-    for {
+    (for {
       assetProcessingResults <- IO(objectKeys.par.map(assetProcessor.processAsset(sourceBucket, _)).toList)
       assetProcessingErrors = assetProcessingResults.exists(_.processingErrors)
       suppliedMetadata = assetProcessingResults.exists(_.suppliedMetadata.nonEmpty)
@@ -114,14 +114,24 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
             _ <- persistenceApi.addClientSideMetadata(addFileAndMetadataInput)
             _ <-
               if (suppliedMetadata) {
-                logger.info("Creating draft metadata object")
-                val draftMetadataCSVWriter = new DraftMetadataCSVWriter()
-                val metadataCSV = draftMetadataCSVWriter.createMetadataCSV(assetProcessingResults)
-                uploadToS3(metadataCSV.toPath, draftMetadataBucket, s"$consignmentId/draft-metadata.csv")
+                createAndUploadDraftMetadata(assetProcessingResults, consignmentId)
               } else IO.unit
           } yield ()
         }
-    } yield AssetProcessingResult(assetProcessingErrors, suppliedMetadata)
+    } yield AssetProcessingResult(assetProcessingErrors, suppliedMetadata)).handleErrorWith { err =>
+      val error = AggregateProcessingError(Some(consignmentId), s"$AggregateProcessing", err.getMessage)
+      errorHandling.handleError(error, logger)
+      IO(errorProcessingResult)
+    }
+  }
+
+  private def createAndUploadDraftMetadata(assetProcessingResults: List[AssetProcessing.AssetProcessingResult], consignmentId: UUID): IO[Unit] = {
+    logger.info("Creating draft metadata object")
+    for {
+      draftMetadataCSVWriter <- IO(new DraftMetadataCSVWriter())
+      metadataCSV <- IO(draftMetadataCSVWriter.createMetadataCSV(assetProcessingResults))
+      _ <- uploadToS3(metadataCSV.toPath, draftMetadataBucket, s"$consignmentId/draft-metadata.csv")
+    } yield ()
   }
 
   private def uploadToS3(filePath: Path, bucket: String, key: String): IO[Unit] = {
