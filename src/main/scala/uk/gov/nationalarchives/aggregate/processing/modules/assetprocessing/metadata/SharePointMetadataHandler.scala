@@ -27,32 +27,27 @@ object SharePointMetadataHandler {
     SharePointLocationPath(pathComponents(1), pathComponents(2), pathComponents(3), pathComponents.slice(1, pathComponents.length).mkString("/"))
   }
 
-  private sealed trait SharePointProperty {
-    val baseProperty: BaseProperty
-    def normaliseFunction: Json => Json
+  private def normaliseFilePath(value: Json): Json = {
+    val originalValue = value.asString.get
+    sharePointLocationPathToFilePath(originalValue).filePath.asJson
+  }
+
+  private def normaliseDateTime(value: Json): Json = {
+    val originalValue = value.asString.get
+    t"$originalValue".getTime.toString.asJson
+  }
+
+  private def normaliseDateOnly(value: Json): Json = {
+    val dateTimeValue = value.asString.get + "T00:00:00Z"
+    t"$dateTimeValue".getTime.toString.asJson
   }
 
   private object NormalisePropertyValue {
     def normalise(id: String, value: Json): Json = id match {
-      case SharePointFilePath.baseProperty.id         => SharePointFilePath.normaliseFunction.apply(value)
-      case SharePointDateLastModified.baseProperty.id => SharePointDateLastModified.normaliseFunction.apply(value)
-      case _                                          => value
-    }
-  }
-
-  private case object SharePointFilePath extends SharePointProperty {
-    override val baseProperty: BaseProperty = FilePathProperty
-    override def normaliseFunction: Json => Json = (value: Json) => {
-      val originalValue = value.asString.get
-      sharePointLocationPathToFilePath(originalValue).filePath.asJson
-    }
-  }
-
-  private case object SharePointDateLastModified extends SharePointProperty {
-    override val baseProperty: BaseProperty = DateLastModifiedProperty
-    override def normaliseFunction: Json => Json = (value: Json) => {
-      val originalValue = value.asString.get
-      t"$originalValue".getTime.toString.asJson
+      case FilePathProperty.id                                                           => normaliseFilePath(value)
+      case DateLastModifiedProperty.id                                                   => normaliseDateTime(value)
+      case ClosureStartDateProperty.id | EndDateProperty.id | FoiScheduleDateProperty.id => normaliseDateOnly(value)
+      case _                                                                             => value
     }
   }
 
