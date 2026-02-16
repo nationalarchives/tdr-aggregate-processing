@@ -331,10 +331,10 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
             .withUrl(s"/draftMetadataBucket/$consignmentId/draft-metadata.csv")
             .withRequestBody(
               containing(
-                "filepath,filename,date last modified,date of the record,description,former reference,closure status,closure start date,closure period,foi exemption code,foi schedule date,is filename closed,alternate filename,is description closed,alternate description,language,translated filename,copyright,related material,restrictions on use,evidence provided by"
+                "filepath,filename,date last modified,date of the record,description,former reference,closure status,closure start date,closure period,foi exemption code,foi schedule date,is filename closed,alternate filename,is description closed,alternate description,language,translated filename,copyright,copyright details,related material,restrictions on use,evidence provided by,note"
               )
             )
-            .withRequestBody(containing(s"$expectedFilePath,file1.txt,2025-07-03,,some kind of description,,Open,,,,,No,,No,,English,,Crown copyright,,,"))
+            .withRequestBody(containing(s"$expectedFilePath,file1.txt,2025-07-03,,some kind of description,,Open,,,,,No,,No,,English,,Crown,,,,,"))
         )
       }
   }

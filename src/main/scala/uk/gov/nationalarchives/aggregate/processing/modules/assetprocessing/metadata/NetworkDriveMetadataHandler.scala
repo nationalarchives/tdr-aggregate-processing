@@ -12,23 +12,15 @@ object NetworkDriveMetadataHandler {
   private val suppliedProperties: Seq[String] = metadataConfig.getPropertiesByPropertyType(Supplied.toString)
   private val systemProperties: Seq[String] = metadataConfig.getPropertiesByPropertyType(System.toString)
 
-  private sealed trait NetworkDriveProperty {
-    val baseProperty: BaseProperty
-    def normaliseFunction: Json => Json
+  private def normaliseFilePath(value: Json): Json = {
+    val originalValue = value.asString.get
+    originalValue.replace("\\", "/").asJson
   }
 
   private object NormalisePropertyValue {
     def normalise(id: String, value: Json): Json = id match {
-      case NetworkDriveFilePath.baseProperty.id => NetworkDriveFilePath.normaliseFunction.apply(value)
-      case _                                    => value
-    }
-  }
-
-  private case object NetworkDriveFilePath extends NetworkDriveProperty {
-    override val baseProperty: BaseProperty = FilePathProperty
-    override def normaliseFunction: Json => Json = (value: Json) => {
-      val originalValue = value.asString.get
-      originalValue.replace("\\", "/").asJson
+      case FilePathProperty.id => normaliseFilePath(value)
+      case _                   => value
     }
   }
 

@@ -53,6 +53,8 @@ class DraftMetadataCSVWriterSpec extends AnyFlatSpec with Matchers with MockitoS
       "legal copyright",
       "",
       "",
+      "",
+      "",
       ""
     )
   }
@@ -69,7 +71,7 @@ class DraftMetadataCSVWriterSpec extends AnyFlatSpec with Matchers with MockitoS
     val actual = writer.createMetadataCSV(List(assetProcessingResults))
     val csvContent: List[List[String]] = CSVReader.open(actual).all()
     checkHeaders(csvContent)
-    csvContent(1) shouldBe List("", "", "2022-03-15", "", "", "", "Open", "", "", "", "", "No", "", "No", "", "English", "", "Crown copyright", "", "", "")
+    csvContent(1) shouldBe List("", "", "2022-03-15", "", "", "", "Open", "", "", "", "", "No", "", "No", "", "English", "", "Crown", "", "", "", "", "")
   }
 
   "convertValue" should "return empty string where date value is empty" in {
@@ -84,7 +86,7 @@ class DraftMetadataCSVWriterSpec extends AnyFlatSpec with Matchers with MockitoS
     val actual = writer.createMetadataCSV(List(assetProcessingResults))
     val csvContent: List[List[String]] = CSVReader.open(actual).all()
     checkHeaders(csvContent)
-    csvContent(1) shouldBe List("", "", "", "", "", "", "Open", "", "", "", "", "No", "", "No", "", "English", "", "Crown copyright", "", "", "")
+    csvContent(1) shouldBe List("", "", "", "", "", "", "Open", "", "", "", "", "No", "", "No", "", "English", "", "Crown", "", "", "", "", "")
   }
 
   it should "convert boolean true -> Yes and false -> No" in {
@@ -100,11 +102,11 @@ class DraftMetadataCSVWriterSpec extends AnyFlatSpec with Matchers with MockitoS
     val actual = writer.createMetadataCSV(List(assetProcessingResults))
     val csvContent: List[List[String]] = CSVReader.open(actual).all()
     checkHeaders(csvContent)
-    csvContent(1) shouldBe List("", "", "", "", "", "", "Open", "", "", "", "", "Yes", "", "No", "", "English", "", "Crown copyright", "", "", "")
+    csvContent(1) shouldBe List("", "", "", "", "", "", "Open", "", "", "", "", "Yes", "", "No", "", "English", "", "Crown", "", "", "", "", "")
   }
 
   private def checkHeaders(csvContent: List[List[String]]) = {
-    csvContent.head.size shouldBe 21
+    csvContent.head.size shouldBe 23
     csvContent.head should contain allOf (
       "filepath",
       "filename",
@@ -124,9 +126,11 @@ class DraftMetadataCSVWriterSpec extends AnyFlatSpec with Matchers with MockitoS
       "language",
       "translated filename",
       "copyright",
+      "copyright details",
       "related material",
       "restrictions on use",
-      "evidence provided by"
+      "evidence provided by",
+      "note"
     )
   }
 }

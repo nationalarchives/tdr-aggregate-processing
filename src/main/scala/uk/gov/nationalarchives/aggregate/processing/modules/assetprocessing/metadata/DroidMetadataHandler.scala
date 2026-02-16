@@ -20,33 +20,22 @@ object DroidMetadataHandler {
   private val suppliedProperties: Seq[String] = metadataConfig.getPropertiesByPropertyType(Supplied.toString)
   private val systemProperties: Seq[String] = metadataConfig.getPropertiesByPropertyType(System.toString)
 
-  private sealed trait DroidProperty {
-    val baseProperty: BaseProperty
-    def normaliseFunction: Json => Json
+  private def normaliseFilePath(value: Json): Json = {
+    val originalValue = value.asString.get
+    val replaceBackSlashes = originalValue.replace("\\", "/")
+    replaceBackSlashes.drop(replaceBackSlashes.indexOfSlice("Content/")).mkString.asJson
+  }
+
+  private def normaliseDateTime(value: Json): Json = {
+    val originalValue = value.asString.get + "Z"
+    t"$originalValue".getTime.toString.asJson
   }
 
   private object NormalisePropertyValue {
     def normalise(id: String, value: Json): Json = id match {
-      case DroidFilePath.baseProperty.id         => DroidFilePath.normaliseFunction.apply(value)
-      case DroidDateLastModified.baseProperty.id => DroidDateLastModified.normaliseFunction.apply(value)
-      case _                                     => value
-    }
-  }
-
-  private case object DroidFilePath extends DroidProperty {
-    override val baseProperty: BaseProperty = FilePathProperty
-    override def normaliseFunction: Json => Json = (value: Json) => {
-      val originalValue = value.asString.get
-      val replaceBackSlashes = originalValue.replace("\\", "/")
-      replaceBackSlashes.drop(replaceBackSlashes.indexOfSlice("Content/")).mkString.asJson
-    }
-  }
-
-  private case object DroidDateLastModified extends DroidProperty {
-    override val baseProperty: BaseProperty = DateLastModifiedProperty
-    override def normaliseFunction: Json => Json = (value: Json) => {
-      val originalValue = value.asString.get + "Z"
-      t"$originalValue".getTime.toString.asJson
+      case FilePathProperty.id         => normaliseFilePath(value)
+      case DateLastModifiedProperty.id => normaliseDateTime(value)
+      case _                           => value
     }
   }
 
