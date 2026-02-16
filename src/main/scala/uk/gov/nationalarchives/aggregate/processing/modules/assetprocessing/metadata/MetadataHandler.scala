@@ -26,8 +26,16 @@ case object ClientSideChecksumProperty extends BaseProperty {
   val id: String = "client_side_checksum"
 }
 
+case object ClosureStartDateProperty extends BaseProperty {
+  val id: String = "closure_start_date"
+}
+
 case object DateLastModifiedProperty extends BaseProperty {
   val id: String = "date_last_modified"
+}
+
+case object EndDateProperty extends BaseProperty {
+  val id: String = "end_date"
 }
 
 case object FileNameProperty extends BaseProperty {
@@ -44,6 +52,10 @@ case object FileSizeProperty extends BaseProperty {
 
 case object FoiExemptionCodeProperty extends BaseProperty {
   val id: String = "foi_exemption_code"
+}
+
+case object FoiScheduleDateProperty extends BaseProperty {
+  val id: String = "foi_schedule_date"
 }
 
 case object MatchIdProperty extends BaseProperty {
