@@ -18,9 +18,9 @@ import uk.gov.nationalarchives.aggregate.processing.modules.Common.ObjectCategor
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ObjectCategory.ObjectCategory
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorType.{ClientDataLoadError, S3Error}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorValue.{Failure, ReadError}
-import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.AggregateProcessing
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.{AggregateProcessing, AssetProcessing}
 import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling.BaseError
-import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.AssetProcessing
+import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.{AssetProcessing => AssetProcessingModule}
 import uk.gov.nationalarchives.aggregate.processing.modules.orchestration.TransferOrchestration
 import uk.gov.nationalarchives.aggregate.processing.modules.orchestration.TransferOrchestration.{AggregateProcessingEvent, OrchestrationResult}
 import uk.gov.nationalarchives.aggregate.processing.modules.{Common, ErrorHandling}
@@ -36,7 +36,7 @@ import scala.jdk.CollectionConverters.CollectionHasAsScala
 
 class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
   implicit val sharepointInputDecoder: Decoder[AggregateEvent] = deriveDecoder[AggregateEvent]
-  private val assetProcessor = AssetProcessing()
+  private val assetProcessor = AssetProcessingModule()
   private val persistenceApi = GraphQlApi()
   private val orchestrator = TransferOrchestration()
   private lazy val errorHandling = ErrorHandling()
@@ -114,18 +114,18 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
             _ <- persistenceApi.addClientSideMetadata(addFileAndMetadataInput)
             _ <-
               if (suppliedMetadata) {
-                createAndUploadDraftMetadata(assetProcessingResults, consignmentId)
+                handleSuppliedMetadata(assetProcessingResults, consignmentId)
               } else IO.unit
           } yield ()
         }
     } yield AssetProcessingResult(assetProcessingErrors, suppliedMetadata)).handleErrorWith { err =>
-      val error = AggregateProcessingError(Some(consignmentId), s"$AggregateProcessing", err.getMessage)
+      val error = AggregateProcessingError(Some(consignmentId), s"$AggregateProcessing.$AssetProcessing.$Failure", err.getMessage)
       errorHandling.handleError(error, logger)
       IO(errorProcessingResult)
     }
   }
 
-  private def createAndUploadDraftMetadata(assetProcessingResults: List[AssetProcessing.AssetProcessingResult], consignmentId: UUID): IO[Unit] = {
+  private def handleSuppliedMetadata(assetProcessingResults: List[AssetProcessingModule.AssetProcessingResult], consignmentId: UUID): IO[Unit] = {
     logger.info("Creating draft metadata object")
     for {
       draftMetadataCSVWriter <- IO(new DraftMetadataCSVWriter())
