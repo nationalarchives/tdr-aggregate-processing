@@ -6,7 +6,7 @@ import com.amazonaws.services.lambda.runtime.events.SQSEvent.SQSMessage
 import com.github.tomakehurst.wiremock.client.WireMock._
 import org.mockito.MockitoSugar.mock
 import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper
-import org.scalatest.prop.{TableDrivenPropertyChecks, TableFor1, TableFor2, TableFor3}
+import org.scalatest.prop.{TableDrivenPropertyChecks, TableFor3}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.AssetSource
 
@@ -288,6 +288,70 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
 
       wiremockGraphqlServer.verify(
         exactly(0),
+        postRequestedFor(anyUrl())
+          .withUrl("/graphql")
+      )
+    }
+
+    s"'handleRequest' with asset source $assetSource" should "throw an error for invalid custom metadata date in supplied metadata" in {
+      val invalidSuppliedFields = """"closure_type": "Open","description": "some kind of description","date_x0020_of_x0020_the_x0020_record": "17/02/2026""""
+
+      val metadata = metadataJsonString(matchId, defaultFileSize, consignmentId, Some(invalidSuppliedFields), None)
+      authOkJson()
+      mockS3GetObjectTagging(objectKey)
+      mockS3GetObjectStream(objectKey, metadata)
+      mockS3ListBucketResponse(userId, consignmentId, List(matchId), assetSource)
+      mockSfnResponseOk()
+      mockGraphQlAddFilesAndMetadataResponse
+      mockGraphQlUpdateConsignmentStatusResponse
+      mockGraphQlGetConsignmentResponse
+      mockGraphQlUpdateParentFolderResponse
+
+      val mockContext = mock[Context]
+
+      val validMessageBody: String =
+        s"""
+            {
+              "metadataSourceBucket": "source-bucket",
+              "metadataSourceObjectPrefix": "$userId/$assetSource/$consignmentId/$category",
+              "dataLoadErrors": false
+            }
+            """.stripMargin
+
+      val message = new SQSMessage()
+      message.setBody(validMessageBody)
+      val messages: java.util.List[SQSMessage] = List(message).asJava
+      val sqsEvent = new SQSEvent()
+      sqsEvent.setRecords(messages)
+
+      new AggregateProcessingLambda().handleRequest(sqsEvent, mockContext)
+
+      wiremockS3.verify(
+        exactly(1),
+        getRequestedFor(anyUrl())
+          .withUrl(s"/?list-type=2&max-keys=1000&prefix=$userId%2F$assetSource%2F$consignmentId%2F$category")
+      )
+
+      wiremockS3.verify(
+        exactly(3),
+        getRequestedFor(anyUrl())
+          .withUrl(s"/$objectKey")
+      )
+
+      wiremockS3.verify(
+        exactly(2),
+        getRequestedFor(anyUrl())
+          .withUrl(s"/$objectKey?tagging")
+      )
+
+      wiremockSfnServer.verify(
+        exactly(0),
+        postRequestedFor(anyUrl())
+          .withRequestBody(containing(s"transfer_service_$consignmentId"))
+      )
+
+      wiremockGraphqlServer.verify(
+        exactly(2),
         postRequestedFor(anyUrl())
           .withUrl("/graphql")
       )
