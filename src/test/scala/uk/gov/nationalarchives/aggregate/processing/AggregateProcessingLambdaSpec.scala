@@ -30,12 +30,25 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
 
   val assetSources: TableFor4[String, (String, Long, UUID, Option[String], Option[String]) => String, String, String] = Table(
     ("Asset Source", "Metadata Json String", "Expected File Path", "Invalid Supplied Metadata"),
-    (AssetSource.HardDrive.toString.toLowerCase, hardDriveMetadataJsonString, "content/Retail/Shared Documents/file1.txt", """"closure_type": "Open","description": "some kind of description","date_last_modified": "2025-13-45T25:99:99""""),
-    (AssetSource.NetworkDrive.toString.toLowerCase, networkDriveJsonString, "", """"closure_type": "Open","description": "some kind of description","lastModified": "17/02/2026""""),
-    (AssetSource.SharePoint.toString.toLowerCase, sharePointMetadataJsonString, "", """"closure_type": "Open","description": "some kind of description","date_x0020_of_x0020_the_x0020_record": "17/02/2026"""")
+    (
+      AssetSource.HardDrive.toString.toLowerCase,
+      hardDriveMetadataJsonString,
+      "content/Retail/Shared Documents/file1.txt",
+      """"closure_type": "Open","description": "some kind of description","date_last_modified": "2025-13-45T25:99:99""""
+    ),
+    (
+      AssetSource.NetworkDrive.toString.toLowerCase,
+      networkDriveJsonString,
+      "",
+      """"closure_type": "Open","description": "some kind of description","lastModified": "17/02/2026""""
+    ),
+    (
+      AssetSource.SharePoint.toString.toLowerCase,
+      sharePointMetadataJsonString,
+      "",
+      """"closure_type": "Open","description": "some kind of description","date_x0020_of_x0020_the_x0020_record": "17/02/2026""""
+    )
   )
-
-
 
   forAll(assetSources) { (assetSource, metadataJsonString, expectedFilePath, invalidSuppliedMetadata) =>
     val objectKey = s"$userId/$assetSource/$consignmentId/$category/$matchId.metadata"
@@ -339,12 +352,12 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
           .withUrl(s"/$objectKey")
       )
 
-      if(assetSource == AssetSource.NetworkDrive.toString.toLowerCase) {
-      wiremockS3.verify(
-        exactly(2),
-        getRequestedFor(anyUrl())
-          .withUrl(s"/$objectKey?tagging")
-      )
+      if (assetSource == AssetSource.NetworkDrive.toString.toLowerCase) {
+        wiremockS3.verify(
+          exactly(2),
+          getRequestedFor(anyUrl())
+            .withUrl(s"/$objectKey?tagging")
+        )
       } else {
         wiremockS3.verify(
           exactly(1),
