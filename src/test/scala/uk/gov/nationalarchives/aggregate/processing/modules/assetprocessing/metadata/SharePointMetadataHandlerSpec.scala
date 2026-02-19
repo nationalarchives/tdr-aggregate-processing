@@ -11,23 +11,19 @@ class SharePointMetadataHandlerSpec extends ExternalServiceSpec with MetadataHel
   private val expectedFilePath = "sites/Retail/Shared Documents/file1.txt"
   private val matchId = "matchId"
   private val consignmentId = UUID.randomUUID()
-  private val dateOnlyString = "2025-07-03"
 
   val handler: BaseMetadataHandler = SharePointMetadataHandler.metadataHandler
 
   "normaliseValues" should "normalise only specified property values" in {
-    val closureStartDateJson = dateOnlyString.asJson
-    val dateLastModifiedJson = "2025-07-03T09:19:47Z".asJson
-    val endDateJson = dateOnlyString.asJson
+    val dateTimeJson = "2025-07-03T09:19:47Z".asJson
     val filePathJson = "/sites/Retail/Shared Documents/file1.txt".asJson
-    val foiScheduleDateJson = dateOnlyString.asJson
     val someOtherJson = "some other json value".asJson
 
-    handler.normaliseValues("closure_start_date", closureStartDateJson) shouldBe "1751500800000".asJson
-    handler.normaliseValues("date_last_modified", dateLastModifiedJson) shouldBe "1751534387000".asJson
-    handler.normaliseValues("end_date", endDateJson) shouldBe "1751500800000".asJson
+    handler.normaliseValues("closure_start_date", dateTimeJson) shouldBe "1751534387000".asJson
+    handler.normaliseValues("date_last_modified", dateTimeJson) shouldBe "1751534387000".asJson
+    handler.normaliseValues("end_date", dateTimeJson) shouldBe "1751534387000".asJson
     handler.normaliseValues("file_path", filePathJson) shouldBe expectedFilePath.asJson
-    handler.normaliseValues("foi_schedule_date", foiScheduleDateJson) shouldBe "1751500800000".asJson
+    handler.normaliseValues("foi_schedule_date", dateTimeJson) shouldBe "1751534387000".asJson
     handler.normaliseValues("some_other_property", someOtherJson) shouldBe someOtherJson
   }
 

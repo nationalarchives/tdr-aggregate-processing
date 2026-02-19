@@ -37,17 +37,11 @@ object SharePointMetadataHandler {
     t"$originalValue".getTime.toString.asJson
   }
 
-  private def normaliseDateOnly(value: Json): Json = {
-    val dateTimeValue = value.asString.get + "T00:00:00Z"
-    t"$dateTimeValue".getTime.toString.asJson
-  }
-
   private object NormalisePropertyValue {
     def normalise(id: String, value: Json): Json = id match {
-      case FilePathProperty.id                                                           => normaliseFilePath(value)
-      case DateLastModifiedProperty.id                                                   => normaliseDateTime(value)
-      case ClosureStartDateProperty.id | EndDateProperty.id | FoiScheduleDateProperty.id => normaliseDateOnly(value)
-      case _                                                                             => value
+      case FilePathProperty.id                                                                                         => normaliseFilePath(value)
+      case DateLastModifiedProperty.id | ClosureStartDateProperty.id | EndDateProperty.id | FoiScheduleDateProperty.id => normaliseDateTime(value)
+      case _                                                                                                           => value
     }
   }
 
