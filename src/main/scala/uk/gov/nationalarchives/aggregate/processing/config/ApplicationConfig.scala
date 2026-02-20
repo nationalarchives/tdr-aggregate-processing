@@ -19,6 +19,7 @@ object ApplicationConfig {
   val draftMetadataBucket: String = configFactory.getString("s3.draftMetadataBucket")
   val malwareScanKey: String = configFactory.getString("guardDuty.malware_scan_tag_key")
   val malwareScanThreatFound: String = configFactory.getString("guardDuty.malware_scan_threat_found_value")
+  val maxIndividualFileSizeMb: Long = configFactory.getLong("maxIndividualFileSizeMb")
 
   def getClientSecret(secretPath: String = authClientSecretPath): String = {
     val ssmClient = SSMClients.ssm(ssmEndpoint)
