@@ -8,7 +8,6 @@ import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.I
 import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.AssetProcessing.{AssetProcessingError, AssetProcessingEvent}
 
 class FileSizeCheck extends InitialCheck {
-  // TODO: value should come from configuration
   private val maxIndividualFileSizeBytes = maxIndividualFileSizeMb * 1000000L
 
   private def error(errorCode: String, fileSize: Long, event: AssetProcessingEvent): AssetProcessingError = {
