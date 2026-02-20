@@ -1,6 +1,7 @@
 package uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.initialchecks
 
 import graphql.codegen.types.ClientSideMetadataInput
+import uk.gov.nationalarchives.aggregate.processing.config.ApplicationConfig.maxIndividualFileSizeMb
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorType.ObjectSizeError
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorValue.{TooBigError, TooSmallError}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.InitialChecks
@@ -8,7 +9,7 @@ import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.Asse
 
 class FileSizeCheck extends InitialCheck {
   // TODO: value should come from configuration
-  private val maxIndividualFileSizeBytes = 2000L * 1000000L
+  private val maxIndividualFileSizeBytes = maxIndividualFileSizeMb * 1000000L
 
   private def error(errorCode: String, fileSize: Long, event: AssetProcessingEvent): AssetProcessingError = {
     val transferId = event.consignmentId
