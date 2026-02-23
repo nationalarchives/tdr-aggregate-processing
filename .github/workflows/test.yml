@@ -7,7 +7,7 @@ on:
       - release-*
 jobs:
   test:
-    uses: nationalarchives/tdr-github-actions/.github/workflows/tdr_test.yml@f52edf22c81f568202369a3b31da0277541b0507 # v.0.0.11
+    uses: nationalarchives/tdr-github-actions/.github/workflows/tdr_test.yml@b6ba669dcee7fd4ac089c2e9fb234c48ddd93ab5 # v.0.0.15
     with:
       repo-name: tdr-aggregate-processing
       test-command: |
