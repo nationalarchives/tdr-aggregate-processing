@@ -48,7 +48,7 @@ class BaseMetadataHandler(
   }
 
   def convertToBaseMetadata(sourceJson: Json): Json = {
-    val metadata = sourceJson.asObject.get.toMap
+    val metadata = sourceJson.deepDropNullValues.asObject.get.toMap
       .map(fv => {
         val originalField = fv._1
         val field = sourceToBasePropertiesMapper(originalField)
