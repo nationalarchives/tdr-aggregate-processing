@@ -54,8 +54,8 @@ case object FoiExemptionCodeProperty extends BaseProperty {
   val id: String = "foi_exemption_code"
 }
 
-case object FoiScheduleDateProperty extends BaseProperty {
-  val id: String = "foi_schedule_date"
+case object FoiExemptionAssertedProperty extends BaseProperty {
+  val id: String = "foi_exemption_asserted"
 }
 
 case object MatchIdProperty extends BaseProperty {

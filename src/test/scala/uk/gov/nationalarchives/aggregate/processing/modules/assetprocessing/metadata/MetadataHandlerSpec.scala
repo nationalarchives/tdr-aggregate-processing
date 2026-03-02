@@ -16,7 +16,7 @@ class MetadataHandlerSpec extends ExternalServiceSpec {
     FilePathProperty.id shouldBe "file_path"
     FileSizeProperty.id shouldBe "file_size"
     FoiExemptionCodeProperty.id shouldBe "foi_exemption_code"
-    FoiScheduleDateProperty.id shouldBe "foi_schedule_date"
+    FoiExemptionAssertedProperty.id shouldBe "foi_exemption_asserted"
     MatchIdProperty.id shouldBe "matchId"
     TransferIdProperty.id shouldBe "transferId"
     TitleClosedProperty.id shouldBe "title_closed"
