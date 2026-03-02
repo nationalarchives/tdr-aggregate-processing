@@ -23,7 +23,8 @@ class SharePointMetadataHandlerSpec extends ExternalServiceSpec with MetadataHel
     handler.normaliseValues("date_last_modified", dateTimeJson) shouldBe "1751534387000".asJson
     handler.normaliseValues("end_date", dateTimeJson) shouldBe "1751534387000".asJson
     handler.normaliseValues("file_path", filePathJson) shouldBe expectedFilePath.asJson
-    handler.normaliseValues("foi_schedule_date", dateTimeJson) shouldBe "1751534387000".asJson
+    handler.normaliseValues("foi_exemption_asserted", dateTimeJson) shouldBe "1751534387000".asJson
+    handler.normaliseValues("closure_period", 20.asJson) shouldBe "20".asJson
     handler.normaliseValues("some_other_property", someOtherJson) shouldBe someOtherJson
   }
 
