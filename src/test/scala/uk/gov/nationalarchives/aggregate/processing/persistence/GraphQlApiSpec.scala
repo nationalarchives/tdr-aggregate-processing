@@ -6,6 +6,7 @@ import com.typesafe.scalalogging.Logger
 import graphql.codegen.AddConsignmentStatus.{addConsignmentStatus => acs}
 import graphql.codegen.AddFilesAndMetadata.{addFilesAndMetadata => afm}
 import graphql.codegen.GetConsignment.{getConsignment => gc}
+import graphql.codegen.UpdateClientSideDraftMetadataFileName.{updateClientSideDraftMetadataFileName => ucsdmfn}
 import graphql.codegen.UpdateConsignmentStatus.{updateConsignmentStatus => ucs}
 import graphql.codegen.UpdateParentFolder.{updateParentFolder => upf}
 import graphql.codegen.types.{AddFileAndMetadataInput, ClientSideMetadataInput, ConsignmentStatusInput, UpdateParentFolderInput}
@@ -36,12 +37,21 @@ class GraphQlApiSpec extends ExternalServiceSpec {
   private val addFilesAndMetadataClient = mock[GraphQLClient[afm.Data, afm.Variables]]
   private val getConsignmentClient = mock[GraphQLClient[gc.Data, gc.Variables]]
   private val updateParentFolderClient = mock[GraphQLClient[upf.Data, upf.Variables]]
+  private val updateDraftMetadataFileNameClient = mock[GraphQLClient[ucsdmfn.Data, ucsdmfn.Variables]]
 
   "addClientSideMetadata" should "add client side metadata with the given arguments" in {
     val mockLogger = mock[UnderlyingLogger]
     val mockApiResponse = List[afm.AddFilesAndMetadata]()
 
-    val api = new GraphQlApi(keycloak, updateConsignmentStatusClient, addConsignmentStatusClient, addFilesAndMetadataClient, getConsignmentClient, updateParentFolderClient)(
+    val api = new GraphQlApi(
+      keycloak,
+      updateConsignmentStatusClient,
+      addConsignmentStatusClient,
+      addFilesAndMetadataClient,
+      getConsignmentClient,
+      updateParentFolderClient,
+      updateDraftMetadataFileNameClient
+    )(
       Logger(mockLogger),
       tdrKeycloakDeployment,
       backend
@@ -91,7 +101,15 @@ class GraphQlApiSpec extends ExternalServiceSpec {
 
     val input = AddFileAndMetadataInput(consignmentId, Nil, None, Some(overrideUserId))
 
-    val api = new GraphQlApi(keycloak, updateConsignmentStatusClient, addConsignmentStatusClient, addFilesAndMetadataClient, getConsignmentClient, updateParentFolderClient)(
+    val api = new GraphQlApi(
+      keycloak,
+      updateConsignmentStatusClient,
+      addConsignmentStatusClient,
+      addFilesAndMetadataClient,
+      getConsignmentClient,
+      updateParentFolderClient,
+      updateDraftMetadataFileNameClient
+    )(
       Logger(mockLogger),
       tdrKeycloakDeployment,
       backend
@@ -108,7 +126,15 @@ class GraphQlApiSpec extends ExternalServiceSpec {
   "updateConsignmentStatus" should "update the consignment status with the given arguments" in {
     val mockLogger = mock[UnderlyingLogger]
 
-    val api = new GraphQlApi(keycloak, updateConsignmentStatusClient, addConsignmentStatusClient, addFilesAndMetadataClient, getConsignmentClient, updateParentFolderClient)(
+    val api = new GraphQlApi(
+      keycloak,
+      updateConsignmentStatusClient,
+      addConsignmentStatusClient,
+      addFilesAndMetadataClient,
+      getConsignmentClient,
+      updateParentFolderClient,
+      updateDraftMetadataFileNameClient
+    )(
       Logger(mockLogger),
       tdrKeycloakDeployment,
       backend
@@ -153,7 +179,15 @@ class GraphQlApiSpec extends ExternalServiceSpec {
       .when(updateConsignmentStatusClient)
       .getResult[Identity](any[BearerAccessToken], any[Document], any[Option[ucs.Variables]])(any[SttpBackend[Identity, Any]], any[ClassTag[Identity[_]]])
 
-    val api = new GraphQlApi(keycloak, updateConsignmentStatusClient, addConsignmentStatusClient, addFilesAndMetadataClient, getConsignmentClient, updateParentFolderClient)(
+    val api = new GraphQlApi(
+      keycloak,
+      updateConsignmentStatusClient,
+      addConsignmentStatusClient,
+      addFilesAndMetadataClient,
+      getConsignmentClient,
+      updateParentFolderClient,
+      updateDraftMetadataFileNameClient
+    )(
       Logger(mockLogger),
       tdrKeycloakDeployment,
       backend
@@ -170,7 +204,15 @@ class GraphQlApiSpec extends ExternalServiceSpec {
   "getConsignmentDetails" should "return details for a consignment given a consignment id" in {
     val mockLogger = mock[UnderlyingLogger]
 
-    val api = new GraphQlApi(keycloak, updateConsignmentStatusClient, addConsignmentStatusClient, addFilesAndMetadataClient, getConsignmentClient, updateParentFolderClient)(
+    val api = new GraphQlApi(
+      keycloak,
+      updateConsignmentStatusClient,
+      addConsignmentStatusClient,
+      addFilesAndMetadataClient,
+      getConsignmentClient,
+      updateParentFolderClient,
+      updateDraftMetadataFileNameClient
+    )(
       Logger(mockLogger),
       tdrKeycloakDeployment,
       backend
@@ -202,7 +244,15 @@ class GraphQlApiSpec extends ExternalServiceSpec {
   "getConsignmentDetails" should "throw an error when getting consignment fails" in {
     val mockLogger = mock[UnderlyingLogger]
 
-    val api = new GraphQlApi(keycloak, updateConsignmentStatusClient, addConsignmentStatusClient, addFilesAndMetadataClient, getConsignmentClient, updateParentFolderClient)(
+    val api = new GraphQlApi(
+      keycloak,
+      updateConsignmentStatusClient,
+      addConsignmentStatusClient,
+      addFilesAndMetadataClient,
+      getConsignmentClient,
+      updateParentFolderClient,
+      updateDraftMetadataFileNameClient
+    )(
       Logger(mockLogger),
       tdrKeycloakDeployment,
       backend
@@ -233,7 +283,15 @@ class GraphQlApiSpec extends ExternalServiceSpec {
   "addParentFolder" should "add parent folder with the given arguments" in {
     val mockLogger = mock[UnderlyingLogger]
 
-    val api = new GraphQlApi(keycloak, updateConsignmentStatusClient, addConsignmentStatusClient, addFilesAndMetadataClient, getConsignmentClient, updateParentFolderClient)(
+    val api = new GraphQlApi(
+      keycloak,
+      updateConsignmentStatusClient,
+      addConsignmentStatusClient,
+      addFilesAndMetadataClient,
+      getConsignmentClient,
+      updateParentFolderClient,
+      updateDraftMetadataFileNameClient
+    )(
       Logger(mockLogger),
       tdrKeycloakDeployment,
       backend
@@ -281,7 +339,15 @@ class GraphQlApiSpec extends ExternalServiceSpec {
 
     val input = UpdateParentFolderInput(consignmentId, parentFolder, Some(overrideUserId))
 
-    val api = new GraphQlApi(keycloak, updateConsignmentStatusClient, addConsignmentStatusClient, addFilesAndMetadataClient, getConsignmentClient, updateParentFolderClient)(
+    val api = new GraphQlApi(
+      keycloak,
+      updateConsignmentStatusClient,
+      addConsignmentStatusClient,
+      addFilesAndMetadataClient,
+      getConsignmentClient,
+      updateParentFolderClient,
+      updateDraftMetadataFileNameClient
+    )(
       Logger(mockLogger),
       tdrKeycloakDeployment,
       backend
@@ -293,5 +359,85 @@ class GraphQlApiSpec extends ExternalServiceSpec {
 
     verify(mockLogger).info("Add parent folder for consignment: {}", consignmentId)
     exception.getMessage shouldBe s"Unable to add parent folder: $consignmentId"
+  }
+
+  "addDraftMetadataFileName" should "add draft metadata file name with the given arguments" in {
+    val mockLogger = mock[UnderlyingLogger]
+
+    val api = new GraphQlApi(
+      keycloak,
+      updateConsignmentStatusClient,
+      addConsignmentStatusClient,
+      addFilesAndMetadataClient,
+      getConsignmentClient,
+      updateParentFolderClient,
+      updateDraftMetadataFileNameClient
+    )(
+      Logger(mockLogger),
+      tdrKeycloakDeployment,
+      backend
+    )
+    val consignmentId = UUID.randomUUID()
+    val overrideUserId = UUID.randomUUID()
+    val fileName = "draft-metadata.csv"
+    val inputVariablesCaptor: ArgumentCaptor[Option[ucsdmfn.Variables]] = ArgumentCaptor.forClass(classOf[Option[ucsdmfn.Variables]])
+
+    when(mockLogger.isInfoEnabled()).thenReturn(true)
+
+    doAnswer(() => Future(new BearerAccessToken("token")))
+      .when(keycloak)
+      .serviceAccountToken[Identity](any[String], any[String])(any[SttpBackend[Identity, Any]], any[ClassTag[Identity[_]]], any[TdrKeycloakDeployment])
+
+    doAnswer(() => Future(GraphQlResponse[ucsdmfn.Data](Option(ucsdmfn.Data(Some(1))), Nil)))
+      .when(updateDraftMetadataFileNameClient)
+      .getResult[Identity](any[BearerAccessToken], any[Document], inputVariablesCaptor.capture())(any[SttpBackend[Identity, Any]], any[ClassTag[Identity[_]]])
+
+    api.addDraftMetadataFileName(consignmentId, fileName).unsafeRunSync()
+    val inputArgs = inputVariablesCaptor.getValue.get.updateClientSideDraftMetadataFileNameInput
+    inputArgs.consignmentId shouldBe consignmentId
+    inputArgs.clientSideDraftMetadataFileName shouldBe fileName
+
+    verify(mockLogger).info("Add draft metadata file name for consignment: {}", consignmentId)
+    verify(mockLogger, times(0)).isErrorEnabled
+  }
+
+  "addDraftMetadataFileName" should "throw an error when fails to update" in {
+    val consignmentId = UUID.randomUUID()
+    val overrideUserId = UUID.randomUUID()
+    val parentFolder = "parent/folder/path"
+    val mockLogger = mock[UnderlyingLogger]
+
+    when(mockLogger.isInfoEnabled()).thenReturn(true)
+
+    doAnswer(() => Future(new BearerAccessToken("token")))
+      .when(keycloak)
+      .serviceAccountToken[Identity](any[String], any[String])(any[SttpBackend[Identity, Any]], any[ClassTag[Identity[_]]], any[TdrKeycloakDeployment])
+
+    doAnswer(() => Future(GraphQlResponse[upf.Data](None, Nil)))
+      .when(updateDraftMetadataFileNameClient)
+      .getResult[Identity](any[BearerAccessToken], any[Document], any[Option[ucsdmfn.Variables]])(any[SttpBackend[Identity, Any]], any[ClassTag[Identity[_]]])
+
+    val input = UpdateParentFolderInput(consignmentId, parentFolder, Some(overrideUserId))
+
+    val api = new GraphQlApi(
+      keycloak,
+      updateConsignmentStatusClient,
+      addConsignmentStatusClient,
+      addFilesAndMetadataClient,
+      getConsignmentClient,
+      updateParentFolderClient,
+      updateDraftMetadataFileNameClient
+    )(
+      Logger(mockLogger),
+      tdrKeycloakDeployment,
+      backend
+    )
+
+    val exception = intercept[RuntimeException] {
+      api.addDraftMetadataFileName(consignmentId, "file-name").unsafeRunSync()
+    }
+
+    verify(mockLogger).info("Add draft metadata file name for consignment: {}", consignmentId)
+    exception.getMessage shouldBe s"Unable to add draft metadata file name: $consignmentId"
   }
 }

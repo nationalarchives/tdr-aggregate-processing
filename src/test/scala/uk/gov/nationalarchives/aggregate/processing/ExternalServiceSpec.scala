@@ -82,6 +82,12 @@ class ExternalServiceSpec extends AnyFlatSpec with BeforeAndAfterEach with Befor
       .willReturn(ok("""{"data": {"updateConsignmentStatus": 1}}""".stripMargin))
   )
 
+  def mockGraphQlUpdateDraftMetadataFileNameResponse: StubMapping = wiremockGraphqlServer.stubFor(
+    post(urlEqualTo(graphQlPath))
+      .withRequestBody(containing("updateClientSideDraftMetadataFileName"))
+      .willReturn(ok("""{"data": {"updateClientSideDraftMetadataFileName": 1}}""".stripMargin))
+  )
+
   def mockGraphQlGetConsignmentResponse: StubMapping = {
     val data = Some(
       getConsignment.Data(

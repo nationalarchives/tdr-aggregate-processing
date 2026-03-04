@@ -41,6 +41,7 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
   private val orchestrator = TransferOrchestration()
   private lazy val errorHandling = ErrorHandling()
   private lazy val errorProcessingResult = AssetProcessingResult(errors = true, suppliedMetadata = false)
+  private lazy val draftMetadataFileName = "draft-metadata.csv"
 
   override def handleRequest(event: SQSEvent, context: Context): Unit = {
     val sqsMessages: Seq[SQSMessage] = event.getRecords.asScala.toList
@@ -130,7 +131,8 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
     for {
       draftMetadataCSVWriter <- IO(new DraftMetadataCSVWriter())
       metadataCSV <- IO(draftMetadataCSVWriter.createMetadataCSV(assetProcessingResults))
-      _ <- uploadToS3(metadataCSV.toPath, draftMetadataBucket, s"$consignmentId/draft-metadata.csv")
+      _ <- persistenceApi.addDraftMetadataFileName(consignmentId, draftMetadataFileName)
+      _ <- uploadToS3(metadataCSV.toPath, draftMetadataBucket, s"$consignmentId/$draftMetadataFileName")
     } yield ()
   }
 

@@ -3,10 +3,10 @@ package uk.gov.nationalarchives.aggregate.processing
 import com.amazonaws.services.lambda.runtime.Context
 import com.amazonaws.services.lambda.runtime.events.SQSEvent
 import com.amazonaws.services.lambda.runtime.events.SQSEvent.SQSMessage
-import com.github.tomakehurst.wiremock.client.WireMock._
+import com.github.tomakehurst.wiremock.client.WireMock.{postRequestedFor, _}
 import org.mockito.MockitoSugar.mock
 import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper
-import org.scalatest.prop.{TableDrivenPropertyChecks, TableFor1, TableFor2, TableFor3, TableFor4}
+import org.scalatest.prop.{TableDrivenPropertyChecks, TableFor4}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.AssetSource
 
@@ -17,7 +17,6 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
   private val userId: UUID = UUID.randomUUID()
   private val consignmentId: UUID = UUID.randomUUID()
   private val matchId = "match-id"
-  private val source: String = Common.AssetSource.SharePoint.toString
   private val category: String = Common.ObjectCategory.Metadata.toString
   private def validMessageBody(assetSource: String): String =
     s"""
@@ -391,6 +390,7 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
         mockGraphQlUpdateConsignmentStatusResponse
         mockGraphQlGetConsignmentResponse
         mockGraphQlUpdateParentFolderResponse
+        mockGraphQlUpdateDraftMetadataFileNameResponse
 
         val mockContext = mock[Context]
 
@@ -410,6 +410,12 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
         sqsEvent.setRecords(messages)
 
         new AggregateProcessingLambda().handleRequest(sqsEvent, mockContext)
+
+        wiremockGraphqlServer.verify(
+          exactly(5),
+          postRequestedFor(anyUrl())
+            .withUrl("/graphql")
+        )
 
         wiremockS3.verify(
           exactly(1),
