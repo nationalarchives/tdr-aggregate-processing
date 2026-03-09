@@ -16,8 +16,9 @@ object SharePointMetadataHandler {
   }
 
   private val metadataConfig: ConfigUtils.MetadataConfiguration = ConfigUtils.loadConfiguration
-  private val suppliedProperties: Seq[String] = metadataConfig.getPropertiesByPropertyType(Supplied.toString)
-  private val systemProperties: Seq[String] = metadataConfig.getPropertiesByPropertyType(System.toString)
+  private val overriddenPropertyClassification = overridePropertyClassification()
+  private val suppliedProperties: Seq[String] = overriddenPropertyClassification._1
+  private val systemProperties: Seq[String] = overriddenPropertyClassification._2
   private val mapper: String => String = metadataConfig.inputToPropertyMapper("sharePointTag")
   private val defaultPropertyValues: Map[String, String] = metadataConfig.getPropertiesWithDefaultValue
   private case class SharePointLocationPath(root: String, site: String, library: String, filePath: String)
@@ -44,11 +45,18 @@ object SharePointMetadataHandler {
 
   private object NormalisePropertyValue {
     def normalise(id: String, value: Json): Json = id match {
-      case FilePathProperty.id                                                                                              => normaliseFilePath(value)
-      case DateLastModifiedProperty.id | ClosureStartDateProperty.id | EndDateProperty.id | FoiExemptionAssertedProperty.id => normaliseDateTime(value)
-      case ClosurePeriodProperty.id                                                                                         => normaliseNumber(value)
-      case _                                                                                                                => value
+      case FilePathProperty.id                                                                                                                       => normaliseFilePath(value)
+      case DateLastModifiedProperty.id | ClosureStartDateProperty.id | EndDateProperty.id | FoiExemptionAssertedProperty.id | DateCreatedProperty.id => normaliseDateTime(value)
+      case ClosurePeriodProperty.id                                                                                                                  => normaliseNumber(value)
+      case _                                                                                                                                         => value
     }
+  }
+
+  private def overridePropertyClassification() = {
+    val baseSuppliedProperties: Seq[String] = metadataConfig.getPropertiesByPropertyType(Supplied.toString)
+    val baseSystemProperties: Seq[String] = metadataConfig.getPropertiesByPropertyType(System.toString)
+
+    (baseSuppliedProperties.filter(_ != "date_created"), baseSystemProperties :+ "date_created")
   }
 
   val metadataHandler = new BaseMetadataHandler(mapper, defaultPropertyValues, suppliedProperties, systemProperties, NormalisePropertyValue.normalise)

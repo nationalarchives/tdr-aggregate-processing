@@ -77,10 +77,25 @@ class SharePointMetadataHandlerSpec extends ExternalServiceSpec with MetadataHel
   }
 
   "classifyBaseMetadata" should "classify given metadata properties correctly" in {
+    val expectedSuppliedMetadata: List[MetadataProperty] =
+      List(
+        MetadataProperty("description", "some kind of description"),
+        MetadataProperty("closure status", "Open")
+      )
+
+    val expectedSystemMetadata: List[MetadataProperty] = List(
+      MetadataProperty("file_path", expectedFilePath),
+      MetadataProperty("file_name", "file1.txt"),
+      MetadataProperty("date_last_modified", "1751534387000"),
+      MetadataProperty("file_size", s"$defaultFileSize"),
+      MetadataProperty("client_side_checksum", "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2"),
+      MetadataProperty("date_created", "1751534387000")
+    )
+
     val sourceJson = convertStringToJson(validBaseMetadataWithSuppliedAndCustom(matchId, consignmentId, expectedFilePath))
     val classifiedMetadata = handler.classifyBaseMetadata(sourceJson)
     classifiedMetadata(MetadataClassification.Custom) shouldEqual expectedCustomMetadata
     classifiedMetadata(MetadataClassification.Supplied) shouldEqual expectedSuppliedMetadata
-    classifiedMetadata(MetadataClassification.System) shouldEqual expectedSystemMetadata(expectedFilePath)
+    classifiedMetadata(MetadataClassification.System) shouldEqual expectedSystemMetadata
   }
 }

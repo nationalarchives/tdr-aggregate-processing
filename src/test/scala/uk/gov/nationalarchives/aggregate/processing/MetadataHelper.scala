@@ -8,7 +8,7 @@ import java.util.UUID
 trait MetadataHelper {
   val defaultFileSize: Long = 12L
   val customFieldJsonString: String = """"customField": "custom metadata value""""
-  val defaultSuppliedFields: String = """"closure_type": "Open","description": "some kind of description""""
+  val defaultSuppliedFields: String = """"closure_type": "Open","description": "some kind of description","date_created": "1751534387000""""
 
   def expectedSystemMetadata(filePath: String): List[MetadataProperty] = List(
     MetadataProperty("file_path", s"$filePath"),
@@ -19,7 +19,11 @@ trait MetadataHelper {
   )
 
   val expectedSuppliedMetadata: List[MetadataProperty] =
-    List(MetadataProperty("description", "some kind of description"), MetadataProperty("closure status", "Open"))
+    List(
+      MetadataProperty("description", "some kind of description"),
+      MetadataProperty("closure status", "Open"),
+      MetadataProperty("date_created", "1751534387000")
+    )
 
   val expectedCustomMetadata: List[MetadataProperty] = List(MetadataProperty("customField", "custom metadata value"))
 
@@ -103,7 +107,8 @@ trait MetadataHelper {
       "FileRef": "/sites/Retail/Shared Documents/file1.txt",
       "sha256ClientSideChecksum": "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2",
       "matchId": "$matchId",
-      "transferId": "$consignmentId"
+      "transferId": "$consignmentId",
+      "Created": "2025-07-03T09:19:47Z"
     }""".stripMargin
 
     addOptionalMetadataJsonString(defaultJsonString, suppliedMetadataJson, customMetadataJson)

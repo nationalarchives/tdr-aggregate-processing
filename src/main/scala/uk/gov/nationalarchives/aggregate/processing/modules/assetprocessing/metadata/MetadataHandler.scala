@@ -30,6 +30,10 @@ case object ClosureStartDateProperty extends BaseProperty {
   val id: String = "closure_start_date"
 }
 
+case object DateCreatedProperty extends BaseProperty {
+  val id: String = "date_created"
+}
+
 case object DateLastModifiedProperty extends BaseProperty {
   val id: String = "date_last_modified"
 }
