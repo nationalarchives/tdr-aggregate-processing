@@ -10,7 +10,7 @@ class FolderOnlyCheck extends InitialCheck {
   private lazy val errorCode = s"$InitialChecks.$UploadError.$FolderOnly"
 
   override def runCheck(event: AssetProcessingEvent, input: ClientSideMetadataInput): List[AssetProcessingError] = {
-    val containsExtension = input.originalPath.contains(".")
+    val containsExtension = input.originalPath.split("/").last.contains(".")
     if (!containsExtension) {
       val transferId = event.consignmentId
       val source = event.source.toString
