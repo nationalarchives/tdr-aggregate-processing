@@ -30,17 +30,19 @@ object Common {
     val EventError: Value = Value("EVENT")
     val FileExtensionError: Value = Value("FILE_EXTENSION")
     val JsonError: Value = Value("JSON")
+    val MalwareScanError: Value = Value("MALWARE_SCAN")
     val MatchIdError: Value = Value("MATCH_ID")
     val ObjectKeyError: Value = Value("OBJECT_KEY")
     val ObjectSizeError: Value = Value("OBJECT_SIZE")
     val S3Error: Value = Value("S3")
-    val MalwareScanError: Value = Value("MALWARE_SCAN")
+    val UploadError: Value = Value("UPLOAD")
   }
 
   object ProcessErrorValue extends Enumeration {
     type ProcessErrorValue = Value
     val Disallowed: Value = Value("DISALLOWED")
     val Failure: Value = Value("FAILURE")
+    val FolderOnly: Value = Value("FOLDER_ONLY")
     val Invalid: Value = Value("INVALID")
     val Mismatch: Value = Value("MISMATCH")
     val ReadError: Value = Value("READ_ERROR")

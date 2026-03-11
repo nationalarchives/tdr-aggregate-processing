@@ -15,7 +15,7 @@ import uk.gov.nationalarchives.aggregate.processing.modules.Common.{AssetSource,
 import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling.BaseError
 import uk.gov.nationalarchives.aggregate.processing.modules._
 import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.AssetProcessing.{AssetProcessingError, AssetProcessingEvent, AssetProcessingResult}
-import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.initialchecks.{FileExtensionCheck, FileSizeCheck, InitialCheck}
+import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.initialchecks.{FileSizeCheck, FolderOnlyCheck, InitialCheck}
 import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.metadata._
 import uk.gov.nationalarchives.aggregate.processing.utilities.UTF8ValidationHandler
 import uk.gov.nationalarchives.aws.utils.s3.{S3Clients, S3Utils}
@@ -25,7 +25,7 @@ import java.util.UUID
 import scala.util.{Failure, Success, Try}
 
 class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
-  private lazy val initialChecks: Set[InitialCheck] = Set(FileSizeCheck.apply(), FileExtensionCheck.apply())
+  private lazy val initialChecks: Set[InitialCheck] = Set(FileSizeCheck.apply(), FolderOnlyCheck.apply())
   private lazy val errorHandling = ErrorHandling()
 
   private def getMetadataHandler(assetSource: AssetSource): MetadataHandler = {
