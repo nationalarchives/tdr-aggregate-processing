@@ -170,9 +170,9 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     verify(mockLogger).info(s"Triggering draft metadata validation for consignment: {}", consignmentId)
     verify(mockLogger, never).isErrorEnabled()
     verify(mockGraphQlApi, times(1)).updateConsignmentStatus(consignmentStatusInputCaptor.capture())
-    verify(mockGraphQlApi, times(1)).addConsignmentStatus(consignmentStatusInputCaptor.capture())
+    verify(mockGraphQlApi, times(2)).addConsignmentStatus(consignmentStatusInputCaptor.capture())
     val capturedStatuses = consignmentStatusInputCaptor.getAllValues
-    capturedStatuses.size() shouldBe 2
+    capturedStatuses.size() shouldBe 3
 
     val uploadStatus = capturedStatuses.get(0)
     uploadStatus.consignmentId shouldBe consignmentId
@@ -180,7 +180,13 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     uploadStatus.statusValue.get shouldBe "Completed"
     uploadStatus.userIdOverride.get shouldBe userId
 
-    val draftMetadataStatus = capturedStatuses.get(1)
+    val draftMetadataUploadStatus = capturedStatuses.get(1)
+    draftMetadataUploadStatus.consignmentId shouldBe consignmentId
+    draftMetadataUploadStatus.statusType shouldBe "DraftMetadataUpload"
+    draftMetadataUploadStatus.statusValue.get shouldBe "Completed"
+    draftMetadataUploadStatus.userIdOverride.get shouldBe userId
+
+    val draftMetadataStatus = capturedStatuses.get(2)
     draftMetadataStatus.consignmentId shouldBe consignmentId
     draftMetadataStatus.statusType shouldBe "DraftMetadata"
     draftMetadataStatus.statusValue.get shouldBe "InProgress"

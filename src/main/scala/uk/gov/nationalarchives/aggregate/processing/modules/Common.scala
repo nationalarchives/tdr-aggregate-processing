@@ -12,6 +12,7 @@ object Common {
     val Upload: Value = Value("Upload")
     val ClientChecks: Value = Value("ClientChecks")
     val DraftMetadata: Value = Value("DraftMetadata")
+    val DraftMetadataUpload: Value = Value("DraftMetadataUpload")
   }
 
   object ProcessType extends Enumeration {
