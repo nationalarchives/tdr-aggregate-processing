@@ -28,6 +28,7 @@ libraryDependencies ++= Seq(
   snsUtils,
   ssmUtils,
   stepFunctionUtils,
+  tdrStatuses,
   typesafeConfig,
   utf8Validator,
   wiremock % Test

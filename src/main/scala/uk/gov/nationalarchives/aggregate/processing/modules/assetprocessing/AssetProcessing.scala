@@ -10,7 +10,6 @@ import uk.gov.nationalarchives.aggregate.processing.modules.Common.ObjectType.Ob
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorType.{EncodingError, JsonError, MalwareScanError, MatchIdError, ObjectKeyError, S3Error => s3e}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorValue.{Invalid, Mismatch, ReadError, ThreatFound}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.{AssetProcessing => ptAp}
-import uk.gov.nationalarchives.aggregate.processing.modules.Common.StateStatusValue.{Completed, CompletedWithIssues}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.{AssetSource, MetadataClassification, ObjectType}
 import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling.BaseError
 import uk.gov.nationalarchives.aggregate.processing.modules._
@@ -19,6 +18,7 @@ import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.init
 import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.metadata._
 import uk.gov.nationalarchives.aggregate.processing.utilities.UTF8ValidationHandler
 import uk.gov.nationalarchives.aws.utils.s3.{S3Clients, S3Utils}
+import uk.gov.nationalarchives.tdr.common.utils.statuses.StatusValues.{CompletedValue, CompletedWithIssuesValue}
 import uk.gov.nationalarchives.utf8.validator.Utf8Validator
 
 import java.util.UUID
@@ -38,7 +38,7 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
 
   private def handleProcessError(errors: List[AssetProcessingError], s3Bucket: String, s3ObjectKey: String): AssetProcessingResult = {
     errors.foreach(errorHandling.handleError(_, logger))
-    val errorTags: Map[String, String] = Map(ptAp.toString -> CompletedWithIssues.toString)
+    val errorTags: Map[String, String] = Map(ptAp.toString -> CompletedWithIssuesValue.value)
     s3Utils.addObjectTags(s3Bucket, s3ObjectKey, errorTags)
     val matchId = errors.head.matchId
     AssetProcessingResult(matchId, processingErrors = true, None)
@@ -144,7 +144,7 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
               val systemMetadata = classifiedMetadata.getOrElse(MetadataClassification.System, Nil)
               val customMetadata = classifiedMetadata.getOrElse(MetadataClassification.Custom, Nil)
               logger.info(s"Asset metadata successfully processed for: $objectKey")
-              val completedTags = Map(ptAp.toString -> Completed.toString)
+              val completedTags = Map(ptAp.toString -> CompletedValue.value)
               s3Utils.addObjectTags(event.s3SourceBucket, event.objectKey, completedTags)
               AssetProcessingResult(Some(matchId), processingErrors = false, Some(input), systemMetadata, suppliedMetadata, customMetadata)
             }
