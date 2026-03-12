@@ -7,14 +7,6 @@ import java.util.UUID
 import scala.util.{Failure, Success, Try}
 
 object Common {
-  object ConsignmentStatusType extends Enumeration {
-    type ConsignmentStatusType = Value
-    val Upload: Value = Value("Upload")
-    val ClientChecks: Value = Value("ClientChecks")
-    val DraftMetadata: Value = Value("DraftMetadata")
-    val DraftMetadataUpload: Value = Value("DraftMetadataUpload")
-  }
-
   object ProcessType extends Enumeration {
     type ProcessType = Value
     val AggregateProcessing: Value = Value("AGGREGATE_PROCESSING")
@@ -50,14 +42,6 @@ object Common {
     val TooBigError: Value = Value("TOO_BIG")
     val TooSmallError: Value = Value("TOO_SMALL")
     val ThreatFound: Value = Value("THREAT_FOUND")
-  }
-
-  object StateStatusValue extends Enumeration {
-    type ConsignmentStatusValue = Value
-    val Completed: Value = Value("Completed")
-    val CompletedWithIssues: Value = Value("CompletedWithIssues")
-    val Failed: Value = Value("Failed")
-    val InProgress: Value = Value("InProgress")
   }
 
   object AssetSource extends Enumeration {

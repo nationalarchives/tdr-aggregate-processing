@@ -7,12 +7,10 @@ import graphql.codegen.types.ConsignmentStatusInput
 import io.circe.Encoder
 import io.circe.generic.semiauto.deriveEncoder
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.AssetSource.AssetSource
-import uk.gov.nationalarchives.aggregate.processing.modules.Common.ConsignmentStatusType.{DraftMetadata, DraftMetadataUpload, Upload}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ObjectCategory.Records
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorType.EventError
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorValue.Invalid
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.{AggregateProcessing, Orchestration}
-import uk.gov.nationalarchives.aggregate.processing.modules.Common.StateStatusValue.{Completed, CompletedWithIssues, ConsignmentStatusValue, Failed, InProgress}
 import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling
 import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling.BaseError
 import uk.gov.nationalarchives.aggregate.processing.modules.orchestration.TransferOrchestration._
@@ -22,6 +20,9 @@ import uk.gov.nationalarchives.aggregate.processing.utilities.NotificationsClien
 import uk.gov.nationalarchives.aggregate.processing.utilities.{KeycloakClient, NotificationsClient}
 import uk.gov.nationalarchives.aws.utils.stepfunction.StepFunctionClients.sfnAsyncClient
 import uk.gov.nationalarchives.aws.utils.stepfunction.StepFunctionUtils
+import uk.gov.nationalarchives.tdr.common.utils.statuses.StatusTypes.{DraftMetadataType, DraftMetadataUploadType, UploadType}
+import uk.gov.nationalarchives.tdr.common.utils.statuses.StatusValues.StatusValue
+import uk.gov.nationalarchives.tdr.common.utils.statuses.StatusValues.{CompletedValue, CompletedWithIssuesValue, FailedValue, InProgressValue}
 
 import java.util.UUID
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -52,13 +53,13 @@ class TransferOrchestration(
     val errors = event.processingErrors
     val consignmentId = event.consignmentId
     val userId = event.userId
-    val consignmentStatusValue: ConsignmentStatusValue = if (errors) Failed else Completed
+    val consignmentStatusValue: StatusValue = if (errors) FailedValue else CompletedValue
 
-    val statusInput = ConsignmentStatusInput(consignmentId, Upload.toString, Some(consignmentStatusValue.toString), Some(event.userId))
+    val statusInput = ConsignmentStatusInput(consignmentId, UploadType.id, Some(consignmentStatusValue.value), Some(event.userId))
     for {
       _ <-
         if (errors) {
-          val transferError = TransferError(Some(consignmentId), s"$AggregateProcessing.$CompletedWithIssues", "One or more assets failed to process.")
+          val transferError = TransferError(Some(consignmentId), s"$AggregateProcessing.${CompletedWithIssuesValue.value}", "One or more assets failed to process.")
           IO(errorHandling.handleError(transferError, logger))
         } else {
           triggerBackendChecksSfn(event) *> triggerDraftMetadataSfn(event)
@@ -73,7 +74,7 @@ class TransferOrchestration(
           transferringBodyName = getConsignmentDetails.flatMap(_.transferringBodyName).get,
           consignmentReference = getConsignmentDetails.map(_.consignmentReference).get,
           consignmentId = consignmentId.toString,
-          status = consignmentStatusValue.toString,
+          status = consignmentStatusValue.value,
           userId = event.userId.toString,
           userEmail = userDetails.email,
           assetSource = event.assetSource.toString,
@@ -91,7 +92,7 @@ class TransferOrchestration(
       .handleErrorWith { ex =>
         IO(logger.error(ex.getMessage)) *> IO(
           errorHandling.handleError(
-            TransferError(Some(consignmentId), s"$AggregateProcessing.$CompletedWithIssues", s"Step function error: ${ex.getMessage}"),
+            TransferError(Some(consignmentId), s"$AggregateProcessing.${CompletedWithIssuesValue.value}", s"Step function error: ${ex.getMessage}"),
             logger
           )
         )
@@ -114,8 +115,8 @@ class TransferOrchestration(
     val consignmentId = event.consignmentId
     if (event.suppliedMetadata) {
       logger.info(s"Triggering draft metadata validation for consignment: $consignmentId")
-      val draftMetadataStatusInput = ConsignmentStatusInput(consignmentId, DraftMetadata.toString, Some(InProgress.toString), Some(event.userId))
-      val draftUploadStatusInput = ConsignmentStatusInput(consignmentId, DraftMetadataUpload.toString, Some(Completed.toString), Some(event.userId))
+      val draftMetadataStatusInput = ConsignmentStatusInput(consignmentId, DraftMetadataType.id, Some(InProgressValue.value), Some(event.userId))
+      val draftUploadStatusInput = ConsignmentStatusInput(consignmentId, DraftMetadataUploadType.id, Some(CompletedValue.value), Some(event.userId))
       for {
         _ <- persistenceApi.addConsignmentStatus(draftUploadStatusInput)
         _ <- persistenceApi.addConsignmentStatus(draftMetadataStatusInput)
