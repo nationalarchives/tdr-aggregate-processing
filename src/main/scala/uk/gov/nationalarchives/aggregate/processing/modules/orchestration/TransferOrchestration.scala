@@ -7,12 +7,12 @@ import graphql.codegen.types.ConsignmentStatusInput
 import io.circe.Encoder
 import io.circe.generic.semiauto.deriveEncoder
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.AssetSource.AssetSource
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.ConsignmentStatusType.{DraftMetadata, DraftMetadataUpload, Upload}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ObjectCategory.Records
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorType.EventError
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorValue.Invalid
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.{AggregateProcessing, Orchestration}
-import uk.gov.nationalarchives.aggregate.processing.modules.Common.StateStatusValue.{Completed, CompletedWithIssues, ConsignmentStatusValue, Failed}
-import uk.gov.nationalarchives.aggregate.processing.modules.Common.{ConsignmentStatusType, StateStatusValue}
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.StateStatusValue.{Completed, CompletedWithIssues, ConsignmentStatusValue, Failed, InProgress}
 import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling
 import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling.BaseError
 import uk.gov.nationalarchives.aggregate.processing.modules.orchestration.TransferOrchestration._
@@ -27,7 +27,7 @@ import java.util.UUID
 import scala.concurrent.ExecutionContext.Implicits.global
 
 class TransferOrchestration(
-    graphQlApi: GraphQlApi,
+    persistenceApi: GraphQlApi,
     stepFunctionUtils: StepFunctionUtils,
     notificationUtils: NotificationsClient,
     keycloakConfigurations: KeycloakClient,
@@ -54,7 +54,7 @@ class TransferOrchestration(
     val userId = event.userId
     val consignmentStatusValue: ConsignmentStatusValue = if (errors) Failed else Completed
 
-    val statusInput = ConsignmentStatusInput(consignmentId, ConsignmentStatusType.Upload.toString, Some(consignmentStatusValue.toString), Some(event.userId))
+    val statusInput = ConsignmentStatusInput(consignmentId, Upload.toString, Some(consignmentStatusValue.toString), Some(event.userId))
     for {
       _ <-
         if (errors) {
@@ -63,10 +63,10 @@ class TransferOrchestration(
         } else {
           triggerBackendChecksSfn(event) *> triggerDraftMetadataSfn(event)
         }
-      updateResult <- graphQlApi.updateConsignmentStatus(statusInput)
+      updateResult <- persistenceApi.updateConsignmentStatus(statusInput)
       success = updateResult.nonEmpty
       result = OrchestrationResult(Some(consignmentId), success = success)
-      getConsignmentDetails <- graphQlApi.getConsignmentDetails(consignmentId)
+      getConsignmentDetails <- persistenceApi.getConsignmentDetails(consignmentId)
       userDetails <- IO.fromFuture(IO(keycloakConfigurations.userDetails(userId.toString)))
       _ <- notificationUtils.publishUploadEvent(
         UploadEvent(
@@ -114,9 +114,11 @@ class TransferOrchestration(
     val consignmentId = event.consignmentId
     if (event.suppliedMetadata) {
       logger.info(s"Triggering draft metadata validation for consignment: $consignmentId")
-      val statusInput = ConsignmentStatusInput(consignmentId, ConsignmentStatusType.DraftMetadata.toString, Some(StateStatusValue.InProgress.toString), Some(event.userId))
+      val draftMetadataStatusInput = ConsignmentStatusInput(consignmentId, DraftMetadata.toString, Some(InProgress.toString), Some(event.userId))
+      val draftUploadStatusInput = ConsignmentStatusInput(consignmentId, DraftMetadataUpload.toString, Some(Completed.toString), Some(event.userId))
       for {
-        _ <- graphQlApi.addConsignmentStatus(statusInput)
+        _ <- persistenceApi.addConsignmentStatus(draftUploadStatusInput)
+        _ <- persistenceApi.addConsignmentStatus(draftMetadataStatusInput)
         _ <- triggerStepFunction(
           arnKey = "sfn.metadataChecksArn",
           input = MetadataChecksStepFunctionInput(consignmentId.toString),

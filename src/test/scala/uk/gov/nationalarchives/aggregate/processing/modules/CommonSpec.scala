@@ -8,9 +8,9 @@ import java.util.UUID
 class CommonSpec extends AnyFlatSpec {
   "ConsignmentStatusType" should "contain the correct enums" in {
     val consignmentStatusType = Common.ConsignmentStatusType
-    val expectedValues = List("ClientChecks", "DraftMetadata", "Upload")
+    val expectedValues = List("ClientChecks", "DraftMetadata", "DraftMetadataUpload", "Upload")
 
-    consignmentStatusType.values.size shouldBe 3
+    consignmentStatusType.values.size shouldBe 4
     consignmentStatusType.values.map(_.toString).toList shouldEqual expectedValues
   }
 
