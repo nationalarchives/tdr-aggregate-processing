@@ -7,6 +7,7 @@ on:
         description: 'Environment'
         required: true
         options:
+          - dev
           - intg
           - staging
           - prod
