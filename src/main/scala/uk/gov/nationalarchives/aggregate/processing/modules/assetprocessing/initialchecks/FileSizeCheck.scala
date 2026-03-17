@@ -12,7 +12,7 @@ class FileSizeCheck extends InitialCheck {
 
   private def error(errorCode: String, fileSize: Long, event: AssetProcessingEvent): AssetProcessingError = {
     val transferId = event.consignmentId
-    val source = event.source.toString
+    val source = event.source.id
     val matchId = event.matchId
     val errorMsg = s"File size: $fileSize bytes"
     AssetProcessingError(Some(transferId), Some(matchId), Some(source), errorCode, errorMsg)

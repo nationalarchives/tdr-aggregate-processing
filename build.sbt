@@ -28,6 +28,7 @@ libraryDependencies ++= Seq(
   snsUtils,
   ssmUtils,
   stepFunctionUtils,
+  tdrObjectKeyContext,
   tdrStatuses,
   typesafeConfig,
   utf8Validator,

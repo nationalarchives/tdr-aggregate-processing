@@ -13,7 +13,7 @@ class FolderOnlyCheck extends InitialCheck {
     val containsExtension = input.originalPath.split("/").last.contains(".")
     if (!containsExtension) {
       val transferId = event.consignmentId
-      val source = event.source.toString
+      val source = event.source.id
       val matchId = event.matchId
       val errorMsg = s"Empty folder uploaded"
       List(AssetProcessingError(Some(transferId), Some(matchId), Some(source), errorCode, errorMsg))

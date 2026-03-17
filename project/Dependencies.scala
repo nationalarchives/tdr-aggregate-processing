@@ -14,13 +14,13 @@ object Dependencies {
   lazy val circeParser = "io.circe" %% "circe-parser" % circeVersion
   lazy val csvParser = "com.github.tototoshi" %% "scala-csv" % "2.0.0"
 
-  lazy val generatedGraphql = "uk.gov.nationalarchives" %% "tdr-generated-graphql" % "0.0.459"
-  lazy val graphqlClient = "uk.gov.nationalarchives" %% "tdr-graphql-client" % "0.0.281"
+  lazy val generatedGraphql = "uk.gov.nationalarchives" %% "tdr-generated-graphql" % "0.0.461"
+  lazy val graphqlClient = "uk.gov.nationalarchives" %% "tdr-graphql-client" % "0.0.283"
 
   lazy val logback = "ch.qos.logback" % "logback-classic" % "1.5.32"
   lazy val logstash = "net.logstash.logback" % "logstash-logback-encoder" % "9.0"
 
-  lazy val metadataSchema = "uk.gov.nationalarchives" % "da-metadata-schema_2.13" % "0.0.121"
+  lazy val metadataSchema = "uk.gov.nationalarchives" % "da-metadata-schema_2.13" % "0.0.122"
   lazy val mockitoScala = "org.mockito" %% "mockito-scala" % mockitoScalaVersion
   lazy val mockitoScalaTest = "org.mockito" %% "mockito-scala-scalatest" % mockitoScalaVersion
 
@@ -33,7 +33,8 @@ object Dependencies {
   lazy val ssmUtils = "uk.gov.nationalarchives" %% "ssm-utils" % awsUtilsVersion
   lazy val stepFunctionUtils = "uk.gov.nationalarchives" %% "stepfunction-utils" % awsUtilsVersion
 
-  lazy val tdrStatuses = "uk.gov.nationalarchives" %% "tdr-statuses" % "0.0.6"
+  lazy val tdrObjectKeyContext = "uk.gov.nationalarchives" %% "tdr-object-key-context" % "0.0.8-SNAPSHOT"
+  lazy val tdrStatuses = "uk.gov.nationalarchives" %% "tdr-statuses" % "0.0.7"
   lazy val typesafeConfig = "com.typesafe" % "config" % "1.4.6"
 
   lazy val utf8Validator = "uk.gov.nationalarchives" % "utf8-validator" % "1.2"

@@ -3,12 +3,12 @@ package uk.gov.nationalarchives.aggregate.processing
 import com.amazonaws.services.lambda.runtime.Context
 import com.amazonaws.services.lambda.runtime.events.SQSEvent
 import com.amazonaws.services.lambda.runtime.events.SQSEvent.SQSMessage
-import com.github.tomakehurst.wiremock.client.WireMock.{postRequestedFor, _}
+import com.github.tomakehurst.wiremock.client.WireMock._
 import org.mockito.MockitoSugar.mock
 import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper
 import org.scalatest.prop.{TableDrivenPropertyChecks, TableFor4}
-import uk.gov.nationalarchives.aggregate.processing.modules.Common
-import uk.gov.nationalarchives.aggregate.processing.modules.Common.AssetSource
+import uk.gov.nationalarchives.tdr.common.utils.objectkeycontext.AssetSources.{HardDrive, NetworkDrive, SharePoint}
+import uk.gov.nationalarchives.tdr.common.utils.objectkeycontext.ObjectCategories.Metadata
 
 import java.util.UUID
 import scala.jdk.CollectionConverters._
@@ -17,7 +17,7 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
   private val userId: UUID = UUID.randomUUID()
   private val consignmentId: UUID = UUID.randomUUID()
   private val matchId = "match-id"
-  private val category: String = Common.ObjectCategory.Metadata.toString
+  private val category: String = Metadata.id
   private def validMessageBody(assetSource: String): String =
     s"""
     {
@@ -30,19 +30,19 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
   val assetSources: TableFor4[String, (String, Long, UUID, Option[String], Option[String]) => String, String, String] = Table(
     ("Asset Source", "Metadata Json String", "Expected File Path", "Invalid Supplied Metadata"),
     (
-      AssetSource.HardDrive.toString.toLowerCase,
+      HardDrive.id.toLowerCase,
       hardDriveMetadataJsonString,
       "content/Retail/Shared Documents/file1.txt",
       """"closure_type": "Open","description": "some kind of description","date_last_modified": "2025-13-45T25:99:99""""
     ),
     (
-      AssetSource.NetworkDrive.toString.toLowerCase,
+      NetworkDrive.id.toLowerCase,
       networkDriveJsonString,
       "",
       """"closure_type": "Open","description": "some kind of description","lastModified": "17/02/2026""""
     ),
     (
-      AssetSource.SharePoint.toString.toLowerCase,
+      SharePoint.id.toLowerCase,
       sharePointMetadataJsonString,
       "",
       """"closure_type": "Open","description": "some kind of description","date_x0020_of_x0020_the_x0020_record": "17/02/2026""""
@@ -351,7 +351,7 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
           .withUrl(s"/$objectKey")
       )
 
-      if (assetSource == AssetSource.NetworkDrive.toString.toLowerCase) {
+      if (assetSource == NetworkDrive.id.toLowerCase) {
         wiremockS3.verify(
           exactly(2),
           getRequestedFor(anyUrl())

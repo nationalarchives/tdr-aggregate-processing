@@ -17,7 +17,6 @@ import org.slf4j.{Logger => UnderlyingLogger}
 import software.amazon.awssdk.services.sfn.model.StartExecutionResponse
 import software.amazon.awssdk.services.sns.model.PublishResponse
 import uk.gov.nationalarchives.aggregate.processing.ExternalServiceSpec
-import uk.gov.nationalarchives.aggregate.processing.modules.Common.AssetSource._
 import uk.gov.nationalarchives.aggregate.processing.modules.orchestration.TransferOrchestration.{
   AggregateProcessingEvent,
   BackendChecksStepFunctionInput,
@@ -27,6 +26,7 @@ import uk.gov.nationalarchives.aggregate.processing.persistence.GraphQlApi
 import uk.gov.nationalarchives.aggregate.processing.utilities.NotificationsClient.UploadEvent
 import uk.gov.nationalarchives.aggregate.processing.utilities.{KeycloakClient, NotificationsClient}
 import uk.gov.nationalarchives.aws.utils.stepfunction.StepFunctionUtils
+import uk.gov.nationalarchives.tdr.common.utils.objectkeycontext.AssetSources.{AssetSource, SharePoint}
 import uk.gov.nationalarchives.tdr.keycloak.KeycloakUtils.UserDetails
 
 import java.time.ZonedDateTime
@@ -34,7 +34,7 @@ import java.util.UUID
 import scala.concurrent.Future
 
 class TransferOrchestrationSpec extends ExternalServiceSpec {
-  val assetSource: Value = SharePoint
+  val assetSource: AssetSource = SharePoint
   val consignmentId: UUID = UUID.randomUUID()
   val userId: UUID = UUID.randomUUID()
   val userEmail = "test@test.com"
@@ -113,7 +113,7 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     snsArgCaptor.getValue.status shouldBe "Completed"
     snsArgCaptor.getValue.transferringBodyName shouldBe transferringBody
     snsArgCaptor.getValue.consignmentReference shouldBe consignmentRef
-    snsArgCaptor.getValue.assetSource shouldBe assetSource.toString
+    snsArgCaptor.getValue.assetSource shouldBe assetSource.id
   }
 
   "orchestrate" should "trigger backend processing, draft metadata sfn, update the consignment status and send an upload complete sns message when asset processing event does not contain errors and supplied metadata is provided" in {
@@ -217,7 +217,7 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     snsArgCaptor.getValue.status shouldBe "Completed"
     snsArgCaptor.getValue.transferringBodyName shouldBe transferringBody
     snsArgCaptor.getValue.consignmentReference shouldBe consignmentRef
-    snsArgCaptor.getValue.assetSource shouldBe assetSource.toString
+    snsArgCaptor.getValue.assetSource shouldBe assetSource.id
   }
 
   "orchestrate" should "log an error for asset processing event, update the consignment status correctly and send a upload failed sns message when asset processing contains errors" in {
@@ -270,7 +270,7 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     snsArgCaptor.getValue.status shouldBe "Failed"
     snsArgCaptor.getValue.transferringBodyName shouldBe transferringBody
     snsArgCaptor.getValue.consignmentReference shouldBe consignmentRef
-    snsArgCaptor.getValue.assetSource shouldBe assetSource.toString
+    snsArgCaptor.getValue.assetSource shouldBe assetSource.id
   }
 
   "orchestrate" should "return a non-successful result when the orchestration event is not of an expected class" in {
