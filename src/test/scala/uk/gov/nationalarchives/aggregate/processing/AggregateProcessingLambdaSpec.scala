@@ -83,7 +83,7 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
       wiremockS3.verify(
         exactly(2),
         getRequestedFor(anyUrl())
-          .withUrl(s"/$objectKey")
+          .withUrl(s"/$objectKey?partNumber=1")
       )
 
       wiremockS3.verify(
@@ -142,7 +142,7 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
       wiremockS3.verify(
         exactly(0),
         getRequestedFor(anyUrl())
-          .withUrl(s"/$objectKey")
+          .withUrl(s"/$objectKey?partNumber=1")
       )
 
       wiremockS3.verify(
@@ -193,7 +193,7 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
       wiremockS3.verify(
         exactly(0),
         getRequestedFor(anyUrl())
-          .withUrl(s"/$objectKey")
+          .withUrl(s"/$objectKey?partNumber=1")
       )
 
       wiremockS3.verify(
@@ -237,7 +237,7 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
       wiremockS3.verify(
         exactly(0),
         getRequestedFor(anyUrl())
-          .withUrl(s"/$objectKey")
+          .withUrl(s"/$objectKey?partNumber=1")
       )
 
       wiremockS3.verify(
@@ -285,7 +285,7 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
       wiremockS3.verify(
         exactly(0),
         getRequestedFor(anyUrl())
-          .withUrl(s"/$objectKey")
+          .withUrl(s"/$objectKey?partNumber=1")
       )
 
       wiremockS3.verify(
@@ -348,7 +348,7 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
       wiremockS3.verify(
         exactly(1),
         getRequestedFor(anyUrl())
-          .withUrl(s"/$objectKey")
+          .withUrl(s"/$objectKey?partNumber=1")
       )
 
       if (assetSource == NetworkDrive.id.toLowerCase) {
