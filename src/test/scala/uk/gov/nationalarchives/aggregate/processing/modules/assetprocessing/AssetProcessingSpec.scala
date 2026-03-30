@@ -12,12 +12,12 @@ import software.amazon.awssdk.core.async.AsyncResponseTransformer
 import software.amazon.awssdk.services.s3.S3AsyncClient
 import software.amazon.awssdk.services.s3.model._
 import software.amazon.awssdk.utils.CompletableFutureUtils.failedFuture
-import uk.gov.nationalarchives.aggregate.processing.{ExternalServiceSpec, MetadataHelper}
 import uk.gov.nationalarchives.aggregate.processing.config.ApplicationConfig.malwareScanKey
-import uk.gov.nationalarchives.aggregate.processing.modules.Common.AssetSource
 import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.AssetProcessing.AssetProcessingResult
 import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.metadata.MetadataProperty
+import uk.gov.nationalarchives.aggregate.processing.{ExternalServiceSpec, MetadataHelper}
 import uk.gov.nationalarchives.aws.utils.s3.S3Utils
+import uk.gov.nationalarchives.tdr.common.utils.objectkeycontext.AssetSources.{HardDrive, NetworkDrive, SharePoint}
 
 import java.io.ByteArrayInputStream
 import java.util.UUID
@@ -31,7 +31,7 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
   val assetSources: TableFor6[String, (String, Long, UUID, Option[String], Option[String]) => String, String, String, String, String] = Table(
     ("Source", "Default Metadata Json String", "Expected Parsed File Path", "Missing Required Field", "Supplied Metadata Json", "Custom Metadata Json"),
     (
-      AssetSource.HardDrive.toString.toLowerCase,
+      HardDrive.id.toLowerCase,
       hardDriveMetadataJsonString,
       "content/Retail/Shared Documents/file1.txt",
       "file_size",
@@ -39,7 +39,7 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
       customFieldJsonString
     ),
     (
-      AssetSource.NetworkDrive.toString.toLowerCase,
+      NetworkDrive.id.toLowerCase,
       networkDriveJsonString,
       "top-level/Retail/Shared Documents/file1.txt",
       "fileSize",
@@ -47,7 +47,7 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
       customFieldJsonString
     ),
     (
-      AssetSource.SharePoint.toString.toLowerCase,
+      SharePoint.id.toLowerCase,
       sharePointMetadataJsonString,
       "sites/Retail/Shared Documents/file1.txt",
       "Length",
@@ -121,7 +121,7 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
         verify(s3UtilsMock, times(1)).addObjectTags("s3Bucket", "incorrect/object/key/format.txt", Map("ASSET_PROCESSING" -> "CompletedWithIssues"))
 
         verify(mockLogger).error(
-          s"AssetProcessingError: consignmentId: None, matchId: None, source: None, errorCode: ASSET_PROCESSING.OBJECT_KEY.INVALID, errorMessage: Invalid object key: incorrect/object/key/format.txt: Invalid UUID string: incorrect"
+          s"AssetProcessingError: consignmentId: None, matchId: None, source: None, errorCode: ASSET_PROCESSING.OBJECT_KEY.INVALID, errorMessage: Invalid object key incorrect/object/key/format.txt: Invalid object category: format.txt"
         )
       }
 

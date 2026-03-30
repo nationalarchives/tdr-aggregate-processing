@@ -14,20 +14,20 @@ import io.circe.generic.semiauto.deriveDecoder
 import io.circe.parser._
 import uk.gov.nationalarchives.aggregate.processing.AggregateProcessingLambda._
 import uk.gov.nationalarchives.aggregate.processing.config.ApplicationConfig.draftMetadataBucket
-import uk.gov.nationalarchives.aggregate.processing.modules.Common.ObjectCategory
-import uk.gov.nationalarchives.aggregate.processing.modules.Common.ObjectCategory.ObjectCategory
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorType.{ClientDataLoadError, S3Error}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorValue.{Failure, ReadError}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.{AggregateProcessing, AssetProcessing}
+import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling
 import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling.BaseError
 import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.{AssetProcessing => AssetProcessingModule}
 import uk.gov.nationalarchives.aggregate.processing.modules.orchestration.TransferOrchestration
 import uk.gov.nationalarchives.aggregate.processing.modules.orchestration.TransferOrchestration.{AggregateProcessingEvent, OrchestrationResult}
-import uk.gov.nationalarchives.aggregate.processing.modules.{Common, ErrorHandling}
 import uk.gov.nationalarchives.aggregate.processing.persistence.GraphQlApi
 import uk.gov.nationalarchives.aggregate.processing.persistence.GraphQlApi.{backend, keycloakDeployment}
 import uk.gov.nationalarchives.aggregate.processing.utilities.DraftMetadataCSVWriter
 import uk.gov.nationalarchives.aws.utils.s3.{S3Clients, S3Utils}
+import uk.gov.nationalarchives.tdr.common.utils.objectkeycontext
+import uk.gov.nationalarchives.tdr.common.utils.objectkeycontext.ObjectCategories.{DryRunMetadata, ObjectCategory}
 
 import java.nio.file.Path
 import java.util.UUID
@@ -49,8 +49,8 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
 
     val resultsIO = events.map(event =>
       processEvent(event).handleErrorWith(err => {
-        val objectContext = Common.objectKeyContextParser(event.metadataSourceObjectPrefix)
-        val error = AggregateProcessingError(Some(objectContext.consignmentId), s"$AggregateProcessing", err.getMessage)
+        val objectContext = objectkeycontext.Context.objectKeyParser(event.metadataSourceObjectPrefix)
+        val error = AggregateProcessingError(Some(objectContext.transferId), s"$AggregateProcessing", err.getMessage)
         errorHandling.handleError(error, logger)
         IO.unit
       })
@@ -62,12 +62,12 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
   def processEvent(event: AggregateEvent): IO[OrchestrationResult] = {
     val sourceBucket = event.metadataSourceBucket
     val objectsPrefix = event.metadataSourceObjectPrefix
-    val objectContext = Common.objectKeyContextParser(objectsPrefix)
-    val consignmentId = objectContext.consignmentId
-    val userId = objectContext.userId
+    val objectContext = objectkeycontext.Context.objectKeyParser(objectsPrefix)
+    val consignmentId = objectContext.transferId
+    val userId = objectContext.userId.get
     val dataLoadErrors = event.dataLoadErrors
-    val assetSource = objectContext.assetSource
-    val dryRun = objectsPrefix.contains(ObjectCategory.DryRunMetadata.toString)
+    val assetSource = objectContext.assetSource.get
+    val dryRun = objectsPrefix.contains(DryRunMetadata.id)
     logger.info(s"Starting processing consignment: $consignmentId")
     for {
       s3Objects <- IO(s3Utils.listAllObjectsWithPrefix(sourceBucket, objectsPrefix))
@@ -77,7 +77,7 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
           errorHandling.handleError(dataLoadError(consignmentId), logger)
           IO(errorProcessingResult)
         case _ if objectKeys.isEmpty =>
-          errorHandling.handleError(noObjectsError(consignmentId, objectContext.category), logger)
+          errorHandling.handleError(noObjectsError(consignmentId, objectContext.category.get), logger)
           IO(errorProcessingResult)
         case _ => processAssets(userId, consignmentId, sourceBucket, objectKeys, dryRun)
       }

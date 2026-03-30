@@ -1,18 +1,11 @@
 package uk.gov.nationalarchives.aggregate.processing.modules
 
-import uk.gov.nationalarchives.aggregate.processing.modules.Common.AssetSource.AssetSource
-import uk.gov.nationalarchives.aggregate.processing.modules.Common.ObjectCategory.ObjectCategory
-
-import java.util.UUID
-import scala.util.{Failure, Success, Try}
-
 object Common {
   object ProcessType extends Enumeration {
     type ProcessType = Value
     val AggregateProcessing: Value = Value("AGGREGATE_PROCESSING")
     val AssetProcessing: Value = Value("ASSET_PROCESSING")
     val InitialChecks: Value = Value("INITIAL_CHECKS")
-    val Persistence: Value = Value("PERSISTENCE")
     val Orchestration: Value = Value("ORCHESTRATION")
   }
 
@@ -21,7 +14,6 @@ object Common {
     val ClientDataLoadError: Value = Value("CLIENT_DATA_LOAD")
     val EncodingError: Value = Value("ENCODING")
     val EventError: Value = Value("EVENT")
-    val FileExtensionError: Value = Value("FILE_EXTENSION")
     val JsonError: Value = Value("JSON")
     val MalwareScanError: Value = Value("MALWARE_SCAN")
     val MatchIdError: Value = Value("MATCH_ID")
@@ -33,7 +25,6 @@ object Common {
 
   object ProcessErrorValue extends Enumeration {
     type ProcessErrorValue = Value
-    val Disallowed: Value = Value("DISALLOWED")
     val Failure: Value = Value("FAILURE")
     val FolderOnly: Value = Value("FOLDER_ONLY")
     val Invalid: Value = Value("INVALID")
@@ -42,26 +33,6 @@ object Common {
     val TooBigError: Value = Value("TOO_BIG")
     val TooSmallError: Value = Value("TOO_SMALL")
     val ThreatFound: Value = Value("THREAT_FOUND")
-  }
-
-  object AssetSource extends Enumeration {
-    type AssetSource = Value
-    val Droid: Value = Value("droid")
-    val HardDrive: Value = Value("harddrive")
-    val NetworkDrive: Value = Value("networkdrive")
-    val SharePoint: Value = Value("sharepoint")
-  }
-
-  object ObjectType extends Enumeration {
-    type ObjectType = Value
-    val Metadata: Value = Value("metadata")
-  }
-
-  object ObjectCategory extends Enumeration {
-    type ObjectCategory = Value
-    val DryRunMetadata: Value = Value("dryrunmetadata")
-    val Metadata: Value = Value("metadata")
-    val Records: Value = Value("records")
   }
 
   object MetadataClassification extends Enumeration {
@@ -73,21 +44,4 @@ object Common {
     type TransferFunction = Value
     val Load: Value = Value("load")
   }
-
-  def objectKeyContextParser(objectKey: String): ObjectKeyContext = {
-    Try {
-      val elements = objectKey.split('/')
-      val userId = UUID.fromString(elements(0))
-      val assetSource = AssetSource.withName(elements(1))
-      val consignmentId = UUID.fromString(elements(2))
-      val objectCategory = ObjectCategory.withName(elements(3))
-      val objectElements = if (elements.length > 4) Some(elements.last) else None
-      ObjectKeyContext(userId, consignmentId, assetSource, objectCategory, objectElements)
-    } match {
-      case Failure(ex)               => throw ex
-      case Success(objectKeyContext) => objectKeyContext
-    }
-  }
-
-  case class ObjectKeyContext(userId: UUID, consignmentId: UUID, assetSource: AssetSource, category: ObjectCategory, objectElements: Option[String])
 }

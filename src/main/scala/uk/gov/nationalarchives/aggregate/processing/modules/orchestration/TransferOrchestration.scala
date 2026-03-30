@@ -6,8 +6,6 @@ import com.typesafe.scalalogging.Logger
 import graphql.codegen.types.ConsignmentStatusInput
 import io.circe.Encoder
 import io.circe.generic.semiauto.deriveEncoder
-import uk.gov.nationalarchives.aggregate.processing.modules.Common.AssetSource.AssetSource
-import uk.gov.nationalarchives.aggregate.processing.modules.Common.ObjectCategory.Records
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorType.EventError
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorValue.Invalid
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.{AggregateProcessing, Orchestration}
@@ -20,9 +18,10 @@ import uk.gov.nationalarchives.aggregate.processing.utilities.NotificationsClien
 import uk.gov.nationalarchives.aggregate.processing.utilities.{KeycloakClient, NotificationsClient}
 import uk.gov.nationalarchives.aws.utils.stepfunction.StepFunctionClients.sfnAsyncClient
 import uk.gov.nationalarchives.aws.utils.stepfunction.StepFunctionUtils
+import uk.gov.nationalarchives.tdr.common.utils.objectkeycontext.AssetSources.AssetSource
+import uk.gov.nationalarchives.tdr.common.utils.objectkeycontext.ObjectCategories.Records
 import uk.gov.nationalarchives.tdr.common.utils.statuses.StatusTypes.{DraftMetadataType, DraftMetadataUploadType, UploadType}
-import uk.gov.nationalarchives.tdr.common.utils.statuses.StatusValues.StatusValue
-import uk.gov.nationalarchives.tdr.common.utils.statuses.StatusValues.{CompletedValue, CompletedWithIssuesValue, FailedValue, InProgressValue}
+import uk.gov.nationalarchives.tdr.common.utils.statuses.StatusValues._
 
 import java.util.UUID
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -77,7 +76,7 @@ class TransferOrchestration(
           status = consignmentStatusValue.value,
           userId = event.userId.toString,
           userEmail = userDetails.email,
-          assetSource = event.assetSource.toString,
+          assetSource = event.assetSource.id,
           environment = config.getString("environment")
         )
       )
@@ -102,11 +101,11 @@ class TransferOrchestration(
 
   private def triggerBackendChecksSfn(event: AggregateProcessingEvent): IO[Unit] = {
     val consignmentId = event.consignmentId
-    val assetSource = event.assetSource.toString
+    val assetSource = event.assetSource.id
     logger.info(s"Triggering file checks for consignment: $consignmentId")
     triggerStepFunction(
       arnKey = "sfn.backendChecksArn",
-      input = BackendChecksStepFunctionInput(consignmentId.toString, s"${event.userId}/$assetSource/$consignmentId/$Records"),
+      input = BackendChecksStepFunctionInput(consignmentId.toString, s"${event.userId}/$assetSource/$consignmentId/${Records.id}"),
       consignmentId = consignmentId
     )
   }

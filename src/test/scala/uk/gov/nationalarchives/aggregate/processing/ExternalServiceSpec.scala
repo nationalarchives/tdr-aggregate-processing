@@ -128,7 +128,7 @@ class ExternalServiceSpec extends AnyFlatSpec with BeforeAndAfterEach with Befor
   def mockS3GetObjectStream(key: String, metadataJsonString: String): StubMapping = {
     val bytes = metadataJsonString.getBytes("UTF-8")
     wiremockS3.stubFor(
-      get(urlEqualTo(s"/$key"))
+      get(urlEqualTo(s"/$key?partNumber=1"))
         .willReturn(aResponse().withStatus(200).withBody(bytes))
     )
   }
