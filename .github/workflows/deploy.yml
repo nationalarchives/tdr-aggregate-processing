@@ -22,7 +22,7 @@ permissions:
   contents: write
 jobs:
   deploy:
-    uses: nationalarchives/tdr-github-actions/.github/workflows/lambda_deploy.yml@4cce7fa069b9dbecddbdacd9350f66adc50ac815 # v0.0.22
+    uses: nationalarchives/tdr-github-actions/.github/workflows/lambda_deploy.yml@b6c9c07143225e2473579be26914683efd719ef6 # v0.0.23
     with:
       lambda-name: aggregate-processing
       deployment-package: aggregate-processing.jar
