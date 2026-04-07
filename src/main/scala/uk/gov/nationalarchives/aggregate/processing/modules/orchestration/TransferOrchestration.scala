@@ -5,7 +5,6 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.typesafe.scalalogging.Logger
 import graphql.codegen.types.ConsignmentStatusInput
 import io.circe.Encoder
-import io.circe.generic.semiauto.deriveEncoder
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorType.EventError
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorValue.Invalid
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.{AggregateProcessing, Orchestration}
@@ -20,6 +19,7 @@ import uk.gov.nationalarchives.aws.utils.stepfunction.StepFunctionClients.sfnAsy
 import uk.gov.nationalarchives.aws.utils.stepfunction.StepFunctionUtils
 import uk.gov.nationalarchives.tdr.common.utils.objectkeycontext.AssetSources.AssetSource
 import uk.gov.nationalarchives.tdr.common.utils.objectkeycontext.ObjectCategories.Records
+import uk.gov.nationalarchives.tdr.common.utils.serviceinputs.Inputs.{BackendChecksInput, MetadataValidationInput}
 import uk.gov.nationalarchives.tdr.common.utils.statuses.StatusTypes.{DraftMetadataType, DraftMetadataUploadType, UploadType}
 import uk.gov.nationalarchives.tdr.common.utils.statuses.StatusValues._
 
@@ -34,9 +34,6 @@ class TransferOrchestration(
     config: Config
 )(implicit logger: Logger) {
   private lazy val errorHandling = ErrorHandling()
-
-  implicit val backendChecksStepFunctionInputEncoder: Encoder[BackendChecksStepFunctionInput] = deriveEncoder[BackendChecksStepFunctionInput]
-  implicit val metadataChecksStepFunctionInputEncoder: Encoder[MetadataChecksStepFunctionInput] = deriveEncoder[MetadataChecksStepFunctionInput]
 
   def orchestrate[T <: Product](orchestrationEvent: T): IO[OrchestrationResult] = {
     orchestrationEvent match {
@@ -105,7 +102,7 @@ class TransferOrchestration(
     logger.info(s"Triggering file checks for consignment: $consignmentId")
     triggerStepFunction(
       arnKey = "sfn.backendChecksArn",
-      input = BackendChecksStepFunctionInput(consignmentId.toString, s"${event.userId}/$assetSource/$consignmentId/${Records.id}"),
+      input = BackendChecksInput(consignmentId.toString, s"${event.userId}/$assetSource/$consignmentId/${Records.id}"),
       consignmentId = consignmentId
     )
   }
@@ -121,7 +118,7 @@ class TransferOrchestration(
         _ <- persistenceApi.addConsignmentStatus(draftMetadataStatusInput)
         _ <- triggerStepFunction(
           arnKey = "sfn.metadataChecksArn",
-          input = MetadataChecksStepFunctionInput(consignmentId.toString),
+          input = MetadataValidationInput(consignmentId.toString, "draft-metadata.csv"),
           consignmentId = consignmentId
         )
       } yield ()
@@ -132,12 +129,6 @@ class TransferOrchestration(
 object TransferOrchestration {
   val config: Config = ConfigFactory.load()
   val logger = Logger[TransferOrchestration]
-
-  trait StepFunctionInput {
-    def consignmentId: String
-  }
-  case class BackendChecksStepFunctionInput(consignmentId: String, s3SourceBucketPrefix: String) extends StepFunctionInput
-  case class MetadataChecksStepFunctionInput(consignmentId: String, fileName: String = "draft-metadata.csv") extends StepFunctionInput
 
   case class AggregateProcessingEvent(assetSource: AssetSource, userId: UUID, consignmentId: UUID, processingErrors: Boolean, suppliedMetadata: Boolean)
 
