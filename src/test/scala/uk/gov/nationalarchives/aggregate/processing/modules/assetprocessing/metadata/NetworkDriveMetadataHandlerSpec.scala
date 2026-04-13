@@ -1,5 +1,6 @@
 package uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.metadata
 
+import io.circe.JsonObject
 import io.circe.syntax.EncoderOps
 import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper
 import uk.gov.nationalarchives.aggregate.processing.{ExternalServiceSpec, MetadataHelper}
@@ -18,10 +19,11 @@ class NetworkDriveMetadataHandlerSpec extends ExternalServiceSpec with MetadataH
     val networkDrivePathJson = "top-level/folder/file1.txt".asJson
     val networkDriveLastModifiedJson = "1616162994000".asJson
     val someOtherJson = "some other json value".asJson
+    val allJsonMetadata = JsonObject()
 
-    networkDriveHandler.normaliseValues("file_path", networkDrivePathJson) shouldBe networkDrivePathJson
-    networkDriveHandler.normaliseValues("date_last_modified", networkDriveLastModifiedJson) shouldBe networkDriveLastModifiedJson
-    networkDriveHandler.normaliseValues("some_other_property", someOtherJson) shouldBe someOtherJson
+    networkDriveHandler.normaliseValues("file_path", networkDrivePathJson, allJsonMetadata) shouldBe networkDrivePathJson
+    networkDriveHandler.normaliseValues("date_last_modified", networkDriveLastModifiedJson, allJsonMetadata) shouldBe networkDriveLastModifiedJson
+    networkDriveHandler.normaliseValues("some_other_property", someOtherJson, allJsonMetadata) shouldBe someOtherJson
   }
 
   "convertToBaseMetadata" should "convert valid network drive json with no default properties to base metadata json" in {

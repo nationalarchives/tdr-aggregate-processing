@@ -2,7 +2,7 @@ package uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.met
 
 import graphql.codegen.types.ClientSideMetadataInput
 import io.circe.syntax.EncoderOps
-import io.circe.{Decoder, Json}
+import io.circe.{Decoder, Json, JsonObject}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.MetadataClassification
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.MetadataClassification.MetadataClassification
 import uk.gov.nationalarchives.tdr.schemautils.ConfigUtils
@@ -12,7 +12,7 @@ class BaseMetadataHandler(
     defaultProperties: Map[String, String],
     suppliedProperties: Seq[String],
     systemProperties: Seq[String],
-    normaliseFunction: (String, Json) => Json,
+    normaliseFunction: (String, Json, JsonObject) => Json,
     enrichMetadataFunction: Map[String, Json] => Json = (baseMetadata: Map[String, Json]) => baseMetadata.asJson
 ) extends MetadataHandler {
   private val excludeProperties = suppliedProperties ++ systemProperties :+ MatchIdProperty.id :+ TransferIdProperty.id
@@ -35,8 +35,8 @@ class BaseMetadataHandler(
   override val sourceToBasePropertiesMapper: String => String = mapper
   override val defaultPropertyValues: Map[String, String] = defaultProperties
 
-  def normaliseValues(property: String, value: Json): Json = {
-    normaliseFunction(property, value)
+  def normaliseValues(property: String, value: Json, allMetadataJson: JsonObject): Json = {
+    normaliseFunction(property, value, allMetadataJson)
   }
 
   def toMetadataProperties(json: Json, properties: Seq[String]): List[MetadataProperty] = {
@@ -48,11 +48,12 @@ class BaseMetadataHandler(
   }
 
   def convertToBaseMetadata(sourceJson: Json): Json = {
+    val allMetadata: JsonObject = sourceJson.deepDropNullValues.asObject.get
     val metadata = sourceJson.deepDropNullValues.asObject.get.toMap
       .map(fv => {
         val originalField = fv._1
         val field = sourceToBasePropertiesMapper(originalField)
-        field -> normaliseValues(field, fv._2)
+        field -> normaliseValues(field, fv._2, allMetadata)
       })
     enrichMetadataFunction(metadata)
   }
