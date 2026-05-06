@@ -153,7 +153,7 @@ class GraphQlApiSpec extends ExternalServiceSpec {
       .when(updateConsignmentStatusClient)
       .getResult[Identity](any[BearerAccessToken], any[Document], inputVariablesCaptor.capture())(any[SttpBackend[Identity, Any]], any[ClassTag[Identity[_]]])
 
-    api.updateConsignmentStatus(ConsignmentStatusInput(consignmentId, "Upload", Some("Completed"), Some(overrideUserId))).unsafeRunSync()
+    api.updateConsignmentStatus(ConsignmentStatusInput(consignmentId, "Upload", Some("Completed"), Some(overrideUserId), None)).unsafeRunSync()
     val inputArgs = inputVariablesCaptor.getValue.get.updateConsignmentStatusInput
     inputArgs.consignmentId shouldBe consignmentId
     inputArgs.statusType shouldBe "Upload"
@@ -194,7 +194,7 @@ class GraphQlApiSpec extends ExternalServiceSpec {
     )
 
     val exception = intercept[RuntimeException] {
-      api.updateConsignmentStatus(ConsignmentStatusInput(consignmentId, "Upload", Some("Completed"), Some(overrideUserId))).unsafeRunSync()
+      api.updateConsignmentStatus(ConsignmentStatusInput(consignmentId, "Upload", Some("Completed"), Some(overrideUserId), None)).unsafeRunSync()
     }
 
     verify(mockLogger).info(s"Updating consignment status: Upload for consignment: $consignmentId")

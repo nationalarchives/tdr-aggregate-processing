@@ -51,7 +51,7 @@ class TransferOrchestration(
     val userId = event.userId
     val consignmentStatusValue: StatusValue = if (errors) FailedValue else CompletedValue
 
-    val statusInput = ConsignmentStatusInput(consignmentId, UploadType.id, Some(consignmentStatusValue.value), Some(event.userId))
+    val statusInput = ConsignmentStatusInput(consignmentId, UploadType.id, Some(consignmentStatusValue.value), Some(event.userId), None)
     for {
       _ <-
         if (errors) {
@@ -111,8 +111,8 @@ class TransferOrchestration(
     val consignmentId = event.consignmentId
     if (event.suppliedMetadata) {
       logger.info(s"Triggering draft metadata validation for consignment: $consignmentId")
-      val draftMetadataStatusInput = ConsignmentStatusInput(consignmentId, DraftMetadataType.id, Some(InProgressValue.value), Some(event.userId))
-      val draftUploadStatusInput = ConsignmentStatusInput(consignmentId, DraftMetadataUploadType.id, Some(CompletedValue.value), Some(event.userId))
+      val draftMetadataStatusInput = ConsignmentStatusInput(consignmentId, DraftMetadataType.id, Some(InProgressValue.value), Some(event.userId), None)
+      val draftUploadStatusInput = ConsignmentStatusInput(consignmentId, DraftMetadataUploadType.id, Some(CompletedValue.value), Some(event.userId), None)
       for {
         _ <- persistenceApi.addConsignmentStatus(draftUploadStatusInput)
         _ <- persistenceApi.addConsignmentStatus(draftMetadataStatusInput)
