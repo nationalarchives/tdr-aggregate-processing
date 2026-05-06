@@ -21,19 +21,19 @@ class HardDriveMetadataHandlerSpec extends ExternalServiceSpec with MetadataHelp
     val someOtherJson = "some other json value".asJson
     val allJsonMetadata = JsonObject()
 
-    hardDriveHandler.normaliseValues("closure_period", "0".asJson, allJsonMetadata) shouldBe "".asJson
-    hardDriveHandler.normaliseValues("closure_period", "12".asJson, allJsonMetadata) shouldBe "12".asJson
-    hardDriveHandler.normaliseValues("closure_type", "open_on_transfer".asJson, allJsonMetadata) shouldBe "Open".asJson
-    hardDriveHandler.normaliseValues("closure_type", "closed_on_transfer".asJson, allJsonMetadata) shouldBe "Closed".asJson
-    hardDriveHandler.normaliseValues("description_closed", "true".asJson, allJsonMetadata) shouldBe "false".asJson
-    hardDriveHandler.normaliseValues("description_closed", "false".asJson, allJsonMetadata) shouldBe "true".asJson
-    hardDriveHandler.normaliseValues("file_path", hardDriveFilePathJson, allJsonMetadata) shouldBe expectedFilePath.asJson
-    hardDriveHandler.normaliseValues("date_last_modified", hardDriveDateLastModifiedJson, allJsonMetadata) shouldBe "1751534387000".asJson
-    hardDriveHandler.normaliseValues("title_closed", "true".asJson, allJsonMetadata) shouldBe "false".asJson
-    hardDriveHandler.normaliseValues("title_closed", "false".asJson, allJsonMetadata) shouldBe "true".asJson
-    hardDriveHandler.normaliseValues("foi_exemption_code", "Open".asJson, allJsonMetadata) shouldBe "".asJson
-    hardDriveHandler.normaliseValues("foi_exemption_code", "30".asJson, allJsonMetadata) shouldBe "30".asJson
-    hardDriveHandler.normaliseValues("some_other_property", someOtherJson, allJsonMetadata) shouldBe someOtherJson
+    hardDriveHandler.normaliseValues(NormaliseValueInput("closure_period", "0".asJson, allJsonMetadata)) shouldBe "".asJson
+    hardDriveHandler.normaliseValues(NormaliseValueInput("closure_period", "12".asJson, allJsonMetadata)) shouldBe "12".asJson
+    hardDriveHandler.normaliseValues(NormaliseValueInput("closure_type", "open_on_transfer".asJson, allJsonMetadata)) shouldBe "Open".asJson
+    hardDriveHandler.normaliseValues(NormaliseValueInput("closure_type", "closed_on_transfer".asJson, allJsonMetadata)) shouldBe "Closed".asJson
+    hardDriveHandler.normaliseValues(NormaliseValueInput("description_closed", "true".asJson, allJsonMetadata)) shouldBe "false".asJson
+    hardDriveHandler.normaliseValues(NormaliseValueInput("description_closed", "false".asJson, allJsonMetadata)) shouldBe "true".asJson
+    hardDriveHandler.normaliseValues(NormaliseValueInput("file_path", hardDriveFilePathJson, allJsonMetadata)) shouldBe expectedFilePath.asJson
+    hardDriveHandler.normaliseValues(NormaliseValueInput("date_last_modified", hardDriveDateLastModifiedJson, allJsonMetadata)) shouldBe "1751534387000".asJson
+    hardDriveHandler.normaliseValues(NormaliseValueInput("title_closed", "true".asJson, allJsonMetadata)) shouldBe "false".asJson
+    hardDriveHandler.normaliseValues(NormaliseValueInput("title_closed", "false".asJson, allJsonMetadata)) shouldBe "true".asJson
+    hardDriveHandler.normaliseValues(NormaliseValueInput("foi_exemption_code", "Open".asJson, allJsonMetadata)) shouldBe "".asJson
+    hardDriveHandler.normaliseValues(NormaliseValueInput("foi_exemption_code", "30".asJson, allJsonMetadata)) shouldBe "30".asJson
+    hardDriveHandler.normaliseValues(NormaliseValueInput("some_other_property", someOtherJson, allJsonMetadata)) shouldBe someOtherJson
   }
 
   "convertToBaseMetadata" should "convert valid hard drive json with no default properties to base metadata json" in {

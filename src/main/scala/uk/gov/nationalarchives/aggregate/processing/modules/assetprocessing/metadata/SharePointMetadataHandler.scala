@@ -50,11 +50,11 @@ object SharePointMetadataHandler {
   }
 
   private object NormalisePropertyValue {
-    def normalise(id: String, value: Json, allMetadataJson: JsonObject): Json = id match {
-      case FilePathProperty.id                                                                                              => normaliseFilePath(value, allMetadataJson)
-      case DateLastModifiedProperty.id | ClosureStartDateProperty.id | EndDateProperty.id | FoiExemptionAssertedProperty.id => normaliseDateTime(value)
-      case ClosurePeriodProperty.id                                                                                         => normaliseNumber(value)
-      case _                                                                                                                => value
+    def normalise(input: NormaliseValueInput): Json = input.property match {
+      case FilePathProperty.id                                                                                              => normaliseFilePath(input.value, input.allMetadataJson)
+      case DateLastModifiedProperty.id | ClosureStartDateProperty.id | EndDateProperty.id | FoiExemptionAssertedProperty.id => normaliseDateTime(input.value)
+      case ClosurePeriodProperty.id                                                                                         => normaliseNumber(input.value)
+      case _                                                                                                                => input.value
     }
   }
 

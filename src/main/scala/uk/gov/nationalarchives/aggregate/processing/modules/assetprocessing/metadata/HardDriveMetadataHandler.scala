@@ -1,6 +1,6 @@
 package uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.metadata
 
-import io.circe.{Json, JsonObject}
+import io.circe.Json
 import io.circe.syntax.EncoderOps
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.MetadataClassification.{Supplied, System}
 import uk.gov.nationalarchives.tdr.schemautils.ConfigUtils
@@ -52,13 +52,13 @@ object HardDriveMetadataHandler {
   }
 
   private object NormalisePropertyValue {
-    def normalise(id: String, value: Json, allMetadataJson: JsonObject): Json = id match {
-      case DateLastModifiedProperty.id => normaliseDateTime(value)
-      case FilePathProperty.id         => normaliseFilePath(value)
-      case FoiExemptionCodeProperty.id => normaliseFoiExemptionCode(value)
+    def normalise(input: NormaliseValueInput): Json = input.property match {
+      case DateLastModifiedProperty.id => normaliseDateTime(input.value)
+      case FilePathProperty.id         => normaliseFilePath(input.value)
+      case FoiExemptionCodeProperty.id => normaliseFoiExemptionCode(input.value)
       case ClosureTypeProperty.id | TitleClosedProperty.id | DescriptionClosedProperty.id | ClosurePeriodProperty.id =>
-        switchToAlternateValue(value)
-      case _ => value
+        switchToAlternateValue(input.value)
+      case _ => input.value
     }
   }
 

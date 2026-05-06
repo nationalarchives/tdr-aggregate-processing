@@ -21,9 +21,9 @@ class DroidMetadataHandlerSpec extends ExternalServiceSpec with MetadataHelper {
     val someOtherJson = "some other json value".asJson
     val allJsonMetadata = JsonObject()
 
-    droidHandler.normaliseValues("file_path", droidFilePathJson, allJsonMetadata) shouldBe expectedFilePath.asJson
-    droidHandler.normaliseValues("date_last_modified", droidDateLastModifiedJson, allJsonMetadata) shouldBe "1751534387000".asJson
-    droidHandler.normaliseValues("some_other_property", someOtherJson, allJsonMetadata) shouldBe someOtherJson
+    droidHandler.normaliseValues(NormaliseValueInput("file_path", droidFilePathJson, allJsonMetadata)) shouldBe expectedFilePath.asJson
+    droidHandler.normaliseValues(NormaliseValueInput("date_last_modified", droidDateLastModifiedJson, allJsonMetadata)) shouldBe "1751534387000".asJson
+    droidHandler.normaliseValues(NormaliseValueInput("some_other_property", someOtherJson, allJsonMetadata)) shouldBe someOtherJson
   }
 
   "convertToBaseMetadata" should "convert valid Droid json with no default properties to base metadata json" in {

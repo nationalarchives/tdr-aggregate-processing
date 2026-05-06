@@ -12,7 +12,7 @@ class BaseMetadataHandler(
     defaultProperties: Map[String, String],
     suppliedProperties: Seq[String],
     systemProperties: Seq[String],
-    normaliseFunction: (String, Json, JsonObject) => Json,
+    normaliseFunction: NormaliseValueInput => Json,
     enrichMetadataFunction: Map[String, Json] => Json = (baseMetadata: Map[String, Json]) => baseMetadata.asJson
 ) extends MetadataHandler {
   private val excludeProperties = suppliedProperties ++ systemProperties :+ MatchIdProperty.id :+ TransferIdProperty.id
@@ -35,8 +35,8 @@ class BaseMetadataHandler(
   override val sourceToBasePropertiesMapper: String => String = mapper
   override val defaultPropertyValues: Map[String, String] = defaultProperties
 
-  def normaliseValues(property: String, value: Json, allMetadataJson: JsonObject): Json = {
-    normaliseFunction(property, value, allMetadataJson)
+  def normaliseValues(input: NormaliseValueInput): Json = {
+    normaliseFunction(input)
   }
 
   def toMetadataProperties(json: Json, properties: Seq[String]): List[MetadataProperty] = {
@@ -53,7 +53,7 @@ class BaseMetadataHandler(
       .map(fv => {
         val originalField = fv._1
         val field = sourceToBasePropertiesMapper(originalField)
-        field -> normaliseValues(field, fv._2, allMetadata)
+        field -> normaliseValues(NormaliseValueInput(field, fv._2, allMetadata))
       })
     enrichMetadataFunction(metadata)
   }

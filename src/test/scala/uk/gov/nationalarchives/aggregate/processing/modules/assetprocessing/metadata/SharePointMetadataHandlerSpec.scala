@@ -23,13 +23,13 @@ class SharePointMetadataHandlerSpec extends ExternalServiceSpec with MetadataHel
     val someOtherJson = "some other json value".asJson
     val allJsonMetadata = JsonObject()
 
-    handler.normaliseValues("closure_start_date", dateTimeJson, allJsonMetadata) shouldBe "1751534387000".asJson
-    handler.normaliseValues("date_last_modified", dateTimeJson, allJsonMetadata) shouldBe "1751534387000".asJson
-    handler.normaliseValues("end_date", dateTimeJson, allJsonMetadata) shouldBe "1751534387000".asJson
-    handler.normaliseValues("file_path", filePathJson, allJsonMetadata) shouldBe expectedFilePath.asJson
-    handler.normaliseValues("foi_exemption_asserted", dateTimeJson, allJsonMetadata) shouldBe "1751534387000".asJson
-    handler.normaliseValues("closure_period", 20.asJson, allJsonMetadata) shouldBe "20".asJson
-    handler.normaliseValues("some_other_property", someOtherJson, allJsonMetadata) shouldBe someOtherJson
+    handler.normaliseValues(NormaliseValueInput("closure_start_date", dateTimeJson, allJsonMetadata)) shouldBe "1751534387000".asJson
+    handler.normaliseValues(NormaliseValueInput("date_last_modified", dateTimeJson, allJsonMetadata)) shouldBe "1751534387000".asJson
+    handler.normaliseValues(NormaliseValueInput("end_date", dateTimeJson, allJsonMetadata)) shouldBe "1751534387000".asJson
+    handler.normaliseValues(NormaliseValueInput("file_path", filePathJson, allJsonMetadata)) shouldBe expectedFilePath.asJson
+    handler.normaliseValues(NormaliseValueInput("foi_exemption_asserted", dateTimeJson, allJsonMetadata)) shouldBe "1751534387000".asJson
+    handler.normaliseValues(NormaliseValueInput("closure_period", 20.asJson, allJsonMetadata)) shouldBe "20".asJson
+    handler.normaliseValues(NormaliseValueInput("some_other_property", someOtherJson, allJsonMetadata)) shouldBe someOtherJson
   }
 
   "normaliseValues" should "return normalised file path based on whether display names are present" in {
@@ -38,19 +38,19 @@ class SharePointMetadataHandlerSpec extends ExternalServiceSpec with MetadataHel
       .add("SiteName", siteDisplayName.asJson)
       .add("LibraryName", libraryDisplayName.asJson)
 
-    handler.normaliseValues("file_path", filePathJson, allJsonMetadata) shouldBe
+    handler.normaliseValues(NormaliseValueInput("file_path", filePathJson, allJsonMetadata)) shouldBe
       "sites/Site Display Name/Library Display Name/aFolder/file1.txt".asJson
 
     val allJsonMetadataLibraryNameOnly = JsonObject()
       .add("LibraryName", libraryDisplayName.asJson)
 
-    handler.normaliseValues("file_path", filePathJson, allJsonMetadataLibraryNameOnly) shouldBe
+    handler.normaliseValues(NormaliseValueInput("file_path", filePathJson, allJsonMetadataLibraryNameOnly)) shouldBe
       "sites/Retail/Library Display Name/aFolder/file1.txt".asJson
 
     val allJsonMetadataSiteNameOnly = JsonObject()
       .add("SiteName", siteDisplayName.asJson)
 
-    handler.normaliseValues("file_path", filePathJson, allJsonMetadataSiteNameOnly) shouldBe
+    handler.normaliseValues(NormaliseValueInput("file_path", filePathJson, allJsonMetadataSiteNameOnly)) shouldBe
       "sites/Site Display Name/Shared Documents/aFolder/file1.txt".asJson
   }
 

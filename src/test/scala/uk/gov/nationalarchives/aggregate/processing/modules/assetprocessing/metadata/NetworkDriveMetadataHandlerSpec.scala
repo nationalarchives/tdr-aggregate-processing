@@ -21,9 +21,9 @@ class NetworkDriveMetadataHandlerSpec extends ExternalServiceSpec with MetadataH
     val someOtherJson = "some other json value".asJson
     val allJsonMetadata = JsonObject()
 
-    networkDriveHandler.normaliseValues("file_path", networkDrivePathJson, allJsonMetadata) shouldBe networkDrivePathJson
-    networkDriveHandler.normaliseValues("date_last_modified", networkDriveLastModifiedJson, allJsonMetadata) shouldBe networkDriveLastModifiedJson
-    networkDriveHandler.normaliseValues("some_other_property", someOtherJson, allJsonMetadata) shouldBe someOtherJson
+    networkDriveHandler.normaliseValues(NormaliseValueInput("file_path", networkDrivePathJson, allJsonMetadata)) shouldBe networkDrivePathJson
+    networkDriveHandler.normaliseValues(NormaliseValueInput("date_last_modified", networkDriveLastModifiedJson, allJsonMetadata)) shouldBe networkDriveLastModifiedJson
+    networkDriveHandler.normaliseValues(NormaliseValueInput("some_other_property", someOtherJson, allJsonMetadata)) shouldBe someOtherJson
   }
 
   "convertToBaseMetadata" should "convert valid network drive json with no default properties to base metadata json" in {
