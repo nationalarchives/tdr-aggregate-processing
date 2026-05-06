@@ -6,6 +6,7 @@ import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.meta
 import java.util.UUID
 
 trait MetadataHelper {
+  val metadataSourceBucket = "tdr-upload-files-cloudfront-dirty"
   val defaultFileSize: Long = 12L
   val customFieldJsonString: String = """"customField": "custom metadata value""""
   val defaultSuppliedFields: String = """"closure_type": "Open","description": "some kind of description""""

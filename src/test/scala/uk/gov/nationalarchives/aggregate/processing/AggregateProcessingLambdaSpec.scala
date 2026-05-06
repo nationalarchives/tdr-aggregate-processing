@@ -21,7 +21,7 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
   private def validMessageBody(assetSource: String): String =
     s"""
     {
-      "metadataSourceBucket": "source-bucket",
+      "metadataSourceBucket": "$metadataSourceBucket",
       "metadataSourceObjectPrefix": "$userId/$assetSource/$consignmentId/$category",
       "dataLoadErrors": false
     }
@@ -119,7 +119,7 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
       val dataLoadErrorsMessageBody: String =
         s"""
           {
-            "metadataSourceBucket": "source-bucket",
+            "metadataSourceBucket": "$metadataSourceBucket",
             "metadataSourceObjectPrefix": "$userId/$assetSource/$consignmentId/$category",
             "dataLoadErrors": true
           }
@@ -325,7 +325,7 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
       val validMessageBody: String =
         s"""
             {
-              "metadataSourceBucket": "source-bucket",
+              "metadataSourceBucket": "$metadataSourceBucket",
               "metadataSourceObjectPrefix": "$userId/$assetSource/$consignmentId/$category",
               "dataLoadErrors": false
             }
@@ -397,7 +397,7 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
         val validMessageBody: String =
           s"""
             {
-              "metadataSourceBucket": "source-bucket",
+              "metadataSourceBucket": "$metadataSourceBucket",
               "metadataSourceObjectPrefix": "$userId/$assetSource/$consignmentId/$category",
               "dataLoadErrors": false
             }
