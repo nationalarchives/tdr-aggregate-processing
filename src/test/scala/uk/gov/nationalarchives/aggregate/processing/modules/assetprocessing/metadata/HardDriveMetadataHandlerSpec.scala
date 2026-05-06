@@ -1,5 +1,6 @@
 package uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.metadata
 
+import io.circe.JsonObject
 import io.circe.syntax.EncoderOps
 import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper
 import uk.gov.nationalarchives.aggregate.processing.{ExternalServiceSpec, MetadataHelper}
@@ -18,20 +19,21 @@ class HardDriveMetadataHandlerSpec extends ExternalServiceSpec with MetadataHelp
     val hardDriveFilePathJson = """Z:\series\content\Retail\Shared Documents\file1.txt""".asJson
     val hardDriveDateLastModifiedJson = "2025-07-03T09:19:47".asJson
     val someOtherJson = "some other json value".asJson
+    val allJsonMetadata = JsonObject()
 
-    hardDriveHandler.normaliseValues("closure_period", "0".asJson) shouldBe "".asJson
-    hardDriveHandler.normaliseValues("closure_period", "12".asJson) shouldBe "12".asJson
-    hardDriveHandler.normaliseValues("closure_type", "open_on_transfer".asJson) shouldBe "Open".asJson
-    hardDriveHandler.normaliseValues("closure_type", "closed_on_transfer".asJson) shouldBe "Closed".asJson
-    hardDriveHandler.normaliseValues("description_closed", "true".asJson) shouldBe "false".asJson
-    hardDriveHandler.normaliseValues("description_closed", "false".asJson) shouldBe "true".asJson
-    hardDriveHandler.normaliseValues("file_path", hardDriveFilePathJson) shouldBe expectedFilePath.asJson
-    hardDriveHandler.normaliseValues("date_last_modified", hardDriveDateLastModifiedJson) shouldBe "1751534387000".asJson
-    hardDriveHandler.normaliseValues("title_closed", "true".asJson) shouldBe "false".asJson
-    hardDriveHandler.normaliseValues("title_closed", "false".asJson) shouldBe "true".asJson
-    hardDriveHandler.normaliseValues("foi_exemption_code", "Open".asJson) shouldBe "".asJson
-    hardDriveHandler.normaliseValues("foi_exemption_code", "30".asJson) shouldBe "30".asJson
-    hardDriveHandler.normaliseValues("some_other_property", someOtherJson) shouldBe someOtherJson
+    hardDriveHandler.normaliseValues("closure_period", "0".asJson, allJsonMetadata) shouldBe "".asJson
+    hardDriveHandler.normaliseValues("closure_period", "12".asJson, allJsonMetadata) shouldBe "12".asJson
+    hardDriveHandler.normaliseValues("closure_type", "open_on_transfer".asJson, allJsonMetadata) shouldBe "Open".asJson
+    hardDriveHandler.normaliseValues("closure_type", "closed_on_transfer".asJson, allJsonMetadata) shouldBe "Closed".asJson
+    hardDriveHandler.normaliseValues("description_closed", "true".asJson, allJsonMetadata) shouldBe "false".asJson
+    hardDriveHandler.normaliseValues("description_closed", "false".asJson, allJsonMetadata) shouldBe "true".asJson
+    hardDriveHandler.normaliseValues("file_path", hardDriveFilePathJson, allJsonMetadata) shouldBe expectedFilePath.asJson
+    hardDriveHandler.normaliseValues("date_last_modified", hardDriveDateLastModifiedJson, allJsonMetadata) shouldBe "1751534387000".asJson
+    hardDriveHandler.normaliseValues("title_closed", "true".asJson, allJsonMetadata) shouldBe "false".asJson
+    hardDriveHandler.normaliseValues("title_closed", "false".asJson, allJsonMetadata) shouldBe "true".asJson
+    hardDriveHandler.normaliseValues("foi_exemption_code", "Open".asJson, allJsonMetadata) shouldBe "".asJson
+    hardDriveHandler.normaliseValues("foi_exemption_code", "30".asJson, allJsonMetadata) shouldBe "30".asJson
+    hardDriveHandler.normaliseValues("some_other_property", someOtherJson, allJsonMetadata) shouldBe someOtherJson
   }
 
   "convertToBaseMetadata" should "convert valid hard drive json with no default properties to base metadata json" in {

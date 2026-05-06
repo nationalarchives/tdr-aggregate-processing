@@ -1,6 +1,6 @@
 package uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.metadata
 
-import io.circe.Json
+import io.circe.{Json, JsonObject}
 import io.circe.syntax.EncoderOps
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.MetadataClassification.{Supplied, System}
 import uk.gov.nationalarchives.tdr.schemautils.ConfigUtils
@@ -18,7 +18,7 @@ object NetworkDriveMetadataHandler {
   }
 
   private object NormalisePropertyValue {
-    def normalise(id: String, value: Json): Json = id match {
+    def normalise(id: String, value: Json, allMetadataJson: JsonObject): Json = id match {
       case FilePathProperty.id => normaliseFilePath(value)
       case _                   => value
     }
