@@ -72,7 +72,7 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     when(mockGraphQlApi.getConsignmentDetails(consignmentId)).thenReturn(consignmentDetailsResponseStub)
     when(sfnUtils.startExecution(any[String], any[BackendChecksInput], any[Option[String]])(any[Encoder[BackendChecksInput]]))
       .thenReturn(IO.pure(StartExecutionResponse.builder.build))
-    when(keycloakConfigurations.userDetails(userId.toString)).thenReturn(Future.successful(UserDetails(userEmail)))
+    when(keycloakConfigurations.userDetails(userId.toString)).thenReturn(Future.successful(UserDetails(userEmail, "test", "test")))
     when(notificationUtils.publishUploadEvent(any[NotificationsClient.UploadEvent])).thenReturn(IO.pure(PublishResponse.builder.build()))
 
     val event = AggregateProcessingEvent(assetSource, userId, consignmentId, processingErrors = false, suppliedMetadata = false)
@@ -153,7 +153,7 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
       .thenReturn(IO.pure(StartExecutionResponse.builder.build))
     when(sfnUtils.startExecution(any[String], any[MetadataValidationInput], any[Option[String]])(any[Encoder[MetadataValidationInput]]))
       .thenReturn(IO.pure(StartExecutionResponse.builder.build))
-    when(keycloakConfigurations.userDetails(userId.toString)).thenReturn(Future.successful(UserDetails(userEmail)))
+    when(keycloakConfigurations.userDetails(userId.toString)).thenReturn(Future.successful(UserDetails(userEmail, "test", "test")))
     when(notificationUtils.publishUploadEvent(any[NotificationsClient.UploadEvent])).thenReturn(IO.pure(PublishResponse.builder.build()))
 
     val event = AggregateProcessingEvent(assetSource, userId, consignmentId, processingErrors = false, suppliedMetadata = true)
@@ -231,7 +231,7 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     when(mockLogger.isErrorEnabled()).thenReturn(true)
     when(mockGraphQlApi.updateConsignmentStatus(any[ConsignmentStatusInput])).thenReturn(IO(Some(1)))
     when(mockGraphQlApi.getConsignmentDetails(consignmentId)).thenReturn(consignmentDetailsResponseStub)
-    when(keycloakConfigurations.userDetails(userId.toString)).thenReturn(Future.successful(UserDetails(userEmail)))
+    when(keycloakConfigurations.userDetails(userId.toString)).thenReturn(Future.successful(UserDetails(userEmail, "test", "test")))
     when(notificationUtils.publishUploadEvent(any[NotificationsClient.UploadEvent])).thenReturn(IO.pure(PublishResponse.builder.build()))
 
     val event = AggregateProcessingEvent(assetSource, userId, consignmentId, processingErrors = true, suppliedMetadata = false)
@@ -322,7 +322,7 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     when(mockLogger.isErrorEnabled()).thenReturn(true)
     when(mockGraphQlApi.updateConsignmentStatus(any[ConsignmentStatusInput])).thenReturn(IO(Some(1)))
     when(mockGraphQlApi.getConsignmentDetails(consignmentId)).thenReturn(consignmentDetailsResponseStub)
-    when(keycloakConfigurations.userDetails(userId.toString)).thenReturn(Future.successful(UserDetails(userEmail)))
+    when(keycloakConfigurations.userDetails(userId.toString)).thenReturn(Future.successful(UserDetails(userEmail, "test", "test")))
 
     when(
       sfnUtils.startExecution(

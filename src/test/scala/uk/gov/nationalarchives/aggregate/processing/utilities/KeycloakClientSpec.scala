@@ -21,7 +21,7 @@ class KeycloakClientSpec extends ExternalServiceSpec {
     val userId = UUID.randomUUID().toString
     val config = ConfigFactory.load()
     val keycloakUtils = mock[KeycloakUtils]
-    val expectedUserDetails = UserDetails("test@test.com")
+    val expectedUserDetails = UserDetails("test@test.com", "test", "test")
     when(keycloakUtils.userDetails(eqTo(userId), any, any)(any, any, any)).thenReturn(Future.successful(expectedUserDetails))
     val keycloakClient = new KeycloakClient(keycloakUtils, config)
 

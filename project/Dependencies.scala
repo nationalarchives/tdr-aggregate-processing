@@ -4,9 +4,9 @@ object Dependencies {
   private val circeVersion = "0.14.15"
   private val mockitoScalaVersion = "2.2.1"
   private val awsUtilsVersion = "0.1.328"
-  private val tdrCommonUtilsVersion = "0.0.19"
+  private val tdrCommonUtilsVersion = "0.0.21"
 
-  lazy val authUtils = "uk.gov.nationalarchives" %% "tdr-auth-utils" % "0.0.283"
+  lazy val authUtils = "uk.gov.nationalarchives" %% "tdr-auth-utils" % "0.0.285"
   lazy val awsLambdaCore = "com.amazonaws" % "aws-lambda-java-core" % "1.4.0"
   lazy val awsLambdaEvents = "com.amazonaws" % "aws-lambda-java-events" % "3.16.1"
 
@@ -37,7 +37,7 @@ object Dependencies {
   lazy val tdrInputs = "uk.gov.nationalarchives" %% "tdr-service-inputs" % tdrCommonUtilsVersion
   lazy val tdrObjectKeyContext = "uk.gov.nationalarchives" %% "tdr-object-key-context" % tdrCommonUtilsVersion
   lazy val tdrStatuses = "uk.gov.nationalarchives" %% "tdr-statuses" % tdrCommonUtilsVersion
-  lazy val typesafeConfig = "com.typesafe" % "config" % "1.4.7"
+  lazy val typesafeConfig = "com.typesafe" % "config" % "1.4.8"
 
   lazy val utf8Validator = "uk.gov.nationalarchives" % "utf8-validator" % "1.2"
 
