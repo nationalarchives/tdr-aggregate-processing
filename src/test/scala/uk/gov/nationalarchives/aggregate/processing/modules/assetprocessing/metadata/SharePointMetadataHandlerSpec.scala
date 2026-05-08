@@ -1,5 +1,6 @@
 package uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.metadata
 
+import io.circe.JsonObject
 import io.circe.syntax.EncoderOps
 import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper
 import uk.gov.nationalarchives.aggregate.processing.{ExternalServiceSpec, MetadataHelper}
@@ -8,6 +9,8 @@ import uk.gov.nationalarchives.aggregate.processing.modules.Common.MetadataClass
 import java.util.UUID
 
 class SharePointMetadataHandlerSpec extends ExternalServiceSpec with MetadataHelper {
+  private val siteDisplayName = "Site Display Name"
+  private val libraryDisplayName = "Library Display Name"
   private val expectedFilePath = "sites/Retail/Shared Documents/file1.txt"
   private val matchId = "matchId"
   private val consignmentId = UUID.randomUUID()
@@ -18,14 +21,37 @@ class SharePointMetadataHandlerSpec extends ExternalServiceSpec with MetadataHel
     val dateTimeJson = "2025-07-03T09:19:47Z".asJson
     val filePathJson = "/sites/Retail/Shared Documents/file1.txt".asJson
     val someOtherJson = "some other json value".asJson
+    val allJsonMetadata = JsonObject()
 
-    handler.normaliseValues("closure_start_date", dateTimeJson) shouldBe "1751534387000".asJson
-    handler.normaliseValues("date_last_modified", dateTimeJson) shouldBe "1751534387000".asJson
-    handler.normaliseValues("end_date", dateTimeJson) shouldBe "1751534387000".asJson
-    handler.normaliseValues("file_path", filePathJson) shouldBe expectedFilePath.asJson
-    handler.normaliseValues("foi_exemption_asserted", dateTimeJson) shouldBe "1751534387000".asJson
-    handler.normaliseValues("closure_period", 20.asJson) shouldBe "20".asJson
-    handler.normaliseValues("some_other_property", someOtherJson) shouldBe someOtherJson
+    handler.normaliseValues("closure_start_date", dateTimeJson, allJsonMetadata) shouldBe "1751534387000".asJson
+    handler.normaliseValues("date_last_modified", dateTimeJson, allJsonMetadata) shouldBe "1751534387000".asJson
+    handler.normaliseValues("end_date", dateTimeJson, allJsonMetadata) shouldBe "1751534387000".asJson
+    handler.normaliseValues("file_path", filePathJson, allJsonMetadata) shouldBe expectedFilePath.asJson
+    handler.normaliseValues("foi_exemption_asserted", dateTimeJson, allJsonMetadata) shouldBe "1751534387000".asJson
+    handler.normaliseValues("closure_period", 20.asJson, allJsonMetadata) shouldBe "20".asJson
+    handler.normaliseValues("some_other_property", someOtherJson, allJsonMetadata) shouldBe someOtherJson
+  }
+
+  "normaliseValues" should "return normalised file path based on whether display names are present" in {
+    val filePathJson = "/sites/Retail/Shared Documents/aFolder/file1.txt".asJson
+    val allJsonMetadata = JsonObject()
+      .add("SiteName", siteDisplayName.asJson)
+      .add("LibraryName", libraryDisplayName.asJson)
+
+    handler.normaliseValues("file_path", filePathJson, allJsonMetadata) shouldBe
+      "sites/Site Display Name/Library Display Name/aFolder/file1.txt".asJson
+
+    val allJsonMetadataLibraryNameOnly = JsonObject()
+      .add("LibraryName", libraryDisplayName.asJson)
+
+    handler.normaliseValues("file_path", filePathJson, allJsonMetadataLibraryNameOnly) shouldBe
+      "sites/Retail/Library Display Name/aFolder/file1.txt".asJson
+
+    val allJsonMetadataSiteNameOnly = JsonObject()
+      .add("SiteName", siteDisplayName.asJson)
+
+    handler.normaliseValues("file_path", filePathJson, allJsonMetadataSiteNameOnly) shouldBe
+      "sites/Site Display Name/Shared Documents/aFolder/file1.txt".asJson
   }
 
   "convertToBaseMetadata" should "convert valid SharePoint json to base metadata json" in {

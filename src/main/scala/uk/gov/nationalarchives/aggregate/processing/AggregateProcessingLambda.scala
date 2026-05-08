@@ -49,8 +49,8 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
 
     val resultsIO = events.map(event =>
       processEvent(event).handleErrorWith(err => {
-        val objectContext = objectkeycontext.Context.objectKeyParser(event.metadataSourceObjectPrefix)
-        val error = AggregateProcessingError(Some(objectContext.transferId), s"$AggregateProcessing", err.getMessage)
+        val objectContext = objectkeycontext.Context.objectKeyParser(event.metadataSourceObjectPrefix, event.metadataSourceBucket)
+        val error = AggregateProcessingError(objectContext.transferId, s"$AggregateProcessing", err.getMessage)
         errorHandling.handleError(error, logger)
         IO.unit
       })
@@ -62,8 +62,8 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
   def processEvent(event: AggregateEvent): IO[OrchestrationResult] = {
     val sourceBucket = event.metadataSourceBucket
     val objectsPrefix = event.metadataSourceObjectPrefix
-    val objectContext = objectkeycontext.Context.objectKeyParser(objectsPrefix)
-    val consignmentId = objectContext.transferId
+    val objectContext = objectkeycontext.Context.objectKeyParser(objectsPrefix, sourceBucket)
+    val consignmentId = objectContext.transferId.get
     val userId = objectContext.userId.get
     val dataLoadErrors = event.dataLoadErrors
     val assetSource = objectContext.assetSource.get

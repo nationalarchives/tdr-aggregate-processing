@@ -1,5 +1,6 @@
 package uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.metadata
 
+import io.circe.JsonObject
 import io.circe.syntax.EncoderOps
 import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper
 import uk.gov.nationalarchives.aggregate.processing.{ExternalServiceSpec, MetadataHelper}
@@ -18,10 +19,11 @@ class DroidMetadataHandlerSpec extends ExternalServiceSpec with MetadataHelper {
     val droidFilePathJson = """Z:\year_batch\batch_number\series\Content\Retail\Shared Documents\file1.txt""".asJson
     val droidDateLastModifiedJson = "2025-07-03T09:19:47".asJson
     val someOtherJson = "some other json value".asJson
+    val allJsonMetadata = JsonObject()
 
-    droidHandler.normaliseValues("file_path", droidFilePathJson) shouldBe expectedFilePath.asJson
-    droidHandler.normaliseValues("date_last_modified", droidDateLastModifiedJson) shouldBe "1751534387000".asJson
-    droidHandler.normaliseValues("some_other_property", someOtherJson) shouldBe someOtherJson
+    droidHandler.normaliseValues("file_path", droidFilePathJson, allJsonMetadata) shouldBe expectedFilePath.asJson
+    droidHandler.normaliseValues("date_last_modified", droidDateLastModifiedJson, allJsonMetadata) shouldBe "1751534387000".asJson
+    droidHandler.normaliseValues("some_other_property", someOtherJson, allJsonMetadata) shouldBe someOtherJson
   }
 
   "convertToBaseMetadata" should "convert valid Droid json with no default properties to base metadata json" in {

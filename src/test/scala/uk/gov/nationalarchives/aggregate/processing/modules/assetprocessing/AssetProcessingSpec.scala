@@ -91,11 +91,11 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
           .thenReturn(Map(malwareScanKey -> "NO_THREATS_FOUND"))
 
         val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
-        val result = assetProcessing.processAsset("s3Bucket", s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata")
+        val result = assetProcessing.processAsset(metadataSourceBucket, s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata")
 
         result shouldEqual expectedResult
 
-        verify(s3UtilsMock, times(1)).addObjectTags("s3Bucket", s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata", Map("ASSET_PROCESSING" -> "Completed"))
+        verify(s3UtilsMock, times(1)).addObjectTags(metadataSourceBucket, s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata", Map("ASSET_PROCESSING" -> "Completed"))
 
         verify(mockLogger, times(0)).isErrorEnabled
         verify(mockLogger).info("Asset metadata successfully processed for: {}", s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata")
@@ -114,11 +114,11 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
 
         val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
 
-        val result = assetProcessing.processAsset("s3Bucket", "incorrect/object/key/format.txt")
+        val result = assetProcessing.processAsset(metadataSourceBucket, "incorrect/object/key/format.txt")
 
         result shouldEqual expectedResult
 
-        verify(s3UtilsMock, times(1)).addObjectTags("s3Bucket", "incorrect/object/key/format.txt", Map("ASSET_PROCESSING" -> "CompletedWithIssues"))
+        verify(s3UtilsMock, times(1)).addObjectTags(metadataSourceBucket, "incorrect/object/key/format.txt", Map("ASSET_PROCESSING" -> "CompletedWithIssues"))
 
         verify(mockLogger).error(
           s"AssetProcessingError: consignmentId: None, matchId: None, source: None, errorCode: ASSET_PROCESSING.OBJECT_KEY.INVALID, errorMessage: Invalid object key incorrect/object/key/format.txt: Invalid object category: format.txt"
@@ -140,11 +140,15 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
           .thenReturn(new ByteArrayInputStream(missingFieldJson.getBytes("UTF-8")))
 
         val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
-        val result = assetProcessing.processAsset("s3Bucket", s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata")
+        val result = assetProcessing.processAsset(metadataSourceBucket, s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata")
 
         result shouldEqual expectedResult
 
-        verify(s3UtilsMock, times(1)).addObjectTags("s3Bucket", s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata", Map("ASSET_PROCESSING" -> "CompletedWithIssues"))
+        verify(s3UtilsMock, times(1)).addObjectTags(
+          metadataSourceBucket,
+          s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata",
+          Map("ASSET_PROCESSING" -> "CompletedWithIssues")
+        )
 
         verify(mockLogger).error(
           s"AssetProcessingError: consignmentId: Some($consignmentId), matchId: Some($matchId), source: Some($assetSource), errorCode: ASSET_PROCESSING.JSON.INVALID, errorMessage: DecodingFailure at .file_size: Missing required field"
@@ -177,14 +181,14 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
         val expectedResult = AssetProcessingResult(Some(matchId), processingErrors = true, None)
 
         val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
-        val result = assetProcessing.processAsset("s3Bucket", s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata")
+        val result = assetProcessing.processAsset(metadataSourceBucket, s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata")
 
         result shouldEqual expectedResult
 
         verify(s3AsyncClient, times(2)).getObjectTagging(
           GetObjectTaggingRequest
             .builder()
-            .bucket("s3Bucket")
+            .bucket(metadataSourceBucket)
             .key(s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata")
             .build()
         )
@@ -209,11 +213,15 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
           .thenReturn(new ByteArrayInputStream(invalidUtf8))
 
         val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
-        val result = assetProcessing.processAsset("s3Bucket", s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata")
+        val result = assetProcessing.processAsset(metadataSourceBucket, s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata")
 
         result shouldEqual expectedResult
 
-        verify(s3UtilsMock, times(1)).addObjectTags("s3Bucket", s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata", Map("ASSET_PROCESSING" -> "CompletedWithIssues"))
+        verify(s3UtilsMock, times(1)).addObjectTags(
+          metadataSourceBucket,
+          s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata",
+          Map("ASSET_PROCESSING" -> "CompletedWithIssues")
+        )
 
         verify(mockLogger).error(
           s"AssetProcessingError: consignmentId: Some($consignmentId), matchId: Some($matchId), source: Some($assetSource), errorCode: ASSET_PROCESSING.ENCODING.INVALID, errorMessage: Invalid UTF-8 Sequence, expecting: 4bytes, but got: 3bytes - reached end of stream. @ byte position: -1"
@@ -235,11 +243,15 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
           .thenReturn(new ByteArrayInputStream(nonJsonString))
 
         val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
-        val result = assetProcessing.processAsset("s3Bucket", s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata")
+        val result = assetProcessing.processAsset(metadataSourceBucket, s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata")
 
         result shouldEqual expectedResult
 
-        verify(s3UtilsMock, times(1)).addObjectTags("s3Bucket", s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata", Map("ASSET_PROCESSING" -> "CompletedWithIssues"))
+        verify(s3UtilsMock, times(1)).addObjectTags(
+          metadataSourceBucket,
+          s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata",
+          Map("ASSET_PROCESSING" -> "CompletedWithIssues")
+        )
 
         verify(mockLogger).error(
           s"AssetProcessingError: consignmentId: Some($consignmentId), matchId: Some($matchId), source: Some($assetSource), errorCode: ASSET_PROCESSING.JSON.INVALID, errorMessage: expected json value got 'some r...' (line 1, column 1)"
@@ -261,11 +273,15 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
           .thenReturn(new ByteArrayInputStream(unknownJsonString.getBytes("UTF-8")))
 
         val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
-        val result = assetProcessing.processAsset("s3Bucket", s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata")
+        val result = assetProcessing.processAsset(metadataSourceBucket, s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata")
 
         result shouldEqual expectedResult
 
-        verify(s3UtilsMock, times(1)).addObjectTags("s3Bucket", s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata", Map("ASSET_PROCESSING" -> "CompletedWithIssues"))
+        verify(s3UtilsMock, times(1)).addObjectTags(
+          metadataSourceBucket,
+          s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata",
+          Map("ASSET_PROCESSING" -> "CompletedWithIssues")
+        )
 
         verify(mockLogger).error(
           s"AssetProcessingError: consignmentId: Some($consignmentId), matchId: Some($matchId), source: Some($assetSource), errorCode: ASSET_PROCESSING.JSON.INVALID, errorMessage: exhausted input"
@@ -287,12 +303,12 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
           .thenReturn(new ByteArrayInputStream(defaultMetadataJsonString(matchId, defaultFileSize, consignmentId, None, None).getBytes("UTF-8")))
 
         val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
-        val result = assetProcessing.processAsset("s3Bucket", s"$userId/$assetSource/$consignmentId/metadata/$differentMatchId.metadata")
+        val result = assetProcessing.processAsset(metadataSourceBucket, s"$userId/$assetSource/$consignmentId/metadata/$differentMatchId.metadata")
 
         result shouldEqual expectedResult
 
         verify(s3UtilsMock, times(1)).addObjectTags(
-          "s3Bucket",
+          metadataSourceBucket,
           s"$userId/$assetSource/$consignmentId/metadata/$differentMatchId.metadata",
           Map("ASSET_PROCESSING" -> "CompletedWithIssues")
         )
@@ -315,13 +331,13 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
           .thenReturn(Map(malwareScanKey -> malwareScanThreatFound))
 
         val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
-        val result = assetProcessing.processAsset("s3Bucket", s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata")
+        val result = assetProcessing.processAsset(metadataSourceBucket, s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata")
 
         val expectedResult = AssetProcessingResult(Some(matchId), processingErrors = true, None)
         result shouldEqual expectedResult
 
         verify(s3UtilsMock, times(1)).addObjectTags(
-          "s3Bucket",
+          metadataSourceBucket,
           s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata",
           Map("ASSET_PROCESSING" -> "CompletedWithIssues")
         )
@@ -358,12 +374,12 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
           .thenReturn(new ByteArrayInputStream(defaultMetadataJsonString(matchId, 0, consignmentId, None, None).getBytes("UTF-8")))
 
         val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
-        val result = assetProcessing.processAsset("s3Bucket", s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata")
+        val result = assetProcessing.processAsset(metadataSourceBucket, s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata")
 
         result shouldEqual expectedResult
 
         verify(s3UtilsMock, times(1)).addObjectTags(
-          "s3Bucket",
+          metadataSourceBucket,
           s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata",
           Map("ASSET_PROCESSING" -> "CompletedWithIssues")
         )
@@ -410,7 +426,7 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
           .thenReturn(new ByteArrayInputStream(jsonMetadataString.getBytes("UTF-8")))
 
         val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
-        val result = assetProcessing.processAsset("s3Bucket", s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata")
+        val result = assetProcessing.processAsset(metadataSourceBucket, s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata")
 
         result shouldEqual expectedResult
 
@@ -456,7 +472,7 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
           .thenReturn(new ByteArrayInputStream(jsonMetadataString.getBytes("UTF-8")))
 
         val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
-        val result = assetProcessing.processAsset("s3Bucket", s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata")
+        val result = assetProcessing.processAsset(metadataSourceBucket, s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata")
 
         result shouldEqual expectedResult
 
