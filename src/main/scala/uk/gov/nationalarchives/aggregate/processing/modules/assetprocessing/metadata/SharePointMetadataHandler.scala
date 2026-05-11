@@ -1,6 +1,6 @@
 package uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.metadata
 
-import io.circe.{Json, JsonObject}
+import io.circe.Json
 import io.circe.syntax.EncoderOps
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.MetadataClassification.{Supplied, System}
 import uk.gov.nationalarchives.tdr.schemautils.ConfigUtils
@@ -22,21 +22,29 @@ object SharePointMetadataHandler {
   private val defaultPropertyValues: Map[String, String] = metadataConfig.getPropertiesWithDefaultValue
   private case class SharePointLocationPath(root: String, site: String, library: String, filePath: String)
 
-  private def sharePointLocationPathToFilePath(locationPath: String, siteDisplayName: Option[Json], libraryDisplayName: Option[Json]): SharePointLocationPath = {
+  private def sharePointLocationPathToFilePath(
+      locationPath: String,
+      siteDisplayName: Option[Json],
+      libraryDisplayName: Option[Json],
+      ignoreSiteName: Boolean
+  ): SharePointLocationPath = {
     val pathComponents = locationPath.split("/")
     val root = pathComponents(1)
     val siteName = if (siteDisplayName.nonEmpty) siteDisplayName.get.asString.get else pathComponents(2)
     val libraryName = if (libraryDisplayName.nonEmpty) libraryDisplayName.get.asString.get else pathComponents(3)
-    val filePath = s"$root/$siteName/$libraryName/${pathComponents.slice(4, pathComponents.length).mkString("/")}"
+    val filePath = if (ignoreSiteName) {
+      s"$libraryName/${pathComponents.slice(4, pathComponents.length).mkString("/")}"
+    } else s"$siteName/$libraryName/${pathComponents.slice(4, pathComponents.length).mkString("/")}"
+
     SharePointLocationPath(root, pathComponents(2), pathComponents(3), filePath)
   }
 
-  private def normaliseFilePath(value: Json, allMetadataJson: JsonObject): Json = {
-    val jsonMap = allMetadataJson.toMap
+  private def normaliseFilePath(input: NormaliseValueInput): Json = {
+    val jsonMap = input.allMetadataJson.toMap
     val siteName: Option[Json] = jsonMap.get("SiteName")
     val libraryName: Option[Json] = jsonMap.get("LibraryName")
-    val originalValue = value.asString.get
-    sharePointLocationPathToFilePath(originalValue, siteName, libraryName).filePath.asJson
+    val originalValue = input.value.asString.get
+    sharePointLocationPathToFilePath(originalValue, siteName, libraryName, input.ignoreSiteName).filePath.asJson
   }
 
   private def normaliseDateTime(value: Json): Json = {
@@ -50,11 +58,11 @@ object SharePointMetadataHandler {
   }
 
   private object NormalisePropertyValue {
-    def normalise(id: String, value: Json, allMetadataJson: JsonObject): Json = id match {
-      case FilePathProperty.id                                                                                              => normaliseFilePath(value, allMetadataJson)
-      case DateLastModifiedProperty.id | ClosureStartDateProperty.id | EndDateProperty.id | FoiExemptionAssertedProperty.id => normaliseDateTime(value)
-      case ClosurePeriodProperty.id                                                                                         => normaliseNumber(value)
-      case _                                                                                                                => value
+    def normalise(input: NormaliseValueInput): Json = input.property match {
+      case FilePathProperty.id                                                                                              => normaliseFilePath(input)
+      case DateLastModifiedProperty.id | ClosureStartDateProperty.id | EndDateProperty.id | FoiExemptionAssertedProperty.id => normaliseDateTime(input.value)
+      case ClosurePeriodProperty.id                                                                                         => normaliseNumber(input.value)
+      case _                                                                                                                => input.value
     }
   }
 

@@ -1,7 +1,7 @@
 package uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.metadata
 
 import graphql.codegen.types.ClientSideMetadataInput
-import io.circe.{Decoder, Json}
+import io.circe.{Decoder, Json, JsonObject}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.MetadataClassification.MetadataClassification
 
 case class MetadataProperty(propertyName: String, propertyValue: String)
@@ -69,6 +69,8 @@ case object TransferIdProperty extends BaseProperty {
 case object TitleClosedProperty extends BaseProperty {
   val id: String = "title_closed"
 }
+
+case class NormaliseValueInput(property: String, value: Json, allMetadataJson: JsonObject, ignoreSiteName: Boolean = false)
 
 trait MetadataHandler {
   val sourceToBasePropertiesMapper: String => String

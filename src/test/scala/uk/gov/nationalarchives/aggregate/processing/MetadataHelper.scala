@@ -101,7 +101,7 @@ trait MetadataHelper {
       "Length": "$fileSize",
       "Modified": "2025-07-03T09:19:47Z",
       "FileLeafRef": "file1.txt",
-      "FileRef": "/sites/Retail/Shared Documents/file1.txt",
+      "FileRef": "/sites/Retail/Shared Documents/aFolder/file1.txt",
       "sha256ClientSideChecksum": "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2",
       "matchId": "$matchId",
       "transferId": "$consignmentId"

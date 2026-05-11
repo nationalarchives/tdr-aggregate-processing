@@ -11,7 +11,7 @@ import java.util.UUID
 class SharePointMetadataHandlerSpec extends ExternalServiceSpec with MetadataHelper {
   private val siteDisplayName = "Site Display Name"
   private val libraryDisplayName = "Library Display Name"
-  private val expectedFilePath = "sites/Retail/Shared Documents/file1.txt"
+  private val expectedFilePath = "Retail/Shared Documents/aFolder/file1.txt"
   private val matchId = "matchId"
   private val consignmentId = UUID.randomUUID()
 
@@ -19,17 +19,22 @@ class SharePointMetadataHandlerSpec extends ExternalServiceSpec with MetadataHel
 
   "normaliseValues" should "normalise only specified property values" in {
     val dateTimeJson = "2025-07-03T09:19:47Z".asJson
-    val filePathJson = "/sites/Retail/Shared Documents/file1.txt".asJson
+    val filePathJson = "/sites/Retail/Shared Documents/aFolder/file1.txt".asJson
     val someOtherJson = "some other json value".asJson
     val allJsonMetadata = JsonObject()
 
-    handler.normaliseValues("closure_start_date", dateTimeJson, allJsonMetadata) shouldBe "1751534387000".asJson
-    handler.normaliseValues("date_last_modified", dateTimeJson, allJsonMetadata) shouldBe "1751534387000".asJson
-    handler.normaliseValues("end_date", dateTimeJson, allJsonMetadata) shouldBe "1751534387000".asJson
-    handler.normaliseValues("file_path", filePathJson, allJsonMetadata) shouldBe expectedFilePath.asJson
-    handler.normaliseValues("foi_exemption_asserted", dateTimeJson, allJsonMetadata) shouldBe "1751534387000".asJson
-    handler.normaliseValues("closure_period", 20.asJson, allJsonMetadata) shouldBe "20".asJson
-    handler.normaliseValues("some_other_property", someOtherJson, allJsonMetadata) shouldBe someOtherJson
+    val expectedSiteNameIgnoredPath = "Shared Documents/aFolder/file1.txt"
+
+    handler.normaliseValues(NormaliseValueInput("closure_start_date", dateTimeJson, allJsonMetadata)) shouldBe "1751534387000".asJson
+    handler.normaliseValues(NormaliseValueInput("date_last_modified", dateTimeJson, allJsonMetadata)) shouldBe "1751534387000".asJson
+    handler.normaliseValues(NormaliseValueInput("end_date", dateTimeJson, allJsonMetadata)) shouldBe "1751534387000".asJson
+    handler.normaliseValues(NormaliseValueInput("file_path", filePathJson, allJsonMetadata)) shouldBe expectedFilePath.asJson
+    handler.normaliseValues(
+      NormaliseValueInput("file_path", filePathJson, allJsonMetadata, ignoreSiteName = true)
+    ) shouldBe expectedSiteNameIgnoredPath.asJson
+    handler.normaliseValues(NormaliseValueInput("foi_exemption_asserted", dateTimeJson, allJsonMetadata)) shouldBe "1751534387000".asJson
+    handler.normaliseValues(NormaliseValueInput("closure_period", 20.asJson, allJsonMetadata)) shouldBe "20".asJson
+    handler.normaliseValues(NormaliseValueInput("some_other_property", someOtherJson, allJsonMetadata)) shouldBe someOtherJson
   }
 
   "normaliseValues" should "return normalised file path based on whether display names are present" in {
@@ -38,20 +43,20 @@ class SharePointMetadataHandlerSpec extends ExternalServiceSpec with MetadataHel
       .add("SiteName", siteDisplayName.asJson)
       .add("LibraryName", libraryDisplayName.asJson)
 
-    handler.normaliseValues("file_path", filePathJson, allJsonMetadata) shouldBe
-      "sites/Site Display Name/Library Display Name/aFolder/file1.txt".asJson
+    handler.normaliseValues(NormaliseValueInput("file_path", filePathJson, allJsonMetadata)) shouldBe
+      "Site Display Name/Library Display Name/aFolder/file1.txt".asJson
 
     val allJsonMetadataLibraryNameOnly = JsonObject()
       .add("LibraryName", libraryDisplayName.asJson)
 
-    handler.normaliseValues("file_path", filePathJson, allJsonMetadataLibraryNameOnly) shouldBe
-      "sites/Retail/Library Display Name/aFolder/file1.txt".asJson
+    handler.normaliseValues(NormaliseValueInput("file_path", filePathJson, allJsonMetadataLibraryNameOnly)) shouldBe
+      "Retail/Library Display Name/aFolder/file1.txt".asJson
 
     val allJsonMetadataSiteNameOnly = JsonObject()
       .add("SiteName", siteDisplayName.asJson)
 
-    handler.normaliseValues("file_path", filePathJson, allJsonMetadataSiteNameOnly) shouldBe
-      "sites/Site Display Name/Shared Documents/aFolder/file1.txt".asJson
+    handler.normaliseValues(NormaliseValueInput("file_path", filePathJson, allJsonMetadataSiteNameOnly)) shouldBe
+      "Site Display Name/Shared Documents/aFolder/file1.txt".asJson
   }
 
   "convertToBaseMetadata" should "convert valid SharePoint json to base metadata json" in {
@@ -84,7 +89,7 @@ class SharePointMetadataHandlerSpec extends ExternalServiceSpec with MetadataHel
       i.checksum shouldBe "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2"
       i.fileSize shouldBe 12L
       i.lastModified shouldBe 1751534387000L
-      i.originalPath shouldBe "sites/Retail/Shared Documents/file1.txt"
+      i.originalPath shouldBe "Retail/Shared Documents/aFolder/file1.txt"
     })
   }
 

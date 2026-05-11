@@ -49,7 +49,7 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
     (
       SharePoint.id.toLowerCase,
       sharePointMetadataJsonString,
-      "sites/Retail/Shared Documents/file1.txt",
+      "Retail/Shared Documents/aFolder/file1.txt",
       "Length",
       """"closure_x0020_status": "Open","description": "some kind of description"""",
       customFieldJsonString
