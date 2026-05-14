@@ -12,7 +12,7 @@ import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.{
 import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling.BaseError
 import uk.gov.nationalarchives.aggregate.processing.modules._
 import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.AssetProcessing.{AssetProcessingError, AssetProcessingEvent, AssetProcessingResult}
-import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.initialchecks.{FileSizeCheck, FolderOnlyCheck, InitialCheck}
+import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.initialchecks.{FileSizeCheck, FolderOnlyCheck, InitialCheck, InvalidFileName}
 import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.metadata._
 import uk.gov.nationalarchives.aggregate.processing.utilities.UTF8ValidationHandler
 import uk.gov.nationalarchives.aws.utils.s3.{S3Clients, S3Utils}
@@ -26,7 +26,12 @@ import java.util.UUID
 import scala.util.{Failure, Success, Try}
 
 class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
-  private lazy val initialChecks: Set[InitialCheck] = Set(FileSizeCheck.apply(), FolderOnlyCheck.apply())
+  private val fileSizeCheck = FileSizeCheck.apply()
+  private val folderOnlyCheck = FolderOnlyCheck.apply()
+  private val invalidFileNameCheck = InvalidFileName.apply()
+  private lazy val initialChecks: Set[InitialCheck] = Set(
+    fileSizeCheck, folderOnlyCheck, invalidFileNameCheck
+  )
   private lazy val errorHandling = ErrorHandling()
 
   private def getMetadataHandler(assetSource: AssetSource): MetadataHandler = {
@@ -110,6 +115,22 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
     }
   }
 
+  private val ignoreInitialChecksErrorCodes = invalidFileNameCheck.errorCodes
+
+  private def handleInitialChecksErrors(event: AssetProcessingEvent, initialChecksErrors: List[AssetProcessingError], input: ClientSideMetadataInput) = {
+    val s3Bucket = event.s3SourceBucket
+    val objectKey = event.objectKey
+    val matchId = event.matchId
+    if (initialChecksErrors.exists(e => ignoreInitialChecksErrorCodes.contains(e.errorCode))) {
+      logger.info(s"Asset ignored: $objectKey")
+      s3Utils.addObjectTags(s3Bucket, objectKey, Map("ignoreObject" -> true.toString))
+      AssetProcessingResult(Some(matchId), processingErrors = false, Some(input), ignoreAsset = true)
+    } else {
+      handleProcessError(initialChecksErrors, s3Bucket, objectKey)
+      AssetProcessingResult(Some(matchId), processingErrors = true, Some(input))
+    }
+  }
+
   private def parseMetadataJson(sourceJson: Json, event: AssetProcessingEvent): AssetProcessingResult = {
     val metadataHandler: MetadataHandler = getMetadataHandler(event.source)
     val matchId = event.matchId
@@ -136,8 +157,7 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
           } else {
             val initialChecksErrors: List[AssetProcessingError] = initialChecks.flatMap(_.runCheck(event, input)).toList
             if (initialChecksErrors.nonEmpty) {
-              handleProcessError(initialChecksErrors, s3Bucket, objectKey)
-              AssetProcessingResult(Some(matchId), processingErrors = true, Some(input))
+              handleInitialChecksErrors(event, initialChecksErrors, input)
             } else {
               val classifiedMetadata = metadataHandler.classifyBaseMetadata(baseMetadataJson)
               val suppliedMetadata = classifiedMetadata.getOrElse(MetadataClassification.Supplied, Nil)
@@ -181,7 +201,8 @@ object AssetProcessing {
       clientSideMetadataInput: Option[ClientSideMetadataInput],
       systemMetadata: List[MetadataProperty] = List(),
       suppliedMetadata: List[MetadataProperty] = List(),
-      customMetadata: List[MetadataProperty] = List()
+      customMetadata: List[MetadataProperty] = List(),
+      ignoreAsset: Boolean = false,
   )
   case class AssetProcessingError(consignmentId: Option[UUID], matchId: Option[String], source: Option[String], errorCode: String, errorMsg: String) extends BaseError {
     override def toString: String = {

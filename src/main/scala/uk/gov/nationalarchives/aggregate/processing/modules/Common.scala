@@ -14,6 +14,7 @@ object Common {
     val ClientDataLoadError: Value = Value("CLIENT_DATA_LOAD")
     val EncodingError: Value = Value("ENCODING")
     val EventError: Value = Value("EVENT")
+    val FileNameError: Value = Value("FILE_NAME")
     val JsonError: Value = Value("JSON")
     val MalwareScanError: Value = Value("MALWARE_SCAN")
     val MatchIdError: Value = Value("MATCH_ID")
