@@ -6,6 +6,7 @@ import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorV
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.InitialChecks
 import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.AssetProcessing
 import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.AssetProcessing.AssetProcessingError
+import uk.gov.nationalarchives.tdr.schema.generated.ExcludedFilenames
 
 class InvalidFileName extends InitialCheck {
   private val errorCode = s"$InitialChecks.$FileNameError.$Invalid"
@@ -14,10 +15,9 @@ class InvalidFileName extends InitialCheck {
 
   override def runCheck(event: AssetProcessing.AssetProcessingEvent, input: types.ClientSideMetadataInput): List[AssetProcessing.AssetProcessingError] = {
     val fileName = input.originalPath.split("/").last
-    //TODO: use config to construct regex to identify invalid file name
-    if (fileName == "thumbs.db") {
+    if (ExcludedFilenames.isExcluded(fileName)) {
       val errorMessage = s"Invalid file name: $fileName"
-      List(AssetProcessingError(Some(event.consignmentId), Some(event.matchId), Some(event.source.toString), errorCode, errorMessage))
+      List(AssetProcessingError(Some(event.consignmentId), Some(event.matchId), Some(event.source.id), errorCode, errorMessage))
     } else {
       Nil
     }

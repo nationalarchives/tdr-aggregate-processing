@@ -17,7 +17,7 @@ import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.meta
 import uk.gov.nationalarchives.aggregate.processing.utilities.UTF8ValidationHandler
 import uk.gov.nationalarchives.aws.utils.s3.{S3Clients, S3Utils}
 import uk.gov.nationalarchives.tdr.common.utils.objectkeycontext.AssetSources.{AssetSource, HardDrive, NetworkDrive, SharePoint}
-import uk.gov.nationalarchives.tdr.common.utils.objectkeycontext.Context
+import uk.gov.nationalarchives.tdr.common.utils.objectkeycontext.{Context, ObjectCategories, ObjectTypes}
 import uk.gov.nationalarchives.tdr.common.utils.objectkeycontext.ObjectTypes.ObjectType
 import uk.gov.nationalarchives.tdr.common.utils.statuses.StatusValues.{CompletedValue, CompletedWithIssuesValue}
 import uk.gov.nationalarchives.utf8.validator.Utf8Validator
@@ -30,7 +30,9 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
   private val folderOnlyCheck = FolderOnlyCheck.apply()
   private val invalidFileNameCheck = InvalidFileName.apply()
   private lazy val initialChecks: Set[InitialCheck] = Set(
-    fileSizeCheck, folderOnlyCheck, invalidFileNameCheck
+    fileSizeCheck,
+    folderOnlyCheck,
+    invalidFileNameCheck
   )
   private lazy val errorHandling = ErrorHandling()
 
@@ -123,7 +125,10 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
     val matchId = event.matchId
     if (initialChecksErrors.exists(e => ignoreInitialChecksErrorCodes.contains(e.errorCode))) {
       logger.info(s"Asset ignored: $objectKey")
-      s3Utils.addObjectTags(s3Bucket, objectKey, Map("ignoreObject" -> true.toString))
+      val ignoreObjectTag = Map("IGNORE_OBJECT" -> "TRUE")
+      val recordObjectKey = s"${event.userId}/${event.source.id}/${event.consignmentId}/${ObjectCategories.Records.id}/${event.matchId}"
+      s3Utils.addObjectTags(s3Bucket, objectKey, ignoreObjectTag)
+      s3Utils.addObjectTags(s3Bucket, recordObjectKey, ignoreObjectTag)
       AssetProcessingResult(Some(matchId), processingErrors = false, Some(input), ignoreAsset = true)
     } else {
       handleProcessError(initialChecksErrors, s3Bucket, objectKey)
@@ -202,7 +207,7 @@ object AssetProcessing {
       systemMetadata: List[MetadataProperty] = List(),
       suppliedMetadata: List[MetadataProperty] = List(),
       customMetadata: List[MetadataProperty] = List(),
-      ignoreAsset: Boolean = false,
+      ignoreAsset: Boolean = false
   )
   case class AssetProcessingError(consignmentId: Option[UUID], matchId: Option[String], source: Option[String], errorCode: String, errorMsg: String) extends BaseError {
     override def toString: String = {
