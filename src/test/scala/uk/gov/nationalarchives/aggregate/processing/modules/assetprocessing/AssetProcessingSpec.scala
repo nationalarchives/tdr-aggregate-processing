@@ -91,7 +91,7 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
           .thenReturn(Map(malwareScanKey -> "NO_THREATS_FOUND"))
 
         val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
-        val result = assetProcessing.processAsset(metadataSourceBucket, s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata")
+        val result = assetProcessing.processAsset(metadataSourceBucket, s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata", ignoreSiteName = false)
 
         result shouldEqual expectedResult
 
@@ -114,7 +114,7 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
 
         val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
 
-        val result = assetProcessing.processAsset(metadataSourceBucket, "incorrect/object/key/format.txt")
+        val result = assetProcessing.processAsset(metadataSourceBucket, "incorrect/object/key/format.txt", ignoreSiteName = false)
 
         result shouldEqual expectedResult
 
@@ -140,7 +140,7 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
           .thenReturn(new ByteArrayInputStream(missingFieldJson.getBytes("UTF-8")))
 
         val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
-        val result = assetProcessing.processAsset(metadataSourceBucket, s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata")
+        val result = assetProcessing.processAsset(metadataSourceBucket, s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata", ignoreSiteName = false)
 
         result shouldEqual expectedResult
 
@@ -181,7 +181,7 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
         val expectedResult = AssetProcessingResult(Some(matchId), processingErrors = true, None)
 
         val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
-        val result = assetProcessing.processAsset(metadataSourceBucket, s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata")
+        val result = assetProcessing.processAsset(metadataSourceBucket, s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata", ignoreSiteName = false)
 
         result shouldEqual expectedResult
 
@@ -213,7 +213,7 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
           .thenReturn(new ByteArrayInputStream(invalidUtf8))
 
         val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
-        val result = assetProcessing.processAsset(metadataSourceBucket, s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata")
+        val result = assetProcessing.processAsset(metadataSourceBucket, s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata", ignoreSiteName = false)
 
         result shouldEqual expectedResult
 
@@ -243,7 +243,7 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
           .thenReturn(new ByteArrayInputStream(nonJsonString))
 
         val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
-        val result = assetProcessing.processAsset(metadataSourceBucket, s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata")
+        val result = assetProcessing.processAsset(metadataSourceBucket, s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata", ignoreSiteName = false)
 
         result shouldEqual expectedResult
 
@@ -273,7 +273,7 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
           .thenReturn(new ByteArrayInputStream(unknownJsonString.getBytes("UTF-8")))
 
         val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
-        val result = assetProcessing.processAsset(metadataSourceBucket, s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata")
+        val result = assetProcessing.processAsset(metadataSourceBucket, s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata", ignoreSiteName = false)
 
         result shouldEqual expectedResult
 
@@ -303,7 +303,7 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
           .thenReturn(new ByteArrayInputStream(defaultMetadataJsonString(matchId, defaultFileSize, consignmentId, None, None).getBytes("UTF-8")))
 
         val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
-        val result = assetProcessing.processAsset(metadataSourceBucket, s"$userId/$assetSource/$consignmentId/metadata/$differentMatchId.metadata")
+        val result = assetProcessing.processAsset(metadataSourceBucket, s"$userId/$assetSource/$consignmentId/metadata/$differentMatchId.metadata", ignoreSiteName = false)
 
         result shouldEqual expectedResult
 
@@ -331,7 +331,7 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
           .thenReturn(Map(malwareScanKey -> malwareScanThreatFound))
 
         val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
-        val result = assetProcessing.processAsset(metadataSourceBucket, s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata")
+        val result = assetProcessing.processAsset(metadataSourceBucket, s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata", ignoreSiteName = false)
 
         val expectedResult = AssetProcessingResult(Some(matchId), processingErrors = true, None)
         result shouldEqual expectedResult
@@ -374,7 +374,7 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
           .thenReturn(new ByteArrayInputStream(defaultMetadataJsonString(matchId, 0, consignmentId, None, None).getBytes("UTF-8")))
 
         val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
-        val result = assetProcessing.processAsset(metadataSourceBucket, s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata")
+        val result = assetProcessing.processAsset(metadataSourceBucket, s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata", ignoreSiteName = false)
 
         result shouldEqual expectedResult
 
@@ -426,7 +426,7 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
           .thenReturn(new ByteArrayInputStream(jsonMetadataString.getBytes("UTF-8")))
 
         val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
-        val result = assetProcessing.processAsset(metadataSourceBucket, s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata")
+        val result = assetProcessing.processAsset(metadataSourceBucket, s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata", ignoreSiteName = false)
 
         result shouldEqual expectedResult
 
@@ -472,7 +472,7 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
           .thenReturn(new ByteArrayInputStream(jsonMetadataString.getBytes("UTF-8")))
 
         val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
-        val result = assetProcessing.processAsset(metadataSourceBucket, s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata")
+        val result = assetProcessing.processAsset(metadataSourceBucket, s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata", ignoreSiteName = false)
 
         result shouldEqual expectedResult
 

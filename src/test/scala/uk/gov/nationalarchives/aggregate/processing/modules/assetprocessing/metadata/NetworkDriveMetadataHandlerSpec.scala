@@ -30,12 +30,12 @@ class NetworkDriveMetadataHandlerSpec extends ExternalServiceSpec with MetadataH
     val rawNetworkDriveJson = convertStringToJson(networkDriveJsonString(matchId, defaultFileSize, consignmentId, None, None))
     val expectedJson = convertStringToJson(validBaseMetadataJsonString(matchId, consignmentId, expectedFilePath))
 
-    networkDriveHandler.convertToBaseMetadata(rawNetworkDriveJson) shouldBe expectedJson
+    networkDriveHandler.convertToBaseMetadata(rawNetworkDriveJson, ignoreSiteName = false) shouldBe expectedJson
   }
 
   "convertToBaseMetadata" should "throw an exception for invalid json" in {
     val exception = intercept[NoSuchElementException] {
-      networkDriveHandler.convertToBaseMetadata("""some value}""".asJson)
+      networkDriveHandler.convertToBaseMetadata("""some value}""".asJson, ignoreSiteName = false)
     }
     exception.getMessage shouldBe "None.get"
   }
