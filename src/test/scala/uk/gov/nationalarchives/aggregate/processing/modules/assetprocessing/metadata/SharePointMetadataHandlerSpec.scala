@@ -59,6 +59,16 @@ class SharePointMetadataHandlerSpec extends ExternalServiceSpec with MetadataHel
       "Site Display Name/Shared Documents/aFolder/file1.txt".asJson
   }
 
+  "normaliseValues" should "exclude the site name from file path when ignoreSiteName set to true" in {
+    val filePathJson = "/sites/Retail/Shared Documents/aFolder/file1.txt".asJson
+    val allJsonMetadata = JsonObject()
+      .add("SiteName", siteDisplayName.asJson)
+      .add("LibraryName", libraryDisplayName.asJson)
+
+    handler.normaliseValues(NormaliseValueInput("file_path", filePathJson, allJsonMetadata, ignoreSiteName = true)) shouldBe
+      "Library Display Name/aFolder/file1.txt".asJson
+  }
+
   "convertToBaseMetadata" should "convert valid SharePoint json to base metadata json" in {
     val rawSharePointJson = convertStringToJson(sharePointMetadataJsonString(matchId, defaultFileSize, consignmentId, None, None))
     val expectedJson = convertStringToJson(validBaseMetadataJsonString(matchId, consignmentId, expectedFilePath))
