@@ -123,8 +123,10 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
     val s3Bucket = event.s3SourceBucket
     val objectKey = event.objectKey
     val matchId = event.matchId
-    if (initialChecksErrors.exists(e => ignoreInitialChecksErrorCodes.contains(e.errorCode))) {
-      logger.info(s"Asset ignored: $objectKey")
+    if (initialChecksErrors.forall(e => ignoreInitialChecksErrorCodes.contains(e.errorCode))) {
+      val errorCodes = initialChecksErrors.map(_.errorCode).mkString(",")
+      val logMessage = s"Asset ignored: $objectKey with error codes $errorCodes"
+      logger.info(logMessage)
       val ignoreObjectTag = Map("IGNORE_OBJECT" -> "TRUE")
       val recordObjectKey = s"${event.userId}/${event.source.id}/${event.consignmentId}/${ObjectCategories.Records.id}/${event.matchId}"
       s3Utils.addObjectTags(s3Bucket, objectKey, ignoreObjectTag)
