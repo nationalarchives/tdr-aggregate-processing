@@ -480,4 +480,49 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
         verify(mockLogger).info("Asset metadata successfully processed for: {}", s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata")
       }
   }
+
+  "'processAsset' with asset source of sharepoint" should "return correct file path when 'ignoreSiteName' is true" in {
+    val mockLogger = mock[UnderlyingLogger]
+    val s3UtilsMock = mock[S3Utils]
+    val jsonMetadataString = sharePointMetadataJsonString(matchId, defaultFileSize, consignmentId, None, None)
+    val sharePointAssetSource = SharePoint.id.toLowerCase
+    val expectedFilePath: String = "Shared Documents/aFolder/file1.txt"
+
+    val expectedInput = ClientSideMetadataInput(
+      expectedFilePath,
+      "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2",
+      1751534387000L,
+      12L,
+      matchId
+    )
+
+    val expectedResult =
+      AssetProcessingResult(
+        Some(matchId),
+        processingErrors = false,
+        Some(expectedInput),
+        systemMetadata = List(
+          MetadataProperty("file_path", expectedFilePath),
+          MetadataProperty("file_name", "file1.txt"),
+          MetadataProperty("date_last_modified", "1751534387000"),
+          MetadataProperty("file_size", s"$defaultFileSize"),
+          MetadataProperty("client_side_checksum", "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2")
+        )
+      )
+
+    when(mockLogger.isInfoEnabled()).thenReturn(true)
+    when(mockLogger.isErrorEnabled).thenReturn(true)
+    when(s3UtilsMock.getObjectTags(any[String], any[String]))
+      .thenReturn(Map(malwareScanKey -> "NO_THREATS_FOUND"))
+    when(s3UtilsMock.getObjectAsStream(any[String], any[String]))
+      .thenReturn(new ByteArrayInputStream(jsonMetadataString.getBytes("UTF-8")))
+
+    val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
+    val result = assetProcessing.processAsset(metadataSourceBucket, s"$userId/$sharePointAssetSource/$consignmentId/metadata/$matchId.metadata", ignoreSiteName = true)
+
+    result shouldEqual expectedResult
+
+    verify(mockLogger, times(0)).isErrorEnabled
+    verify(mockLogger).info("Asset metadata successfully processed for: {}", s"$userId/$sharePointAssetSource/$consignmentId/metadata/$matchId.metadata")
+  }
 }
