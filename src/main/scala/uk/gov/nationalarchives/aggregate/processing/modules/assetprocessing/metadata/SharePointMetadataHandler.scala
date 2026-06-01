@@ -32,9 +32,9 @@ object SharePointMetadataHandler {
     val root = pathComponents(1)
     val siteName = if (siteDisplayName.nonEmpty) siteDisplayName.get.asString.get else pathComponents(2)
     val libraryName = if (libraryDisplayName.nonEmpty) libraryDisplayName.get.asString.get else pathComponents(3)
-    val filePath = if (ignoreSiteName) {
-      s"$libraryName/${pathComponents.slice(4, pathComponents.length).mkString("/")}"
-    } else s"$siteName/$libraryName/${pathComponents.slice(4, pathComponents.length).mkString("/")}"
+    val folderNames = pathComponents.slice(4, pathComponents.length).mkString("/")
+    val filePath = if (ignoreSiteName) { s"$libraryName/$folderNames" }
+    else s"$siteName/$libraryName/$folderNames"
 
     SharePointLocationPath(root, pathComponents(2), pathComponents(3), filePath)
   }
@@ -44,7 +44,8 @@ object SharePointMetadataHandler {
     val siteName: Option[Json] = jsonMap.get("SiteName")
     val libraryName: Option[Json] = jsonMap.get("LibraryName")
     val originalValue = input.value.asString.get
-    sharePointLocationPathToFilePath(originalValue, siteName, libraryName, input.ignoreSiteName).filePath.asJson
+    val ignoreSiteName = input.ignoreSiteName.getOrElse(false)
+    sharePointLocationPathToFilePath(originalValue, siteName, libraryName, ignoreSiteName).filePath.asJson
   }
 
   private def normaliseDateTime(value: Json): Json = {

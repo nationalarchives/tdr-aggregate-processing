@@ -30,7 +30,7 @@ class SharePointMetadataHandlerSpec extends ExternalServiceSpec with MetadataHel
     handler.normaliseValues(NormaliseValueInput("end_date", dateTimeJson, allJsonMetadata)) shouldBe "1751534387000".asJson
     handler.normaliseValues(NormaliseValueInput("file_path", filePathJson, allJsonMetadata)) shouldBe expectedFilePath.asJson
     handler.normaliseValues(
-      NormaliseValueInput("file_path", filePathJson, allJsonMetadata, ignoreSiteName = true)
+      NormaliseValueInput("file_path", filePathJson, allJsonMetadata, ignoreSiteName = Some(true))
     ) shouldBe expectedSiteNameIgnoredPath.asJson
     handler.normaliseValues(NormaliseValueInput("foi_exemption_asserted", dateTimeJson, allJsonMetadata)) shouldBe "1751534387000".asJson
     handler.normaliseValues(NormaliseValueInput("closure_period", 20.asJson, allJsonMetadata)) shouldBe "20".asJson
@@ -59,11 +59,21 @@ class SharePointMetadataHandlerSpec extends ExternalServiceSpec with MetadataHel
       "Site Display Name/Shared Documents/aFolder/file1.txt".asJson
   }
 
+  "normaliseValues" should "exclude the site name from file path when ignoreSiteName set to true" in {
+    val filePathJson = "/sites/Retail/Shared Documents/aFolder/file1.txt".asJson
+    val allJsonMetadata = JsonObject()
+      .add("SiteName", siteDisplayName.asJson)
+      .add("LibraryName", libraryDisplayName.asJson)
+
+    handler.normaliseValues(NormaliseValueInput("file_path", filePathJson, allJsonMetadata, ignoreSiteName = Some(true))) shouldBe
+      "Library Display Name/aFolder/file1.txt".asJson
+  }
+
   "convertToBaseMetadata" should "convert valid SharePoint json to base metadata json" in {
     val rawSharePointJson = convertStringToJson(sharePointMetadataJsonString(matchId, defaultFileSize, consignmentId, None, None))
     val expectedJson = convertStringToJson(validBaseMetadataJsonString(matchId, consignmentId, expectedFilePath))
 
-    handler.convertToBaseMetadata(rawSharePointJson) shouldBe expectedJson
+    handler.convertToBaseMetadata(rawSharePointJson, None) shouldBe expectedJson
   }
 
   "convertToBaseMetadata" should "convert valid SharePoint json to base metadata json when null date property present" in {
@@ -71,12 +81,12 @@ class SharePointMetadataHandlerSpec extends ExternalServiceSpec with MetadataHel
     val rawSharePointJson = convertStringToJson(sharePointMetadataJsonString(matchId, defaultFileSize, consignmentId, Some(nullDateProperty), None))
     val expectedJson = convertStringToJson(validBaseMetadataJsonString(matchId, consignmentId, expectedFilePath))
 
-    handler.convertToBaseMetadata(rawSharePointJson) shouldBe expectedJson
+    handler.convertToBaseMetadata(rawSharePointJson, None) shouldBe expectedJson
   }
 
   "convertToBaseMetadata" should "throw an exception for invalid json" in {
     val exception = intercept[NoSuchElementException] {
-      handler.convertToBaseMetadata("""some value}""".asJson)
+      handler.convertToBaseMetadata("""some value}""".asJson, None)
     }
     exception.getMessage shouldBe "None.get"
   }

@@ -11,7 +11,7 @@ import java.util.UUID
 
 class FileSizeCheckSpec extends ExternalServiceSpec {
   val transferId: UUID = UUID.randomUUID()
-  val event = AssetProcessingEvent(UUID.randomUUID(), transferId, "matchId-1", SharePoint, Metadata, "s3-source-bucket", "object/key")
+  val event = AssetProcessingEvent(UUID.randomUUID(), transferId, "matchId-1", SharePoint, Metadata, "s3-source-bucket", "object/key", ignoreSiteName = false)
 
   "runCheck" should "return an asset processing error when a file has a size of 0 bytes" in {
     val input = ClientSideMetadataInput("folder1/folder2/file.txt", "checksum", 12L, 0, "matchId-1")
