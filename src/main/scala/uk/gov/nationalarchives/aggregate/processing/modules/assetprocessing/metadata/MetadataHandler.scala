@@ -70,7 +70,7 @@ case object TitleClosedProperty extends BaseProperty {
   val id: String = "title_closed"
 }
 
-case class NormaliseValueInput(property: String, value: Json, allMetadataJson: JsonObject, ignoreSiteName: Boolean = false)
+case class NormaliseValueInput(property: String, value: Json, allMetadataJson: JsonObject, ignoreSiteName: Option[Boolean] = None)
 
 trait MetadataHandler {
   val sourceToBasePropertiesMapper: String => String
@@ -81,7 +81,7 @@ trait MetadataHandler {
 
   def toMetadataProperties(json: Json, properties: Seq[String]): List[MetadataProperty]
 
-  def convertToBaseMetadata(sourceJson: Json, ignoreSiteName: Boolean): Json
+  def convertToBaseMetadata(sourceJson: Json, ignoreSiteName: Option[Boolean]): Json
 
   def classifyBaseMetadata(baseMetadataJson: Json): Map[MetadataClassification, List[MetadataProperty]]
 }

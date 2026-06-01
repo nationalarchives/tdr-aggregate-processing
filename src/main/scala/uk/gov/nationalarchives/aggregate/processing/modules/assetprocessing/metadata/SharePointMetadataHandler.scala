@@ -44,7 +44,8 @@ object SharePointMetadataHandler {
     val siteName: Option[Json] = jsonMap.get("SiteName")
     val libraryName: Option[Json] = jsonMap.get("LibraryName")
     val originalValue = input.value.asString.get
-    sharePointLocationPathToFilePath(originalValue, siteName, libraryName, input.ignoreSiteName).filePath.asJson
+    val ignoreSiteName = input.ignoreSiteName.getOrElse(false)
+    sharePointLocationPathToFilePath(originalValue, siteName, libraryName, ignoreSiteName).filePath.asJson
   }
 
   private def normaliseDateTime(value: Json): Json = {

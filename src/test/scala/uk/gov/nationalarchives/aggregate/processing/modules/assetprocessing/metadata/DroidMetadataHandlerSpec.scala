@@ -30,12 +30,12 @@ class DroidMetadataHandlerSpec extends ExternalServiceSpec with MetadataHelper {
     val rawSharePointJson = convertStringToJson(droidMetadataJsonString(matchId, defaultFileSize, consignmentId, None, None))
     val expectedJson = convertStringToJson(validBaseMetadataJsonString(matchId, consignmentId, expectedFilePath))
 
-    droidHandler.convertToBaseMetadata(rawSharePointJson, ignoreSiteName = false) shouldBe expectedJson
+    droidHandler.convertToBaseMetadata(rawSharePointJson, None) shouldBe expectedJson
   }
 
   "convertToBaseMetadata" should "throw an exception for invalid json" in {
     val exception = intercept[NoSuchElementException] {
-      droidHandler.convertToBaseMetadata("""some value}""".asJson, ignoreSiteName = false)
+      droidHandler.convertToBaseMetadata("""some value}""".asJson, None)
     }
     exception.getMessage shouldBe "None.get"
   }

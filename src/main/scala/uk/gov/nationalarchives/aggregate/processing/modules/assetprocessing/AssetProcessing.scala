@@ -124,7 +124,7 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
     val matchId = event.matchId
     val objectKey = event.objectKey
     val s3Bucket = event.s3SourceBucket
-    val baseMetadataJson = metadataHandler.convertToBaseMetadata(sourceJson, event.ignoreSiteName)
+    val baseMetadataJson = metadataHandler.convertToBaseMetadata(sourceJson, Some(event.ignoreSiteName))
     metadataHandler
       .toClientSideMetadataInput(baseMetadataJson)
       .fold(

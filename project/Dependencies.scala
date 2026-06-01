@@ -4,9 +4,9 @@ object Dependencies {
   private val circeVersion = "0.14.15"
   private val mockitoScalaVersion = "2.2.1"
   private val awsUtilsVersion = "0.1.331"
-  private val tdrCommonUtilsVersion = "0.0.21"
+  private val tdrCommonUtilsVersion = "0.0.27"
 
-  lazy val authUtils = "uk.gov.nationalarchives" %% "tdr-auth-utils" % "0.0.289"
+  lazy val authUtils = "uk.gov.nationalarchives" %% "tdr-auth-utils" % "0.0.290"
   lazy val awsLambdaCore = "com.amazonaws" % "aws-lambda-java-core" % "1.4.0"
   lazy val awsLambdaEvents = "com.amazonaws" % "aws-lambda-java-events" % "3.16.1"
 
