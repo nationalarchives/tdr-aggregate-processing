@@ -53,7 +53,7 @@ class BaseMetadataHandler(
       .map(fv => {
         val originalField = fv._1
         val field = sourceToBasePropertiesMapper(originalField)
-        field -> normaliseValues(NormaliseValueInput(field, fv._2, allMetadata))
+        field -> normaliseValues(NormaliseValueInput(field, fv._2, allMetadata, ignoreSiteName))
       })
     enrichMetadataFunction(metadata)
   }
