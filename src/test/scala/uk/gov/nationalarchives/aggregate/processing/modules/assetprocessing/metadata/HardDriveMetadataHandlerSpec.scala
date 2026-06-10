@@ -40,12 +40,12 @@ class HardDriveMetadataHandlerSpec extends ExternalServiceSpec with MetadataHelp
     val rawSharePointJson = convertStringToJson(hardDriveMetadataJsonString(matchId, defaultFileSize, consignmentId, None, None))
     val expectedJson = convertStringToJson(validBaseMetadataJsonString(matchId, consignmentId, expectedFilePath))
 
-    hardDriveHandler.convertToBaseMetadata(rawSharePointJson) shouldBe expectedJson
+    hardDriveHandler.convertToBaseMetadata(rawSharePointJson, None) shouldBe expectedJson
   }
 
   "convertToBaseMetadata" should "throw an exception for invalid json" in {
     val exception = intercept[NoSuchElementException] {
-      hardDriveHandler.convertToBaseMetadata("""some value}""".asJson)
+      hardDriveHandler.convertToBaseMetadata("""some value}""".asJson, None)
     }
     exception.getMessage shouldBe "None.get"
   }

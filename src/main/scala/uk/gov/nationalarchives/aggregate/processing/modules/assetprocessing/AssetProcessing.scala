@@ -52,12 +52,21 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
     AssetProcessingResult(matchId, processingErrors = true, None)
   }
 
-  def processAsset(s3Bucket: String, objectKey: String): AssetProcessingResult = {
+  def processAsset(s3Bucket: String, objectKey: String, ignoreSiteName: Boolean): AssetProcessingResult = {
     Try {
       val objectContext = Context.objectKeyParser(objectKey, s3Bucket)
       val objectElements = objectContext.objectName.get.split("\\.")
       val matchId = objectElements(0)
-      AssetProcessingEvent(objectContext.userId.get, objectContext.transferId.get, matchId, objectContext.assetSource.get, objectContext.objectType.get, s3Bucket, objectKey)
+      AssetProcessingEvent(
+        objectContext.userId.get,
+        objectContext.transferId.get,
+        matchId,
+        objectContext.assetSource.get,
+        objectContext.objectType.get,
+        s3Bucket,
+        objectKey,
+        ignoreSiteName
+      )
     } match {
       case Failure(ex) =>
         val error = AssetProcessingError(None, None, None, s"$ptAp.$ObjectKeyError.$Invalid", s"${ex.getMessage}")
@@ -143,7 +152,7 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
     val matchId = event.matchId
     val objectKey = event.objectKey
     val s3Bucket = event.s3SourceBucket
-    val baseMetadataJson = metadataHandler.convertToBaseMetadata(sourceJson)
+    val baseMetadataJson = metadataHandler.convertToBaseMetadata(sourceJson, Some(event.ignoreSiteName))
     metadataHandler
       .toClientSideMetadataInput(baseMetadataJson)
       .fold(
@@ -199,7 +208,8 @@ object AssetProcessing {
       source: AssetSource,
       objectType: ObjectType,
       s3SourceBucket: String,
-      objectKey: String
+      objectKey: String,
+      ignoreSiteName: Boolean
   )
 
   case class AssetProcessingResult(

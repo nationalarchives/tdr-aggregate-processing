@@ -23,7 +23,8 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
     {
       "metadataSourceBucket": "$metadataSourceBucket",
       "metadataSourceObjectPrefix": "$userId/$assetSource/$consignmentId/$category",
-      "dataLoadErrors": false
+      "dataLoadErrors": false,
+      "ignoreSiteName": false
     }
     """.stripMargin
 
@@ -121,7 +122,8 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
           {
             "metadataSourceBucket": "$metadataSourceBucket",
             "metadataSourceObjectPrefix": "$userId/$assetSource/$consignmentId/$category",
-            "dataLoadErrors": true
+            "dataLoadErrors": true,
+            "ignoreSiteName": false
           }
           """.stripMargin
 
@@ -327,7 +329,8 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
             {
               "metadataSourceBucket": "$metadataSourceBucket",
               "metadataSourceObjectPrefix": "$userId/$assetSource/$consignmentId/$category",
-              "dataLoadErrors": false
+              "dataLoadErrors": false,
+              "ignoreSiteName": false
             }
             """.stripMargin
 
@@ -399,7 +402,8 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
             {
               "metadataSourceBucket": "$metadataSourceBucket",
               "metadataSourceObjectPrefix": "$userId/$assetSource/$consignmentId/$category",
-              "dataLoadErrors": false
+              "dataLoadErrors": false,
+              "ignoreSiteName": false
             }
             """.stripMargin
 

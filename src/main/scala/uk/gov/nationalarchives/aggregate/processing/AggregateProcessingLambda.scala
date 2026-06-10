@@ -68,6 +68,7 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
     val dataLoadErrors = event.dataLoadErrors
     val assetSource = objectContext.assetSource.get
     val dryRun = objectsPrefix.contains(DryRunMetadata.id)
+    val ignoreSiteName = event.ignoreSiteName
     logger.info(s"Starting processing consignment: $consignmentId")
     for {
       s3Objects <- IO(s3Utils.listAllObjectsWithPrefix(sourceBucket, objectsPrefix))
@@ -79,7 +80,7 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
         case _ if objectKeys.isEmpty =>
           errorHandling.handleError(noObjectsError(consignmentId, objectContext.category.get), logger)
           IO(errorProcessingResult)
-        case _ => processAssets(userId, consignmentId, sourceBucket, objectKeys, dryRun)
+        case _ => processAssets(userId, consignmentId, sourceBucket, objectKeys, dryRun, ignoreSiteName)
       }
       orchestrationEvent = AggregateProcessingEvent(
         assetSource,
@@ -98,9 +99,16 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
   private def noObjectsError(consignmentId: UUID, objectCategory: ObjectCategory) =
     AggregateProcessingError(Some(consignmentId), s"$AggregateProcessing.$S3Error.$ReadError", s"No $objectCategory objects found for consignment: $consignmentId")
 
-  private def processAssets(userId: UUID, consignmentId: UUID, sourceBucket: String, objectKeys: List[String], dryRun: Boolean): IO[AssetProcessingResult] = {
+  private def processAssets(
+      userId: UUID,
+      consignmentId: UUID,
+      sourceBucket: String,
+      objectKeys: List[String],
+      dryRun: Boolean,
+      ignoreSiteName: Boolean
+  ): IO[AssetProcessingResult] = {
     (for {
-      assetProcessingResults <- IO(objectKeys.par.map(assetProcessor.processAsset(sourceBucket, _)).toList)
+      assetProcessingResults <- IO(objectKeys.par.map(assetProcessor.processAsset(sourceBucket, _, ignoreSiteName)).toList)
       assetsToProcess = assetProcessingResults.filter(!_.ignoreAsset)
       assetProcessingErrors = assetsToProcess.exists(_.processingErrors)
       suppliedMetadata = assetsToProcess.exists(_.suppliedMetadata.nonEmpty)
@@ -167,5 +175,5 @@ object AggregateProcessingLambda {
   }
 
   private case class AssetProcessingResult(errors: Boolean, suppliedMetadata: Boolean)
-  case class AggregateEvent(metadataSourceBucket: String, metadataSourceObjectPrefix: String, dataLoadErrors: Boolean)
+  case class AggregateEvent(metadataSourceBucket: String, metadataSourceObjectPrefix: String, dataLoadErrors: Boolean, ignoreSiteName: Boolean)
 }

@@ -47,13 +47,13 @@ class BaseMetadataHandler(
     } yield MetadataProperty(key, value)
   }
 
-  def convertToBaseMetadata(sourceJson: Json): Json = {
+  def convertToBaseMetadata(sourceJson: Json, ignoreSiteName: Option[Boolean]): Json = {
     val allMetadata: JsonObject = sourceJson.deepDropNullValues.asObject.get
     val metadata = allMetadata.toMap
       .map(fv => {
         val originalField = fv._1
         val field = sourceToBasePropertiesMapper(originalField)
-        field -> normaliseValues(NormaliseValueInput(field, fv._2, allMetadata))
+        field -> normaliseValues(NormaliseValueInput(field, fv._2, allMetadata, ignoreSiteName))
       })
     enrichMetadataFunction(metadata)
   }
