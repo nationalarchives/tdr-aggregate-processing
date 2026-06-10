@@ -566,7 +566,7 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
         .thenReturn(new ByteArrayInputStream(jsonMetadataString.getBytes("UTF-8")))
 
       val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
-      val result = assetProcessing.processAsset(metadataSourceBucket, s"$userId/sharepoint/$consignmentId/metadata/$matchId.metadata")
+      val result = assetProcessing.processAsset(metadataSourceBucket, s"$userId/sharepoint/$consignmentId/metadata/$matchId.metadata", ignoreSiteName = false)
 
       result shouldEqual expectedResult
 
@@ -627,7 +627,7 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
       .thenReturn(new ByteArrayInputStream(jsonMetadataString.getBytes("UTF-8")))
 
     val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
-    val result = assetProcessing.processAsset(metadataSourceBucket, s"$userId/sharepoint/$consignmentId/metadata/$matchId.metadata")
+    val result = assetProcessing.processAsset(metadataSourceBucket, s"$userId/sharepoint/$consignmentId/metadata/$matchId.metadata", ignoreSiteName = false)
 
     result shouldEqual expectedResult
 
