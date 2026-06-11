@@ -17,16 +17,13 @@ import org.slf4j.{Logger => UnderlyingLogger}
 import software.amazon.awssdk.services.sfn.model.StartExecutionResponse
 import software.amazon.awssdk.services.sns.model.PublishResponse
 import uk.gov.nationalarchives.aggregate.processing.ExternalServiceSpec
-import uk.gov.nationalarchives.aggregate.processing.modules.Common.AssetSource._
-import uk.gov.nationalarchives.aggregate.processing.modules.orchestration.TransferOrchestration.{
-  AggregateProcessingEvent,
-  BackendChecksStepFunctionInput,
-  MetadataChecksStepFunctionInput
-}
+import uk.gov.nationalarchives.aggregate.processing.modules.orchestration.TransferOrchestration.AggregateProcessingEvent
 import uk.gov.nationalarchives.aggregate.processing.persistence.GraphQlApi
 import uk.gov.nationalarchives.aggregate.processing.utilities.NotificationsClient.UploadEvent
 import uk.gov.nationalarchives.aggregate.processing.utilities.{KeycloakClient, NotificationsClient}
 import uk.gov.nationalarchives.aws.utils.stepfunction.StepFunctionUtils
+import uk.gov.nationalarchives.tdr.common.utils.objectkeycontext.AssetSources.{AssetSource, SharePoint}
+import uk.gov.nationalarchives.tdr.common.utils.serviceinputs.Inputs.{BackendChecksInput, MetadataValidationInput}
 import uk.gov.nationalarchives.tdr.keycloak.KeycloakUtils.UserDetails
 
 import java.time.ZonedDateTime
@@ -34,7 +31,7 @@ import java.util.UUID
 import scala.concurrent.Future
 
 class TransferOrchestrationSpec extends ExternalServiceSpec {
-  val assetSource: Value = SharePoint
+  val assetSource: AssetSource = SharePoint
   val consignmentId: UUID = UUID.randomUUID()
   val userId: UUID = UUID.randomUUID()
   val userEmail = "test@test.com"
@@ -65,7 +62,7 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
 
     val consignmentStatusInputCaptor: ArgumentCaptor[ConsignmentStatusInput] = ArgumentCaptor.forClass(classOf[ConsignmentStatusInput])
     val sfnArnCaptor: ArgumentCaptor[String] = ArgumentCaptor.forClass(classOf[String])
-    val sfnInputCaptor: ArgumentCaptor[BackendChecksStepFunctionInput] = ArgumentCaptor.forClass(classOf[BackendChecksStepFunctionInput])
+    val sfnInputCaptor: ArgumentCaptor[BackendChecksInput] = ArgumentCaptor.forClass(classOf[BackendChecksInput])
     val sfnNameCaptor: ArgumentCaptor[Option[String]] = ArgumentCaptor.forClass(classOf[Option[String]])
     val snsArgCaptor: ArgumentCaptor[UploadEvent] = ArgumentCaptor.forClass(classOf[UploadEvent])
 
@@ -73,9 +70,9 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     when(mockLogger.isErrorEnabled()).thenReturn(true)
     when(mockGraphQlApi.updateConsignmentStatus(any[ConsignmentStatusInput])).thenReturn(IO(Some(1)))
     when(mockGraphQlApi.getConsignmentDetails(consignmentId)).thenReturn(consignmentDetailsResponseStub)
-    when(sfnUtils.startExecution(any[String], any[BackendChecksStepFunctionInput], any[Option[String]])(any[Encoder[BackendChecksStepFunctionInput]]))
+    when(sfnUtils.startExecution(any[String], any[BackendChecksInput], any[Option[String]])(any[Encoder[BackendChecksInput]]))
       .thenReturn(IO.pure(StartExecutionResponse.builder.build))
-    when(keycloakConfigurations.userDetails(userId.toString)).thenReturn(Future.successful(UserDetails(userEmail)))
+    when(keycloakConfigurations.userDetails(userId.toString)).thenReturn(Future.successful(UserDetails(userEmail, "test", "test")))
     when(notificationUtils.publishUploadEvent(any[NotificationsClient.UploadEvent])).thenReturn(IO.pure(PublishResponse.builder.build()))
 
     val event = AggregateProcessingEvent(assetSource, userId, consignmentId, processingErrors = false, suppliedMetadata = false)
@@ -98,9 +95,9 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
 
     verify(keycloakConfigurations).userDetails(userId.toString)
     verify(sfnUtils, times(1)).startExecution(any[String], any, any[Option[String]])(any())
-    verify(sfnUtils).startExecution(sfnArnCaptor.capture(), sfnInputCaptor.capture(), sfnNameCaptor.capture())(any[Encoder[BackendChecksStepFunctionInput]])
+    verify(sfnUtils).startExecution(sfnArnCaptor.capture(), sfnInputCaptor.capture(), sfnNameCaptor.capture())(any[Encoder[BackendChecksInput]])
     sfnArnCaptor.getValue shouldBe config.getString("sfn.backendChecksArn")
-    sfnInputCaptor.getValue shouldBe BackendChecksStepFunctionInput(
+    sfnInputCaptor.getValue shouldBe BackendChecksInput(
       consignmentId.toString,
       s"$userId/sharepoint/$consignmentId/records"
     )
@@ -113,7 +110,7 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     snsArgCaptor.getValue.status shouldBe "Completed"
     snsArgCaptor.getValue.transferringBodyName shouldBe transferringBody
     snsArgCaptor.getValue.consignmentReference shouldBe consignmentRef
-    snsArgCaptor.getValue.assetSource shouldBe assetSource.toString
+    snsArgCaptor.getValue.assetSource shouldBe assetSource.id
   }
 
   "orchestrate" should "trigger backend processing, draft metadata sfn, update the consignment status and send an upload complete sns message when asset processing event does not contain errors and supplied metadata is provided" in {
@@ -126,11 +123,11 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
 
     val consignmentStatusInputCaptor: ArgumentCaptor[ConsignmentStatusInput] = ArgumentCaptor.forClass(classOf[ConsignmentStatusInput])
     val backendSfnArnCaptor: ArgumentCaptor[String] = ArgumentCaptor.forClass(classOf[String])
-    val backendSfnInputCaptor: ArgumentCaptor[BackendChecksStepFunctionInput] = ArgumentCaptor.forClass(classOf[BackendChecksStepFunctionInput])
+    val backendSfnInputCaptor: ArgumentCaptor[BackendChecksInput] = ArgumentCaptor.forClass(classOf[BackendChecksInput])
     val backendSfnNameCaptor: ArgumentCaptor[Option[String]] = ArgumentCaptor.forClass(classOf[Option[String]])
 
     val draftMetadataSfnArnCaptor: ArgumentCaptor[String] = ArgumentCaptor.forClass(classOf[String])
-    val draftMetadataSfnInputCaptor: ArgumentCaptor[MetadataChecksStepFunctionInput] = ArgumentCaptor.forClass(classOf[MetadataChecksStepFunctionInput])
+    val draftMetadataSfnInputCaptor: ArgumentCaptor[MetadataValidationInput] = ArgumentCaptor.forClass(classOf[MetadataValidationInput])
     val draftMetadataSfnNameCaptor: ArgumentCaptor[Option[String]] = ArgumentCaptor.forClass(classOf[Option[String]])
 
     val snsArgCaptor: ArgumentCaptor[UploadEvent] = ArgumentCaptor.forClass(classOf[UploadEvent])
@@ -152,11 +149,11 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
         )
       )
     when(mockGraphQlApi.getConsignmentDetails(consignmentId)).thenReturn(consignmentDetailsResponseStub)
-    when(sfnUtils.startExecution(any[String], any[BackendChecksStepFunctionInput], any[Option[String]])(any[Encoder[BackendChecksStepFunctionInput]]))
+    when(sfnUtils.startExecution(any[String], any[BackendChecksInput], any[Option[String]])(any[Encoder[BackendChecksInput]]))
       .thenReturn(IO.pure(StartExecutionResponse.builder.build))
-    when(sfnUtils.startExecution(any[String], any[MetadataChecksStepFunctionInput], any[Option[String]])(any[Encoder[MetadataChecksStepFunctionInput]]))
+    when(sfnUtils.startExecution(any[String], any[MetadataValidationInput], any[Option[String]])(any[Encoder[MetadataValidationInput]]))
       .thenReturn(IO.pure(StartExecutionResponse.builder.build))
-    when(keycloakConfigurations.userDetails(userId.toString)).thenReturn(Future.successful(UserDetails(userEmail)))
+    when(keycloakConfigurations.userDetails(userId.toString)).thenReturn(Future.successful(UserDetails(userEmail, "test", "test")))
     when(notificationUtils.publishUploadEvent(any[NotificationsClient.UploadEvent])).thenReturn(IO.pure(PublishResponse.builder.build()))
 
     val event = AggregateProcessingEvent(assetSource, userId, consignmentId, processingErrors = false, suppliedMetadata = true)
@@ -170,9 +167,9 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     verify(mockLogger).info(s"Triggering draft metadata validation for consignment: {}", consignmentId)
     verify(mockLogger, never).isErrorEnabled()
     verify(mockGraphQlApi, times(1)).updateConsignmentStatus(consignmentStatusInputCaptor.capture())
-    verify(mockGraphQlApi, times(1)).addConsignmentStatus(consignmentStatusInputCaptor.capture())
+    verify(mockGraphQlApi, times(2)).addConsignmentStatus(consignmentStatusInputCaptor.capture())
     val capturedStatuses = consignmentStatusInputCaptor.getAllValues
-    capturedStatuses.size() shouldBe 2
+    capturedStatuses.size() shouldBe 3
 
     val uploadStatus = capturedStatuses.get(0)
     uploadStatus.consignmentId shouldBe consignmentId
@@ -180,7 +177,13 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     uploadStatus.statusValue.get shouldBe "Completed"
     uploadStatus.userIdOverride.get shouldBe userId
 
-    val draftMetadataStatus = capturedStatuses.get(1)
+    val draftMetadataUploadStatus = capturedStatuses.get(1)
+    draftMetadataUploadStatus.consignmentId shouldBe consignmentId
+    draftMetadataUploadStatus.statusType shouldBe "DraftMetadataUpload"
+    draftMetadataUploadStatus.statusValue.get shouldBe "Completed"
+    draftMetadataUploadStatus.userIdOverride.get shouldBe userId
+
+    val draftMetadataStatus = capturedStatuses.get(2)
     draftMetadataStatus.consignmentId shouldBe consignmentId
     draftMetadataStatus.statusType shouldBe "DraftMetadata"
     draftMetadataStatus.statusValue.get shouldBe "InProgress"
@@ -190,17 +193,17 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     verify(keycloakConfigurations).userDetails(userId.toString)
 
     verify(sfnUtils, times(2)).startExecution(any[String], any, any[Option[String]])(any())
-    verify(sfnUtils).startExecution(backendSfnArnCaptor.capture(), backendSfnInputCaptor.capture(), backendSfnNameCaptor.capture())(any[Encoder[BackendChecksStepFunctionInput]])
+    verify(sfnUtils).startExecution(backendSfnArnCaptor.capture(), backendSfnInputCaptor.capture(), backendSfnNameCaptor.capture())(any[Encoder[BackendChecksInput]])
     verify(sfnUtils).startExecution(draftMetadataSfnArnCaptor.capture(), draftMetadataSfnInputCaptor.capture(), draftMetadataSfnNameCaptor.capture())(
-      any[Encoder[MetadataChecksStepFunctionInput]]
+      any[Encoder[MetadataValidationInput]]
     )
     backendSfnArnCaptor.getValue shouldBe config.getString("sfn.backendChecksArn")
     draftMetadataSfnArnCaptor.getValue shouldBe config.getString("sfn.metadataChecksArn")
-    backendSfnInputCaptor.getValue shouldBe BackendChecksStepFunctionInput(
+    backendSfnInputCaptor.getValue shouldBe BackendChecksInput(
       consignmentId.toString,
       s"$userId/sharepoint/$consignmentId/records"
     )
-    draftMetadataSfnInputCaptor.getValue shouldBe MetadataChecksStepFunctionInput(consignmentId.toString)
+    draftMetadataSfnInputCaptor.getValue shouldBe MetadataValidationInput(consignmentId.toString, "draft-metadata.csv")
     backendSfnNameCaptor.getValue shouldBe Some(s"transfer_service_$consignmentId")
     draftMetadataSfnNameCaptor.getValue shouldBe Some(s"transfer_service_$consignmentId")
 
@@ -211,7 +214,7 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     snsArgCaptor.getValue.status shouldBe "Completed"
     snsArgCaptor.getValue.transferringBodyName shouldBe transferringBody
     snsArgCaptor.getValue.consignmentReference shouldBe consignmentRef
-    snsArgCaptor.getValue.assetSource shouldBe assetSource.toString
+    snsArgCaptor.getValue.assetSource shouldBe assetSource.id
   }
 
   "orchestrate" should "log an error for asset processing event, update the consignment status correctly and send a upload failed sns message when asset processing contains errors" in {
@@ -228,7 +231,7 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     when(mockLogger.isErrorEnabled()).thenReturn(true)
     when(mockGraphQlApi.updateConsignmentStatus(any[ConsignmentStatusInput])).thenReturn(IO(Some(1)))
     when(mockGraphQlApi.getConsignmentDetails(consignmentId)).thenReturn(consignmentDetailsResponseStub)
-    when(keycloakConfigurations.userDetails(userId.toString)).thenReturn(Future.successful(UserDetails(userEmail)))
+    when(keycloakConfigurations.userDetails(userId.toString)).thenReturn(Future.successful(UserDetails(userEmail, "test", "test")))
     when(notificationUtils.publishUploadEvent(any[NotificationsClient.UploadEvent])).thenReturn(IO.pure(PublishResponse.builder.build()))
 
     val event = AggregateProcessingEvent(assetSource, userId, consignmentId, processingErrors = true, suppliedMetadata = false)
@@ -245,9 +248,9 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     verify(keycloakConfigurations).userDetails(userId.toString)
     verify(sfnUtils, never).startExecution(
       any[String],
-      any[BackendChecksStepFunctionInput],
+      any[BackendChecksInput],
       any[Option[String]]
-    )(any[Encoder[BackendChecksStepFunctionInput]])
+    )(any[Encoder[BackendChecksInput]])
 
     verify(mockGraphQlApi).updateConsignmentStatus(consignmentStatusInputCaptor.capture())
     consignmentStatusInputCaptor.getValue.consignmentId shouldBe consignmentId
@@ -264,7 +267,7 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     snsArgCaptor.getValue.status shouldBe "Failed"
     snsArgCaptor.getValue.transferringBodyName shouldBe transferringBody
     snsArgCaptor.getValue.consignmentReference shouldBe consignmentRef
-    snsArgCaptor.getValue.assetSource shouldBe assetSource.toString
+    snsArgCaptor.getValue.assetSource shouldBe assetSource.id
   }
 
   "orchestrate" should "return a non-successful result when the orchestration event is not of an expected class" in {
@@ -289,9 +292,9 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
 
     verify(sfnUtils, never).startExecution(
       any[String],
-      any[BackendChecksStepFunctionInput],
+      any[BackendChecksInput],
       any[Option[String]]
-    )(any[Encoder[BackendChecksStepFunctionInput]])
+    )(any[Encoder[BackendChecksInput]])
 
     verify(mockGraphQlApi, never).updateConsignmentStatus(any[ConsignmentStatusInput])
 
@@ -310,8 +313,8 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
 
     val arnCaptor: ArgumentCaptor[String] =
       ArgumentCaptor.forClass(classOf[String])
-    val sfnInputCaptor: ArgumentCaptor[BackendChecksStepFunctionInput] =
-      ArgumentCaptor.forClass(classOf[BackendChecksStepFunctionInput])
+    val sfnInputCaptor: ArgumentCaptor[BackendChecksInput] =
+      ArgumentCaptor.forClass(classOf[BackendChecksInput])
     val nameCaptor: ArgumentCaptor[Option[String]] =
       ArgumentCaptor.forClass(classOf[Option[String]])
     val consignmentStatusInputCaptor: ArgumentCaptor[ConsignmentStatusInput] = ArgumentCaptor.forClass(classOf[ConsignmentStatusInput])
@@ -319,14 +322,14 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     when(mockLogger.isErrorEnabled()).thenReturn(true)
     when(mockGraphQlApi.updateConsignmentStatus(any[ConsignmentStatusInput])).thenReturn(IO(Some(1)))
     when(mockGraphQlApi.getConsignmentDetails(consignmentId)).thenReturn(consignmentDetailsResponseStub)
-    when(keycloakConfigurations.userDetails(userId.toString)).thenReturn(Future.successful(UserDetails(userEmail)))
+    when(keycloakConfigurations.userDetails(userId.toString)).thenReturn(Future.successful(UserDetails(userEmail, "test", "test")))
 
     when(
       sfnUtils.startExecution(
         any[String],
-        any[BackendChecksStepFunctionInput],
+        any[BackendChecksInput],
         any[Option[String]]
-      )(any[Encoder[BackendChecksStepFunctionInput]])
+      )(any[Encoder[BackendChecksInput]])
     ).thenReturn(IO.raiseError(new RuntimeException("Step function failed")))
 
     when(notificationUtils.publishUploadEvent(any[NotificationsClient.UploadEvent])).thenReturn(IO.pure(PublishResponse.builder.build()))
@@ -341,11 +344,11 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
       arnCaptor.capture(),
       sfnInputCaptor.capture(),
       nameCaptor.capture()
-    )(any[Encoder[BackendChecksStepFunctionInput]])
+    )(any[Encoder[BackendChecksInput]])
 
     arnCaptor.getValue shouldBe config.getString("sfn.backendChecksArn")
 
-    sfnInputCaptor.getValue shouldBe BackendChecksStepFunctionInput(
+    sfnInputCaptor.getValue shouldBe BackendChecksInput(
       consignmentId.toString,
       s"$userId/sharepoint/$consignmentId/records"
     )

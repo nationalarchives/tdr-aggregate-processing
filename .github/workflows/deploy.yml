@@ -7,6 +7,7 @@ on:
         description: 'Environment'
         required: true
         options:
+          - dev
           - intg
           - staging
           - prod
@@ -21,7 +22,7 @@ permissions:
   contents: write
 jobs:
   deploy:
-    uses: nationalarchives/tdr-github-actions/.github/workflows/lambda_deploy.yml@f4766d435f6a5fbcf8ebbf64020b208c04ac2a2f # v0.0.9
+    uses: nationalarchives/tdr-github-actions/.github/workflows/lambda_deploy.yml@f318ce8a5d99c08b1235663f97fdb1b35844674e # v0.0.39
     with:
       lambda-name: aggregate-processing
       deployment-package: aggregate-processing.jar

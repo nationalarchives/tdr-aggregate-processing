@@ -2,7 +2,7 @@ package uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.met
 
 import graphql.codegen.types.ClientSideMetadataInput
 import io.circe.syntax.EncoderOps
-import io.circe.{Decoder, Json}
+import io.circe.{Decoder, Json, JsonObject}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.MetadataClassification
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.MetadataClassification.MetadataClassification
 import uk.gov.nationalarchives.tdr.schemautils.ConfigUtils
@@ -12,7 +12,7 @@ class BaseMetadataHandler(
     defaultProperties: Map[String, String],
     suppliedProperties: Seq[String],
     systemProperties: Seq[String],
-    normaliseFunction: (String, Json) => Json,
+    normaliseFunction: NormaliseValueInput => Json,
     enrichMetadataFunction: Map[String, Json] => Json = (baseMetadata: Map[String, Json]) => baseMetadata.asJson
 ) extends MetadataHandler {
   private val excludeProperties = suppliedProperties ++ systemProperties :+ MatchIdProperty.id :+ TransferIdProperty.id
@@ -35,8 +35,8 @@ class BaseMetadataHandler(
   override val sourceToBasePropertiesMapper: String => String = mapper
   override val defaultPropertyValues: Map[String, String] = defaultProperties
 
-  def normaliseValues(property: String, value: Json): Json = {
-    normaliseFunction(property, value)
+  def normaliseValues(input: NormaliseValueInput): Json = {
+    normaliseFunction(input)
   }
 
   def toMetadataProperties(json: Json, properties: Seq[String]): List[MetadataProperty] = {
@@ -47,12 +47,13 @@ class BaseMetadataHandler(
     } yield MetadataProperty(key, value)
   }
 
-  def convertToBaseMetadata(sourceJson: Json): Json = {
-    val metadata = sourceJson.asObject.get.toMap
+  def convertToBaseMetadata(sourceJson: Json, ignoreSiteName: Option[Boolean]): Json = {
+    val allMetadata: JsonObject = sourceJson.deepDropNullValues.asObject.get
+    val metadata = allMetadata.toMap
       .map(fv => {
         val originalField = fv._1
         val field = sourceToBasePropertiesMapper(originalField)
-        field -> normaliseValues(field, fv._2)
+        field -> normaliseValues(NormaliseValueInput(field, fv._2, allMetadata, ignoreSiteName))
       })
     enrichMetadataFunction(metadata)
   }
@@ -60,12 +61,12 @@ class BaseMetadataHandler(
   def toClientSideMetadataInput(baseMetadataJson: Json): Decoder.Result[ClientSideMetadataInput] =
     baseMetadataJson.as[ClientSideMetadataInput]
 
-  def classifyMetadata(json: Json): Map[MetadataClassification, List[MetadataProperty]] = {
-    val allPropertyNames: Seq[String] = json.asObject.map(_.keys.toSeq).getOrElse(Seq.empty)
+  def classifyBaseMetadata(baseMetadataJson: Json): Map[MetadataClassification, List[MetadataProperty]] = {
+    val allPropertyNames: Seq[String] = baseMetadataJson.asObject.map(_.keys.toSeq).getOrElse(Seq.empty)
     val customProperties = allPropertyNames.diff(excludeProperties)
-    val suppliedMetadata = toMetadataProperties(json, suppliedProperties)
-    val systemMetadata = toMetadataProperties(json, systemProperties)
-    val customMetadata = toMetadataProperties(json, customProperties)
+    val suppliedMetadata = toMetadataProperties(baseMetadataJson, suppliedProperties)
+    val systemMetadata = toMetadataProperties(baseMetadataJson, systemProperties)
+    val customMetadata = toMetadataProperties(baseMetadataJson, customProperties)
     Map(
       MetadataClassification.Custom -> customMetadata,
       MetadataClassification.Supplied -> convertBaseSuppliedToTdrHeaders(suppliedMetadata),

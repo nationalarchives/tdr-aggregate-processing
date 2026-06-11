@@ -6,9 +6,10 @@ import com.typesafe.scalalogging.Logger
 import graphql.codegen.AddConsignmentStatus.{addConsignmentStatus => acs}
 import graphql.codegen.AddFilesAndMetadata.{addFilesAndMetadata => afm}
 import graphql.codegen.GetConsignment.{getConsignment => gc}
+import graphql.codegen.UpdateClientSideDraftMetadataFileName.{updateClientSideDraftMetadataFileName => ucsdmfn}
 import graphql.codegen.UpdateConsignmentStatus.{updateConsignmentStatus => ucs}
 import graphql.codegen.UpdateParentFolder.{updateParentFolder => upf}
-import graphql.codegen.types.{AddFileAndMetadataInput, ConsignmentStatusInput, UpdateParentFolderInput}
+import graphql.codegen.types.{AddFileAndMetadataInput, ConsignmentStatusInput, UpdateClientSideDraftMetadataFileNameInput, UpdateParentFolderInput}
 import sttp.client3.{HttpURLConnectionBackend, Identity, SttpBackend, SttpBackendOptions}
 import uk.gov.nationalarchives.aggregate.processing.config.ApplicationConfig._
 import uk.gov.nationalarchives.tdr.GraphQLClient
@@ -24,7 +25,8 @@ class GraphQlApi(
     addConsignmentStatusClient: GraphQLClient[acs.Data, acs.Variables],
     addFilesAndMetadataClient: GraphQLClient[afm.Data, afm.Variables],
     getConsignmentClient: GraphQLClient[gc.Data, gc.Variables],
-    updateParentFolderClient: GraphQLClient[upf.Data, upf.Variables]
+    updateParentFolderClient: GraphQLClient[upf.Data, upf.Variables],
+    updateDraftMetadataFileNameClient: GraphQLClient[ucsdmfn.Data, ucsdmfn.Variables]
 )(implicit
     logger: Logger,
     keycloakDeployment: TdrKeycloakDeployment,
@@ -88,6 +90,17 @@ class GraphQlApi(
       data <- IO.fromOption(result.data)(throw new RuntimeException(s"Unable to add parent folder: $consignmentId"))
     } yield data.updateParentFolder
   }
+
+  def addDraftMetadataFileName(consignmentId: UUID, fileName: String): IO[Option[Int]] = {
+    logger.info(s"Add draft metadata file name for consignment: $consignmentId")
+
+    val input = UpdateClientSideDraftMetadataFileNameInput(consignmentId, fileName)
+    for {
+      token <- keycloak.serviceAccountToken(authClientId, clientSecret).toIO
+      result <- updateDraftMetadataFileNameClient.getResult(token, ucsdmfn.document, ucsdmfn.Variables(input).some).toIO
+      data <- IO.fromOption(result.data)(throw new RuntimeException(s"Unable to add draft metadata file name: $consignmentId"))
+    } yield data.updateClientSideDraftMetadataFileName
+  }
 }
 
 object GraphQlApi {
@@ -99,13 +112,22 @@ object GraphQlApi {
   private val addFilesAndMetadataClient = new GraphQLClient[afm.Data, afm.Variables](graphQlApiUrl)
   private val getConsignmentClient = new GraphQLClient[gc.Data, gc.Variables](graphQlApiUrl)
   private val updateParentFolderClient = new GraphQLClient[upf.Data, upf.Variables](graphQlApiUrl)
+  private val updateDraftMetadataFileNameClient = new GraphQLClient[ucsdmfn.Data, ucsdmfn.Variables](graphQlApiUrl)
 
   val logger = Logger[GraphQlApi]
 
   def apply()(implicit
       backend: SttpBackend[Identity, Any],
       keycloakDeployment: TdrKeycloakDeployment
-  ) = new GraphQlApi(keycloakUtils, updateConsignmentStatusClient, addConsignmentStatusClient, addFilesAndMetadataClient, getConsignmentClient, updateParentFolderClient)(
+  ) = new GraphQlApi(
+    keycloakUtils,
+    updateConsignmentStatusClient,
+    addConsignmentStatusClient,
+    addFilesAndMetadataClient,
+    getConsignmentClient,
+    updateParentFolderClient,
+    updateDraftMetadataFileNameClient
+  )(
     logger,
     keycloakDeployment,
     backend

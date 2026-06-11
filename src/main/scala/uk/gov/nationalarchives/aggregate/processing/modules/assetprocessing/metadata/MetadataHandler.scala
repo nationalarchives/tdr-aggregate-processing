@@ -1,7 +1,7 @@
 package uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.metadata
 
 import graphql.codegen.types.ClientSideMetadataInput
-import io.circe.{Decoder, Json}
+import io.circe.{Decoder, Json, JsonObject}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.MetadataClassification.MetadataClassification
 
 case class MetadataProperty(propertyName: String, propertyValue: String)
@@ -26,8 +26,16 @@ case object ClientSideChecksumProperty extends BaseProperty {
   val id: String = "client_side_checksum"
 }
 
+case object ClosureStartDateProperty extends BaseProperty {
+  val id: String = "closure_start_date"
+}
+
 case object DateLastModifiedProperty extends BaseProperty {
   val id: String = "date_last_modified"
+}
+
+case object EndDateProperty extends BaseProperty {
+  val id: String = "end_date"
 }
 
 case object FileNameProperty extends BaseProperty {
@@ -42,6 +50,14 @@ case object FileSizeProperty extends BaseProperty {
   val id: String = "file_size"
 }
 
+case object FoiExemptionCodeProperty extends BaseProperty {
+  val id: String = "foi_exemption_code"
+}
+
+case object FoiExemptionAssertedProperty extends BaseProperty {
+  val id: String = "foi_exemption_asserted"
+}
+
 case object MatchIdProperty extends BaseProperty {
   val id: String = "matchId"
 }
@@ -54,6 +70,8 @@ case object TitleClosedProperty extends BaseProperty {
   val id: String = "title_closed"
 }
 
+case class NormaliseValueInput(property: String, value: Json, allMetadataJson: JsonObject, ignoreSiteName: Option[Boolean] = None)
+
 trait MetadataHandler {
   val sourceToBasePropertiesMapper: String => String
 
@@ -63,7 +81,7 @@ trait MetadataHandler {
 
   def toMetadataProperties(json: Json, properties: Seq[String]): List[MetadataProperty]
 
-  def convertToBaseMetadata(sourceJson: Json): Json
+  def convertToBaseMetadata(sourceJson: Json, ignoreSiteName: Option[Boolean]): Json
 
-  def classifyMetadata(json: Json): Map[MetadataClassification, List[MetadataProperty]]
+  def classifyBaseMetadata(baseMetadataJson: Json): Map[MetadataClassification, List[MetadataProperty]]
 }

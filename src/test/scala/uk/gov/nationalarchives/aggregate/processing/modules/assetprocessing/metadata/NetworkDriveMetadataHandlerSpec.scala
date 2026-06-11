@@ -1,12 +1,17 @@
 package uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.metadata
 
+import io.circe.JsonObject
 import io.circe.syntax.EncoderOps
 import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper
-import uk.gov.nationalarchives.aggregate.processing.ExternalServiceSpec
+import uk.gov.nationalarchives.aggregate.processing.{ExternalServiceSpec, MetadataHelper}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.MetadataClassification
 
-class NetworkDriveMetadataHandlerSpec extends ExternalServiceSpec {
-  private val expectedFilePath = "top-level/folder/file1.txt"
+import java.util.UUID
+
+class NetworkDriveMetadataHandlerSpec extends ExternalServiceSpec with MetadataHelper {
+  private val expectedFilePath = "top-level/Retail/Shared Documents/file1.txt"
+  private val matchId = "matchId"
+  private val consignmentId = UUID.randomUUID()
 
   val networkDriveHandler: BaseMetadataHandler = NetworkDriveMetadataHandler.metadataHandler
 
@@ -14,44 +19,36 @@ class NetworkDriveMetadataHandlerSpec extends ExternalServiceSpec {
     val networkDrivePathJson = "top-level/folder/file1.txt".asJson
     val networkDriveLastModifiedJson = "1616162994000".asJson
     val someOtherJson = "some other json value".asJson
+    val allJsonMetadata = JsonObject()
 
-    networkDriveHandler.normaliseValues("file_path", networkDrivePathJson) shouldBe networkDrivePathJson
-    networkDriveHandler.normaliseValues("date_last_modified", networkDriveLastModifiedJson) shouldBe networkDriveLastModifiedJson
-    networkDriveHandler.normaliseValues("some_other_property", someOtherJson) shouldBe someOtherJson
+    networkDriveHandler.normaliseValues(NormaliseValueInput("file_path", networkDrivePathJson, allJsonMetadata)) shouldBe networkDrivePathJson
+    networkDriveHandler.normaliseValues(NormaliseValueInput("date_last_modified", networkDriveLastModifiedJson, allJsonMetadata)) shouldBe networkDriveLastModifiedJson
+    networkDriveHandler.normaliseValues(NormaliseValueInput("some_other_property", someOtherJson, allJsonMetadata)) shouldBe someOtherJson
   }
 
   "convertToBaseMetadata" should "convert valid network drive json with no default properties to base metadata json" in {
-    val rawNetworkDriveJsonString = """{
-           | "fileSize": "12",
-           | "transferId": "consignmentId",
-           | "originalPath": "top-level/folder/file1.txt",
-           | "checksum": "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2",
-           | "lastModified": "1751534387000",
-           | "matchId": "matchId"
-          }""".stripMargin
+    val rawNetworkDriveJson = convertStringToJson(networkDriveJsonString(matchId, defaultFileSize, consignmentId, None, None))
+    val expectedJson = convertStringToJson(validBaseMetadataJsonString(matchId, consignmentId, expectedFilePath))
 
-    val rawNetworkDriveJson = convertStringToJson(rawNetworkDriveJsonString)
-    val expectedJson = convertStringToJson(validBaseMetadataJsonString(expectedFilePath))
-
-    networkDriveHandler.convertToBaseMetadata(rawNetworkDriveJson) shouldBe expectedJson
+    networkDriveHandler.convertToBaseMetadata(rawNetworkDriveJson, None) shouldBe expectedJson
   }
 
   "convertToBaseMetadata" should "throw an exception for invalid json" in {
     val exception = intercept[NoSuchElementException] {
-      networkDriveHandler.convertToBaseMetadata("""some value}""".asJson)
+      networkDriveHandler.convertToBaseMetadata("""some value}""".asJson, None)
     }
     exception.getMessage shouldBe "None.get"
   }
 
   "toClientSideMetadataInput" should "convert valid base metadata json to ClientSideMetadataInput" in {
-    val input = networkDriveHandler.toClientSideMetadataInput(convertStringToJson(validBaseMetadataJsonString(expectedFilePath)))
+    val input = networkDriveHandler.toClientSideMetadataInput(convertStringToJson(validBaseMetadataJsonString(matchId, consignmentId, expectedFilePath)))
     input.isLeft shouldBe false
     input.map(i => {
       i.matchId shouldBe "matchId"
       i.checksum shouldBe "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2"
       i.fileSize shouldBe 12L
       i.lastModified shouldBe 1751534387000L
-      i.originalPath shouldBe "top-level/folder/file1.txt"
+      i.originalPath shouldBe expectedFilePath
     })
   }
 
@@ -63,17 +60,17 @@ class NetworkDriveMetadataHandlerSpec extends ExternalServiceSpec {
 
   "toMetadataProperties" should "return specified properties if exist in json" in {
     val properties = Seq("file_size", "file_name", "somePropertyNotInJson")
-    val selectedMetadata = networkDriveHandler.toMetadataProperties(convertStringToJson(validBaseMetadataJsonString(expectedFilePath)), properties)
+    val selectedMetadata = networkDriveHandler.toMetadataProperties(convertStringToJson(validBaseMetadataJsonString(matchId, consignmentId, expectedFilePath)), properties)
     selectedMetadata.size shouldBe 2
     selectedMetadata.contains(MetadataProperty("file_size", "12")) shouldBe true
     selectedMetadata.contains(MetadataProperty("file_name", "file1.txt")) shouldBe true
   }
 
-  "classifyMetadata" should "classify given metadata properties correctly" in {
-    val sourceJson = convertStringToJson(baseMetadataWithSuppliedAndCustom())
-    val classifiedMetadata = networkDriveHandler.classifyMetadata(sourceJson)
+  "classifyBaseMetadata" should "classify given metadata properties correctly" in {
+    val sourceJson = convertStringToJson(validBaseMetadataWithSuppliedAndCustom(matchId, consignmentId, expectedFilePath))
+    val classifiedMetadata = networkDriveHandler.classifyBaseMetadata(sourceJson)
     classifiedMetadata(MetadataClassification.Custom) shouldEqual expectedCustomMetadata
     classifiedMetadata(MetadataClassification.Supplied) shouldEqual expectedSuppliedMetadata
-    classifiedMetadata(MetadataClassification.System) shouldEqual expectedSystemMetadata
+    classifiedMetadata(MetadataClassification.System) shouldEqual expectedSystemMetadata(expectedFilePath)
   }
 }

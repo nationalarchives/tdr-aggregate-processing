@@ -4,71 +4,98 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.typesafe.scalalogging.Logger
 import graphql.codegen.types.ClientSideMetadataInput
 import io.circe.{Json, parser}
-import uk.gov.nationalarchives.aggregate.processing.modules.Common.AssetSource.AssetSource
-import uk.gov.nationalarchives.aggregate.processing.modules.Common.ObjectType.ObjectType
-import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorType.{EncodingError, JsonError, MatchIdError, ObjectKeyError, S3Error => s3e}
-import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorValue.{Invalid, Mismatch, ReadError}
+import uk.gov.nationalarchives.aggregate.processing.config.ApplicationConfig.{malwareScanKey, malwareScanThreatFound}
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.MetadataClassification
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorType.{EncodingError, JsonError, MalwareScanError, MatchIdError, ObjectKeyError, S3Error => s3e}
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorValue.{Invalid, Mismatch, ReadError, ThreatFound}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.{AssetProcessing => ptAp}
-import uk.gov.nationalarchives.aggregate.processing.modules.Common.StateStatusValue.{Completed, CompletedWithIssues}
-import uk.gov.nationalarchives.aggregate.processing.modules.Common.{AssetSource, MetadataClassification, ObjectType}
 import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling.BaseError
 import uk.gov.nationalarchives.aggregate.processing.modules._
 import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.AssetProcessing.{AssetProcessingError, AssetProcessingEvent, AssetProcessingResult}
-import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.initialchecks.{FileExtensionCheck, FileSizeCheck, InitialCheck}
+import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.initialchecks.{FileSizeCheck, FolderOnlyCheck, InitialCheck}
 import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.metadata._
 import uk.gov.nationalarchives.aggregate.processing.utilities.UTF8ValidationHandler
 import uk.gov.nationalarchives.aws.utils.s3.{S3Clients, S3Utils}
-import uk.gov.nationalarchives.tdr.schemautils.ConfigUtils
+import uk.gov.nationalarchives.tdr.common.utils.objectkeycontext.AssetSources.{AssetSource, HardDrive, NetworkDrive, SharePoint}
+import uk.gov.nationalarchives.tdr.common.utils.objectkeycontext.Context
+import uk.gov.nationalarchives.tdr.common.utils.objectkeycontext.ObjectTypes.ObjectType
+import uk.gov.nationalarchives.tdr.common.utils.statuses.StatusValues.{CompletedValue, CompletedWithIssuesValue}
 import uk.gov.nationalarchives.utf8.validator.Utf8Validator
 
 import java.util.UUID
 import scala.util.{Failure, Success, Try}
 
 class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
-  private lazy val metadataConfig: ConfigUtils.MetadataConfiguration = ConfigUtils.loadConfiguration
-  private lazy val initialChecks: Set[InitialCheck] = Set(FileSizeCheck.apply(), FileExtensionCheck.apply())
+  private lazy val initialChecks: Set[InitialCheck] = Set(FileSizeCheck.apply(), FolderOnlyCheck.apply())
   private lazy val errorHandling = ErrorHandling()
 
   private def getMetadataHandler(assetSource: AssetSource): MetadataHandler = {
     assetSource match {
-      case AssetSource.HardDrive    => HardDriveMetadataHandler.metadataHandler
-      case AssetSource.NetworkDrive => NetworkDriveMetadataHandler.metadataHandler
-      case AssetSource.SharePoint   => SharePointMetadataHandler.metadataHandler
+      case HardDrive    => HardDriveMetadataHandler.metadataHandler
+      case NetworkDrive => NetworkDriveMetadataHandler.metadataHandler
+      case SharePoint   => SharePointMetadataHandler.metadataHandler
     }
   }
 
   private def handleProcessError(errors: List[AssetProcessingError], s3Bucket: String, s3ObjectKey: String): AssetProcessingResult = {
     errors.foreach(errorHandling.handleError(_, logger))
-    val errorTags: Map[String, String] = Map(ptAp.toString -> CompletedWithIssues.toString)
+    val errorTags: Map[String, String] = Map(ptAp.toString -> CompletedWithIssuesValue.value)
     s3Utils.addObjectTags(s3Bucket, s3ObjectKey, errorTags)
     val matchId = errors.head.matchId
     AssetProcessingResult(matchId, processingErrors = true, None)
   }
 
-  def processAsset(s3Bucket: String, objectKey: String): AssetProcessingResult = {
+  def processAsset(s3Bucket: String, objectKey: String, ignoreSiteName: Boolean): AssetProcessingResult = {
     Try {
-      val objectContext = Common.objectKeyContextParser(objectKey)
-      val objectElements = objectContext.objectElements.get.split("\\.")
+      val objectContext = Context.objectKeyParser(objectKey, s3Bucket)
+      val objectElements = objectContext.objectName.get.split("\\.")
       val matchId = objectElements(0)
-      val objectType = ObjectType.withName(objectElements(1))
-      AssetProcessingEvent(objectContext.userId, objectContext.consignmentId, matchId, objectContext.assetSource, objectType, s3Bucket, objectKey)
+      AssetProcessingEvent(
+        objectContext.userId.get,
+        objectContext.transferId.get,
+        matchId,
+        objectContext.assetSource.get,
+        objectContext.objectType.get,
+        s3Bucket,
+        objectKey,
+        ignoreSiteName
+      )
     } match {
       case Failure(ex) =>
-        val error = AssetProcessingError(None, None, None, s"$ptAp.$ObjectKeyError.$Invalid", s"Invalid object key: $objectKey: ${ex.getMessage}")
+        val error = AssetProcessingError(None, None, None, s"$ptAp.$ObjectKeyError.$Invalid", s"${ex.getMessage}")
         handleProcessError(List(error), s3Bucket, objectKey)
       case Success(event) => parseMetadataObject(s3Utils, event)
     }
   }
 
   private def parseMetadataObject(s3Utils: S3Utils, event: AssetProcessingEvent): AssetProcessingResult = {
-    // TODO: check for threat found
     val s3Bucket = event.s3SourceBucket
     val objectKey = event.objectKey
-    Try(s3Utils.getObjectAsStream(s3Bucket, objectKey)) match {
-      case Failure(ex) =>
-        val error = generateErrorMessage(event, s"$ptAp.$s3e.$ReadError", ex.getMessage)
-        handleProcessError(List(error), s3Bucket, objectKey)
-      case Success(inputStream) => validUTF8(inputStream, event)
+    val objectTags = s3Utils.getObjectTags(s3Bucket, objectKey)
+
+    checkMalwareScan(objectTags, s3Bucket, objectKey, event) match {
+      case Some(result) => result
+      case None =>
+        Try(s3Utils.getObjectAsStream(s3Bucket, objectKey)) match {
+          case Failure(ex) =>
+            val error = generateErrorMessage(event, s"$ptAp.$s3e.$ReadError", ex.getMessage)
+            handleProcessError(List(error), s3Bucket, objectKey)
+          case Success(inputStream) => validUTF8(inputStream, event)
+        }
+    }
+  }
+
+  private def checkMalwareScan(
+      objectTags: Map[String, String],
+      s3Bucket: String,
+      objectKey: String,
+      event: AssetProcessingEvent
+  ): Option[AssetProcessingResult] = {
+    objectTags.get(malwareScanKey) match {
+      case Some(value) if value == malwareScanThreatFound =>
+        val error = generateErrorMessage(event, s"$ptAp.$MalwareScanError.$ThreatFound", "malware scan threat found")
+        Some(handleProcessError(List(error), s3Bucket, objectKey))
+      case _ => None
     }
   }
 
@@ -97,12 +124,12 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
     val matchId = event.matchId
     val objectKey = event.objectKey
     val s3Bucket = event.s3SourceBucket
-    val baseMetadataJson = metadataHandler.convertToBaseMetadata(sourceJson)
+    val baseMetadataJson = metadataHandler.convertToBaseMetadata(sourceJson, Some(event.ignoreSiteName))
     metadataHandler
       .toClientSideMetadataInput(baseMetadataJson)
       .fold(
         err => {
-          val error = AssetProcessingError(Some(event.consignmentId), Some(event.matchId), Some(event.source.toString), s"$ptAp.$JsonError.$Invalid", err.getMessage())
+          val error = AssetProcessingError(Some(event.consignmentId), Some(event.matchId), Some(event.source.id), s"$ptAp.$JsonError.$Invalid", err.getMessage())
           handleProcessError(List(error), s3Bucket, objectKey)
         },
         input => {
@@ -110,7 +137,7 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
             val error = AssetProcessingError(
               Some(event.consignmentId),
               None,
-              Some(event.source.toString),
+              Some(event.source.id),
               s"$ptAp.$MatchIdError.$Mismatch",
               s"Mismatched match ids: ${event.matchId} and ${input.matchId}"
             )
@@ -121,12 +148,12 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
               handleProcessError(initialChecksErrors, s3Bucket, objectKey)
               AssetProcessingResult(Some(matchId), processingErrors = true, Some(input))
             } else {
-              val classifiedMetadata = metadataHandler.classifyMetadata(baseMetadataJson)
+              val classifiedMetadata = metadataHandler.classifyBaseMetadata(baseMetadataJson)
               val suppliedMetadata = classifiedMetadata.getOrElse(MetadataClassification.Supplied, Nil)
               val systemMetadata = classifiedMetadata.getOrElse(MetadataClassification.System, Nil)
               val customMetadata = classifiedMetadata.getOrElse(MetadataClassification.Custom, Nil)
               logger.info(s"Asset metadata successfully processed for: $objectKey")
-              val completedTags = Map(ptAp.toString -> Completed.toString)
+              val completedTags = Map(ptAp.toString -> CompletedValue.value)
               s3Utils.addObjectTags(event.s3SourceBucket, event.objectKey, completedTags)
               AssetProcessingResult(Some(matchId), processingErrors = false, Some(input), systemMetadata, suppliedMetadata, customMetadata)
             }
@@ -139,7 +166,7 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
     AssetProcessingError(
       consignmentId = Some(event.consignmentId),
       matchId = Some(event.matchId),
-      source = Some(event.source.toString),
+      source = Some(event.source.id),
       errorCode = errorCode,
       errorMsg = errorMessage
     )
@@ -154,7 +181,8 @@ object AssetProcessing {
       source: AssetSource,
       objectType: ObjectType,
       s3SourceBucket: String,
-      objectKey: String
+      objectKey: String,
+      ignoreSiteName: Boolean
   )
 
   case class AssetProcessingResult(

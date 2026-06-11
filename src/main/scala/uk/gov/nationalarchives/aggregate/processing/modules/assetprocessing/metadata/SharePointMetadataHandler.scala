@@ -16,44 +16,54 @@ object SharePointMetadataHandler {
   }
 
   private val metadataConfig: ConfigUtils.MetadataConfiguration = ConfigUtils.loadConfiguration
-  private lazy val tdrDataLoadHeaderToPropertyMapper: String => String = metadataConfig.propertyToOutputMapper("tdrFileHeader")
-  private val suppliedProperties: Seq[String] = metadataConfig.getPropertiesByPropertyType(Supplied.toString).map(p => tdrDataLoadHeaderToPropertyMapper(p))
+  private val suppliedProperties: Seq[String] = metadataConfig.getPropertiesByPropertyType(Supplied.toString)
   private val systemProperties: Seq[String] = metadataConfig.getPropertiesByPropertyType(System.toString)
   private val mapper: String => String = metadataConfig.inputToPropertyMapper("sharePointTag")
   private val defaultPropertyValues: Map[String, String] = metadataConfig.getPropertiesWithDefaultValue
   private case class SharePointLocationPath(root: String, site: String, library: String, filePath: String)
 
-  private def sharePointLocationPathToFilePath(locationPath: String): SharePointLocationPath = {
+  private def sharePointLocationPathToFilePath(
+      locationPath: String,
+      siteDisplayName: Option[Json],
+      libraryDisplayName: Option[Json],
+      ignoreSiteName: Boolean
+  ): SharePointLocationPath = {
     val pathComponents = locationPath.split("/")
-    SharePointLocationPath(pathComponents(1), pathComponents(2), pathComponents(3), pathComponents.slice(1, pathComponents.length).mkString("/"))
+    val root = pathComponents(1)
+    val siteName = if (siteDisplayName.nonEmpty) siteDisplayName.get.asString.get else pathComponents(2)
+    val libraryName = if (libraryDisplayName.nonEmpty) libraryDisplayName.get.asString.get else pathComponents(3)
+    val folderNames = pathComponents.slice(4, pathComponents.length).mkString("/")
+    val filePath = if (ignoreSiteName) { s"$libraryName/$folderNames" }
+    else s"$siteName/$libraryName/$folderNames"
+
+    SharePointLocationPath(root, pathComponents(2), pathComponents(3), filePath)
   }
 
-  private sealed trait SharePointProperty {
-    val baseProperty: BaseProperty
-    def normaliseFunction: Json => Json
+  private def normaliseFilePath(input: NormaliseValueInput): Json = {
+    val jsonMap = input.allMetadataJson.toMap
+    val siteName: Option[Json] = jsonMap.get("SiteName")
+    val libraryName: Option[Json] = jsonMap.get("LibraryName")
+    val originalValue = input.value.asString.get
+    val ignoreSiteName = input.ignoreSiteName.getOrElse(false)
+    sharePointLocationPathToFilePath(originalValue, siteName, libraryName, ignoreSiteName).filePath.asJson
+  }
+
+  private def normaliseDateTime(value: Json): Json = {
+    val originalValue = value.asString.get
+    t"$originalValue".getTime.toString.asJson
+  }
+
+  private def normaliseNumber(value: Json): Json = {
+    val originalValue = value.asNumber.get
+    originalValue.toString.asJson
   }
 
   private object NormalisePropertyValue {
-    def normalise(id: String, value: Json): Json = id match {
-      case SharePointFilePath.baseProperty.id         => SharePointFilePath.normaliseFunction.apply(value)
-      case SharePointDateLastModified.baseProperty.id => SharePointDateLastModified.normaliseFunction.apply(value)
-      case _                                          => value
-    }
-  }
-
-  private case object SharePointFilePath extends SharePointProperty {
-    override val baseProperty: BaseProperty = FilePathProperty
-    override def normaliseFunction: Json => Json = (value: Json) => {
-      val originalValue = value.asString.get
-      sharePointLocationPathToFilePath(originalValue).filePath.asJson
-    }
-  }
-
-  private case object SharePointDateLastModified extends SharePointProperty {
-    override val baseProperty: BaseProperty = DateLastModifiedProperty
-    override def normaliseFunction: Json => Json = (value: Json) => {
-      val originalValue = value.asString.get
-      t"$originalValue".getTime.toString.asJson
+    def normalise(input: NormaliseValueInput): Json = input.property match {
+      case FilePathProperty.id                                                                                              => normaliseFilePath(input)
+      case DateLastModifiedProperty.id | ClosureStartDateProperty.id | EndDateProperty.id | FoiExemptionAssertedProperty.id => normaliseDateTime(input.value)
+      case ClosurePeriodProperty.id                                                                                         => normaliseNumber(input.value)
+      case _                                                                                                                => input.value
     }
   }
 

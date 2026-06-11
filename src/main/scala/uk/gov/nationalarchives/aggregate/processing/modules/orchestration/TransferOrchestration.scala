@@ -5,14 +5,9 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.typesafe.scalalogging.Logger
 import graphql.codegen.types.ConsignmentStatusInput
 import io.circe.Encoder
-import io.circe.generic.semiauto.deriveEncoder
-import uk.gov.nationalarchives.aggregate.processing.modules.Common.AssetSource.AssetSource
-import uk.gov.nationalarchives.aggregate.processing.modules.Common.ObjectCategory.Records
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorType.EventError
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorValue.Invalid
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.{AggregateProcessing, Orchestration}
-import uk.gov.nationalarchives.aggregate.processing.modules.Common.StateStatusValue.{Completed, CompletedWithIssues, ConsignmentStatusValue, Failed}
-import uk.gov.nationalarchives.aggregate.processing.modules.Common.{ConsignmentStatusType, StateStatusValue}
 import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling
 import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling.BaseError
 import uk.gov.nationalarchives.aggregate.processing.modules.orchestration.TransferOrchestration._
@@ -20,24 +15,25 @@ import uk.gov.nationalarchives.aggregate.processing.persistence.GraphQlApi
 import uk.gov.nationalarchives.aggregate.processing.persistence.GraphQlApi.{backend, keycloakDeployment}
 import uk.gov.nationalarchives.aggregate.processing.utilities.NotificationsClient.UploadEvent
 import uk.gov.nationalarchives.aggregate.processing.utilities.{KeycloakClient, NotificationsClient}
-import uk.gov.nationalarchives.aws.utils.s3.{S3Clients, S3Utils}
 import uk.gov.nationalarchives.aws.utils.stepfunction.StepFunctionClients.sfnAsyncClient
 import uk.gov.nationalarchives.aws.utils.stepfunction.StepFunctionUtils
+import uk.gov.nationalarchives.tdr.common.utils.objectkeycontext.AssetSources.AssetSource
+import uk.gov.nationalarchives.tdr.common.utils.objectkeycontext.ObjectCategories.Records
+import uk.gov.nationalarchives.tdr.common.utils.serviceinputs.Inputs.{BackendChecksInput, MetadataValidationInput}
+import uk.gov.nationalarchives.tdr.common.utils.statuses.StatusTypes.{DraftMetadataType, DraftMetadataUploadType, UploadType}
+import uk.gov.nationalarchives.tdr.common.utils.statuses.StatusValues._
 
 import java.util.UUID
 import scala.concurrent.ExecutionContext.Implicits.global
 
 class TransferOrchestration(
-    graphQlApi: GraphQlApi,
+    persistenceApi: GraphQlApi,
     stepFunctionUtils: StepFunctionUtils,
     notificationUtils: NotificationsClient,
     keycloakConfigurations: KeycloakClient,
     config: Config
 )(implicit logger: Logger) {
   private lazy val errorHandling = ErrorHandling()
-
-  implicit val backendChecksStepFunctionInputEncoder: Encoder[BackendChecksStepFunctionInput] = deriveEncoder[BackendChecksStepFunctionInput]
-  implicit val metadataChecksStepFunctionInputEncoder: Encoder[MetadataChecksStepFunctionInput] = deriveEncoder[MetadataChecksStepFunctionInput]
 
   def orchestrate[T <: Product](orchestrationEvent: T): IO[OrchestrationResult] = {
     orchestrationEvent match {
@@ -53,31 +49,31 @@ class TransferOrchestration(
     val errors = event.processingErrors
     val consignmentId = event.consignmentId
     val userId = event.userId
-    val consignmentStatusValue: ConsignmentStatusValue = if (errors) Failed else Completed
+    val consignmentStatusValue: StatusValue = if (errors) FailedValue else CompletedValue
 
-    val statusInput = ConsignmentStatusInput(consignmentId, ConsignmentStatusType.Upload.toString, Some(consignmentStatusValue.toString), Some(event.userId))
+    val statusInput = ConsignmentStatusInput(consignmentId, UploadType.id, Some(consignmentStatusValue.value), Some(event.userId), None)
     for {
       _ <-
         if (errors) {
-          val transferError = TransferError(Some(consignmentId), s"$AggregateProcessing.$CompletedWithIssues", "One or more assets failed to process.")
+          val transferError = TransferError(Some(consignmentId), s"$AggregateProcessing.${CompletedWithIssuesValue.value}", "One or more assets failed to process.")
           IO(errorHandling.handleError(transferError, logger))
         } else {
           triggerBackendChecksSfn(event) *> triggerDraftMetadataSfn(event)
         }
-      updateResult <- graphQlApi.updateConsignmentStatus(statusInput)
+      updateResult <- persistenceApi.updateConsignmentStatus(statusInput)
       success = updateResult.nonEmpty
       result = OrchestrationResult(Some(consignmentId), success = success)
-      getConsignmentDetails <- graphQlApi.getConsignmentDetails(consignmentId)
+      getConsignmentDetails <- persistenceApi.getConsignmentDetails(consignmentId)
       userDetails <- IO.fromFuture(IO(keycloakConfigurations.userDetails(userId.toString)))
       _ <- notificationUtils.publishUploadEvent(
         UploadEvent(
           transferringBodyName = getConsignmentDetails.flatMap(_.transferringBodyName).get,
           consignmentReference = getConsignmentDetails.map(_.consignmentReference).get,
           consignmentId = consignmentId.toString,
-          status = consignmentStatusValue.toString,
+          status = consignmentStatusValue.value,
           userId = event.userId.toString,
           userEmail = userDetails.email,
-          assetSource = event.assetSource.toString,
+          assetSource = event.assetSource.id,
           environment = config.getString("environment")
         )
       )
@@ -92,7 +88,7 @@ class TransferOrchestration(
       .handleErrorWith { ex =>
         IO(logger.error(ex.getMessage)) *> IO(
           errorHandling.handleError(
-            TransferError(Some(consignmentId), s"$AggregateProcessing.$CompletedWithIssues", s"Step function error: ${ex.getMessage}"),
+            TransferError(Some(consignmentId), s"$AggregateProcessing.${CompletedWithIssuesValue.value}", s"Step function error: ${ex.getMessage}"),
             logger
           )
         )
@@ -102,11 +98,11 @@ class TransferOrchestration(
 
   private def triggerBackendChecksSfn(event: AggregateProcessingEvent): IO[Unit] = {
     val consignmentId = event.consignmentId
-    val assetSource = event.assetSource.toString
+    val assetSource = event.assetSource.id
     logger.info(s"Triggering file checks for consignment: $consignmentId")
     triggerStepFunction(
       arnKey = "sfn.backendChecksArn",
-      input = BackendChecksStepFunctionInput(consignmentId.toString, s"${event.userId}/$assetSource/$consignmentId/$Records"),
+      input = BackendChecksInput(consignmentId.toString, s"${event.userId}/$assetSource/$consignmentId/${Records.id}"),
       consignmentId = consignmentId
     )
   }
@@ -115,12 +111,14 @@ class TransferOrchestration(
     val consignmentId = event.consignmentId
     if (event.suppliedMetadata) {
       logger.info(s"Triggering draft metadata validation for consignment: $consignmentId")
-      val statusInput = ConsignmentStatusInput(consignmentId, ConsignmentStatusType.DraftMetadata.toString, Some(StateStatusValue.InProgress.toString), Some(event.userId))
+      val draftMetadataStatusInput = ConsignmentStatusInput(consignmentId, DraftMetadataType.id, Some(InProgressValue.value), Some(event.userId), None)
+      val draftUploadStatusInput = ConsignmentStatusInput(consignmentId, DraftMetadataUploadType.id, Some(CompletedValue.value), Some(event.userId), None)
       for {
-        _ <- graphQlApi.addConsignmentStatus(statusInput)
+        _ <- persistenceApi.addConsignmentStatus(draftUploadStatusInput)
+        _ <- persistenceApi.addConsignmentStatus(draftMetadataStatusInput)
         _ <- triggerStepFunction(
           arnKey = "sfn.metadataChecksArn",
-          input = MetadataChecksStepFunctionInput(consignmentId.toString),
+          input = MetadataValidationInput(consignmentId.toString, "draft-metadata.csv"),
           consignmentId = consignmentId
         )
       } yield ()
@@ -131,12 +129,6 @@ class TransferOrchestration(
 object TransferOrchestration {
   val config: Config = ConfigFactory.load()
   val logger = Logger[TransferOrchestration]
-
-  trait StepFunctionInput {
-    def consignmentId: String
-  }
-  case class BackendChecksStepFunctionInput(consignmentId: String, s3SourceBucketPrefix: String) extends StepFunctionInput
-  case class MetadataChecksStepFunctionInput(consignmentId: String, fileName: String = "draft-metadata.csv") extends StepFunctionInput
 
   case class AggregateProcessingEvent(assetSource: AssetSource, userId: UUID, consignmentId: UUID, processingErrors: Boolean, suppliedMetadata: Boolean)
 
