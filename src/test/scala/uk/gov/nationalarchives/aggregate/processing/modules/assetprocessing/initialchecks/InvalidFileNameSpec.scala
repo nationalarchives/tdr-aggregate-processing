@@ -35,4 +35,14 @@ class InvalidFileNameSpec extends ExternalServiceSpec {
       result.head.consignmentId.get shouldBe event.consignmentId
     })
   }
+
+  "runCheck" should "return no errors for invalid file names when feature access is blocked" in {
+    val check = new InvalidFileName(blockInvalidFileNameCheck = true)
+    ExcludedFilenames.all.foreach(e => {
+      val invalidFileName = e.pattern
+      val input = ClientSideMetadataInput(s"folder1/folder2/$invalidFileName", "checksum", 12L, 0, "matchId-1")
+      val result = check.runCheck(event, input)
+      result.size shouldBe 0
+    })
+  }
 }
