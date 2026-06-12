@@ -7,7 +7,9 @@ import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.I
 import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.AssetProcessing.{AssetProcessingError, AssetProcessingEvent}
 
 class FolderOnlyCheck extends InitialCheck {
-  private lazy val errorCode = s"$InitialChecks.$UploadError.$FolderOnly"
+  private val errorCode = s"$InitialChecks.$UploadError.$FolderOnly"
+
+  override val errorCodes: Set[String] = Set(errorCode)
 
   override def runCheck(event: AssetProcessingEvent, input: ClientSideMetadataInput): List[AssetProcessingError] = {
     val containsExtension = input.originalPath.split("/").last.contains(".")

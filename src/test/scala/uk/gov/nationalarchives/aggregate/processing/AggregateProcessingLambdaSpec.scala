@@ -434,4 +434,80 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
         )
       }
   }
+
+  "'handleRequest'" should "handle an asset marked as 'ignored' correctly" in {
+    val assetSource = SharePoint.id
+    val objectKey = s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata"
+    val invalidNameMetadata = s"""{
+      "Length": "12",
+      "Modified": "2025-07-03T09:19:47Z",
+      "FileLeafRef": "thumbs.db",
+      "FileRef": "/sites/Retail/Shared Documents/aFolder/thumbs.db",
+      "sha256ClientSideChecksum": "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2",
+      "matchId": "$matchId",
+      "transferId": "$consignmentId"
+    }""".stripMargin
+
+    val expectedPutTagsRequestXml: String =
+      s"""<?xml version="1.0" encoding="UTF-8"?><Tagging xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+         |<TagSet><Tag><Key>GuardDutyMalwareScanStatus</Key>
+         |<Value>NO_THREATS_FOUND</Value></Tag>
+         |<Tag><Key>IGNORE_OBJECT</Key>
+         |<Value>TRUE</Value></Tag>
+         |</TagSet></Tagging>""".stripMargin.replaceAll("\\n", "")
+
+    authOkJson()
+    mockS3GetObjectTagging(objectKey)
+    mockS3GetObjectStream(objectKey, invalidNameMetadata)
+    mockS3ListBucketResponse(userId, consignmentId, List(matchId), assetSource)
+    mockSfnResponseOk()
+    mockGraphQlAddFilesAndMetadataResponse
+    mockGraphQlUpdateConsignmentStatusResponse
+    mockGraphQlGetConsignmentResponse
+    mockGraphQlUpdateParentFolderResponse
+    val mockContext = mock[Context]
+
+    val message1 = new SQSMessage()
+    message1.setBody(validMessageBody(assetSource))
+    val messages: java.util.List[SQSMessage] = List(message1).asJava
+    val sqsEvent = new SQSEvent()
+    sqsEvent.setRecords(messages)
+    new AggregateProcessingLambda().handleRequest(sqsEvent, mockContext)
+
+    wiremockS3.verify(
+      exactly(1),
+      getRequestedFor(anyUrl())
+        .withUrl(s"/?list-type=2&max-keys=1000&prefix=$userId%2F$assetSource%2F$consignmentId%2F$category")
+    )
+
+    wiremockS3.verify(
+      exactly(1),
+      getRequestedFor(anyUrl())
+        .withUrl(s"/$objectKey?partNumber=1")
+    )
+
+    wiremockS3.verify(
+      exactly(2),
+      getRequestedFor(anyUrl())
+        .withUrl(s"/$objectKey?tagging")
+    )
+
+    wiremockS3.verify(
+      exactly(1),
+      putRequestedFor(urlMatching(".*\\?tagging"))
+        .withRequestBody(equalToXml(expectedPutTagsRequestXml))
+    )
+
+    wiremockSfnServer.verify(
+      exactly(0),
+      postRequestedFor(anyUrl())
+        .withRequestBody(containing(s"transfer_service_$consignmentId"))
+    )
+
+    wiremockGraphqlServer.verify(
+      exactly(2),
+      postRequestedFor(anyUrl())
+        .withUrl("/graphql")
+    )
+  }
 }

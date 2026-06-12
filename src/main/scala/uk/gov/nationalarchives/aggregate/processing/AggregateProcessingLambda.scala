@@ -109,13 +109,14 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
   ): IO[AssetProcessingResult] = {
     (for {
       assetProcessingResults <- IO(objectKeys.par.map(assetProcessor.processAsset(sourceBucket, _, ignoreSiteName)).toList)
-      assetProcessingErrors = assetProcessingResults.exists(_.processingErrors)
-      suppliedMetadata = assetProcessingResults.exists(_.suppliedMetadata.nonEmpty)
+      assetsToProcess = assetProcessingResults.filter(!_.ignoreAsset)
+      assetProcessingErrors = assetsToProcess.exists(_.processingErrors)
+      suppliedMetadata = assetsToProcess.exists(_.suppliedMetadata.nonEmpty)
       _ <-
         if (assetProcessingErrors || dryRun) {
           IO.unit
         } else {
-          val clientSideMetadataInput = assetProcessingResults.flatMap(_.clientSideMetadataInput)
+          val clientSideMetadataInput = assetsToProcess.flatMap(_.clientSideMetadataInput)
           val addFileAndMetadataInput = AddFileAndMetadataInput(consignmentId, clientSideMetadataInput, None, Some(userId))
           val updateParentFolderInput = UpdateParentFolderInput(consignmentId, parentFolder = clientSideMetadataInput.head.originalPath.split("/").head, Some(userId))
           for {
@@ -123,7 +124,7 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
             _ <- persistenceApi.addClientSideMetadata(addFileAndMetadataInput)
             _ <-
               if (suppliedMetadata) {
-                handleSuppliedMetadata(assetProcessingResults, consignmentId)
+                handleSuppliedMetadata(assetsToProcess, consignmentId)
               } else IO.unit
           } yield ()
         }
