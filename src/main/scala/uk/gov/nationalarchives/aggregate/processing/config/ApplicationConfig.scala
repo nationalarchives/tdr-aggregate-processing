@@ -20,6 +20,7 @@ object ApplicationConfig {
   val malwareScanKey: String = configFactory.getString("guardDuty.malware_scan_tag_key")
   val malwareScanThreatFound: String = configFactory.getString("guardDuty.malware_scan_threat_found_value")
   val maxIndividualFileSizeMb: Long = configFactory.getLong("maxIndividualFileSizeMb")
+  val blockInvalidFileNameCheck: Boolean = configFactory.getBoolean("featureAccessBlocks.blockInvalidFileNameCheck")
 
   def getClientSecret(secretPath: String = authClientSecretPath): String = {
     val ssmClient = SSMClients.ssm(ssmEndpoint)

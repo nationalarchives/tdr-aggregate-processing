@@ -12,12 +12,12 @@ import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.{
 import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling.BaseError
 import uk.gov.nationalarchives.aggregate.processing.modules._
 import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.AssetProcessing.{AssetProcessingError, AssetProcessingEvent, AssetProcessingResult}
-import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.initialchecks.{FileSizeCheck, FolderOnlyCheck, InitialCheck}
+import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.initialchecks.{FileSizeCheck, FolderOnlyCheck, InitialCheck, InvalidFileName}
 import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.metadata._
 import uk.gov.nationalarchives.aggregate.processing.utilities.UTF8ValidationHandler
 import uk.gov.nationalarchives.aws.utils.s3.{S3Clients, S3Utils}
 import uk.gov.nationalarchives.tdr.common.utils.objectkeycontext.AssetSources.{AssetSource, HardDrive, NetworkDrive, SharePoint}
-import uk.gov.nationalarchives.tdr.common.utils.objectkeycontext.Context
+import uk.gov.nationalarchives.tdr.common.utils.objectkeycontext.{Context, ObjectCategories, ObjectTypes}
 import uk.gov.nationalarchives.tdr.common.utils.objectkeycontext.ObjectTypes.ObjectType
 import uk.gov.nationalarchives.tdr.common.utils.statuses.StatusValues.{CompletedValue, CompletedWithIssuesValue}
 import uk.gov.nationalarchives.utf8.validator.Utf8Validator
@@ -26,7 +26,14 @@ import java.util.UUID
 import scala.util.{Failure, Success, Try}
 
 class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
-  private lazy val initialChecks: Set[InitialCheck] = Set(FileSizeCheck.apply(), FolderOnlyCheck.apply())
+  private val fileSizeCheck = FileSizeCheck.apply()
+  private val folderOnlyCheck = FolderOnlyCheck.apply()
+  private val invalidFileNameCheck = InvalidFileName.apply()
+  private lazy val initialChecks: Set[InitialCheck] = Set(
+    fileSizeCheck,
+    folderOnlyCheck,
+    invalidFileNameCheck
+  )
   private lazy val errorHandling = ErrorHandling()
 
   private def getMetadataHandler(assetSource: AssetSource): MetadataHandler = {
@@ -119,6 +126,27 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
     }
   }
 
+  private val ignoreInitialChecksErrorCodes = invalidFileNameCheck.errorCodes
+
+  private def handleInitialChecksErrors(event: AssetProcessingEvent, initialChecksErrors: List[AssetProcessingError], input: ClientSideMetadataInput) = {
+    val s3Bucket = event.s3SourceBucket
+    val objectKey = event.objectKey
+    val matchId = event.matchId
+    if (initialChecksErrors.forall(e => ignoreInitialChecksErrorCodes.contains(e.errorCode))) {
+      val errorCodes = initialChecksErrors.map(_.errorCode).mkString(",")
+      val logMessage = s"Asset ignored: $objectKey with error codes $errorCodes"
+      logger.info(logMessage)
+      val ignoreObjectTag = Map("IGNORE_OBJECT" -> "TRUE")
+      val recordObjectKey = s"${event.userId}/${event.source.id}/${event.consignmentId}/${ObjectCategories.Records.id}/${event.matchId}"
+      s3Utils.addObjectTags(s3Bucket, objectKey, ignoreObjectTag)
+      s3Utils.addObjectTags(s3Bucket, recordObjectKey, ignoreObjectTag)
+      AssetProcessingResult(Some(matchId), processingErrors = false, Some(input), ignoreAsset = true)
+    } else {
+      handleProcessError(initialChecksErrors, s3Bucket, objectKey)
+      AssetProcessingResult(Some(matchId), processingErrors = true, Some(input))
+    }
+  }
+
   private def parseMetadataJson(sourceJson: Json, event: AssetProcessingEvent): AssetProcessingResult = {
     val metadataHandler: MetadataHandler = getMetadataHandler(event.source)
     val matchId = event.matchId
@@ -145,8 +173,7 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
           } else {
             val initialChecksErrors: List[AssetProcessingError] = initialChecks.flatMap(_.runCheck(event, input)).toList
             if (initialChecksErrors.nonEmpty) {
-              handleProcessError(initialChecksErrors, s3Bucket, objectKey)
-              AssetProcessingResult(Some(matchId), processingErrors = true, Some(input))
+              handleInitialChecksErrors(event, initialChecksErrors, input)
             } else {
               val classifiedMetadata = metadataHandler.classifyBaseMetadata(baseMetadataJson)
               val suppliedMetadata = classifiedMetadata.getOrElse(MetadataClassification.Supplied, Nil)
@@ -191,7 +218,8 @@ object AssetProcessing {
       clientSideMetadataInput: Option[ClientSideMetadataInput],
       systemMetadata: List[MetadataProperty] = List(),
       suppliedMetadata: List[MetadataProperty] = List(),
-      customMetadata: List[MetadataProperty] = List()
+      customMetadata: List[MetadataProperty] = List(),
+      ignoreAsset: Boolean = false
   )
   case class AssetProcessingError(consignmentId: Option[UUID], matchId: Option[String], source: Option[String], errorCode: String, errorMsg: String) extends BaseError {
     override def toString: String = {
