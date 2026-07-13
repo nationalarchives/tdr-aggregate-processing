@@ -4,9 +4,9 @@ object Dependencies {
   private val circeVersion = "0.14.16"
   private val mockitoScalaVersion = "2.2.1"
   private val awsUtilsVersion = "0.1.338"
-  private val tdrCommonUtilsVersion = "0.0.36"
+  private val tdrCommonUtilsVersion = "0.0.37"
 
-  lazy val authUtils = "uk.gov.nationalarchives" %% "tdr-auth-utils" % "0.0.292"
+  lazy val authUtils = "uk.gov.nationalarchives" %% "tdr-auth-utils" % "0.0.294"
   lazy val awsLambdaCore = "com.amazonaws" % "aws-lambda-java-core" % "1.4.0"
   lazy val awsLambdaEvents = "com.amazonaws" % "aws-lambda-java-events" % "3.16.1"
 
@@ -15,13 +15,13 @@ object Dependencies {
   lazy val circeParser = "io.circe" %% "circe-parser" % circeVersion
   lazy val csvParser = "com.github.tototoshi" %% "scala-csv" % "2.0.0"
 
-  lazy val generatedGraphql = "uk.gov.nationalarchives" %% "tdr-generated-graphql" % "0.0.478"
-  lazy val graphqlClient = "uk.gov.nationalarchives" %% "tdr-graphql-client" % "0.0.304"
+  lazy val generatedGraphql = "uk.gov.nationalarchives" %% "tdr-generated-graphql" % "0.0.479"
+  lazy val graphqlClient = "uk.gov.nationalarchives" %% "tdr-graphql-client" % "0.0.305"
 
-  lazy val logback = "ch.qos.logback" % "logback-classic" % "1.5.37"
+  lazy val logback = "ch.qos.logback" % "logback-classic" % "1.5.38"
   lazy val logstash = "net.logstash.logback" % "logstash-logback-encoder" % "9.0"
 
-  lazy val metadataSchema = "uk.gov.nationalarchives" % "da-metadata-schema_2.13" % "0.0.135"
+  lazy val metadataSchema = "uk.gov.nationalarchives" % "da-metadata-schema_2.13" % "0.0.137"
   lazy val mockitoScala = "org.mockito" %% "mockito-scala" % mockitoScalaVersion
   lazy val mockitoScalaTest = "org.mockito" %% "mockito-scala-scalatest" % mockitoScalaVersion
 
