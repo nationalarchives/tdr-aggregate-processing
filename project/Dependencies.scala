@@ -2,11 +2,11 @@ import sbt.*
 
 object Dependencies {
   private val circeVersion = "0.14.16"
-  private val mockitoScalaVersion = "2.2.1"
+  private val mockitoScalaVersion = "2.2.3"
   private val awsUtilsVersion = "0.1.338"
-  private val tdrCommonUtilsVersion = "0.0.37"
+  private val tdrCommonUtilsVersion = "0.0.40"
 
-  lazy val authUtils = "uk.gov.nationalarchives" %% "tdr-auth-utils" % "0.0.294"
+  lazy val authUtils = "uk.gov.nationalarchives" %% "tdr-auth-utils" % "0.0.295"
   lazy val awsLambdaCore = "com.amazonaws" % "aws-lambda-java-core" % "1.4.0"
   lazy val awsLambdaEvents = "com.amazonaws" % "aws-lambda-java-events" % "3.16.1"
 
@@ -15,7 +15,7 @@ object Dependencies {
   lazy val circeParser = "io.circe" %% "circe-parser" % circeVersion
   lazy val csvParser = "com.github.tototoshi" %% "scala-csv" % "2.0.0"
 
-  lazy val generatedGraphql = "uk.gov.nationalarchives" %% "tdr-generated-graphql" % "0.0.479"
+  lazy val generatedGraphql = "uk.gov.nationalarchives" %% "tdr-generated-graphql" % "0.0.480"
   lazy val graphqlClient = "uk.gov.nationalarchives" %% "tdr-graphql-client" % "0.0.305"
 
   lazy val logback = "ch.qos.logback" % "logback-classic" % "1.5.38"
@@ -37,6 +37,7 @@ object Dependencies {
   lazy val tdrInputs = "uk.gov.nationalarchives" %% "tdr-service-inputs" % tdrCommonUtilsVersion
   lazy val tdrObjectKeyContext = "uk.gov.nationalarchives" %% "tdr-object-key-context" % tdrCommonUtilsVersion
   lazy val tdrStatuses = "uk.gov.nationalarchives" %% "tdr-statuses" % tdrCommonUtilsVersion
+  lazy val tdrTransferState = "uk.gov.nationalarchives" %% "tdr-state-control" % tdrCommonUtilsVersion
   lazy val typesafeConfig = "com.typesafe" % "config" % "1.4.9"
 
   lazy val utf8Validator = "uk.gov.nationalarchives" % "utf8-validator" % "1.2"

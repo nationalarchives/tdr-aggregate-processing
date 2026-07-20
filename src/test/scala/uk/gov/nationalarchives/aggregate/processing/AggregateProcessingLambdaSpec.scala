@@ -4,11 +4,14 @@ import com.amazonaws.services.lambda.runtime.Context
 import com.amazonaws.services.lambda.runtime.events.SQSEvent
 import com.amazonaws.services.lambda.runtime.events.SQSEvent.SQSMessage
 import com.github.tomakehurst.wiremock.client.WireMock._
+import graphql.codegen.GetConsignment.getConsignment.GetConsignment.ConsignmentStatuses
 import org.mockito.MockitoSugar.mock
 import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper
 import org.scalatest.prop.{TableDrivenPropertyChecks, TableFor4}
 import uk.gov.nationalarchives.tdr.common.utils.objectkeycontext.AssetSources.{HardDrive, NetworkDrive, SharePoint}
 import uk.gov.nationalarchives.tdr.common.utils.objectkeycontext.ObjectCategories.Metadata
+import uk.gov.nationalarchives.tdr.common.utils.statuses.StatusTypes.{ClientChecksType, UploadType}
+import uk.gov.nationalarchives.tdr.common.utils.statuses.StatusValues.{CompletedValue, InProgressValue}
 
 import java.util.UUID
 import scala.jdk.CollectionConverters._
@@ -55,14 +58,18 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
 
     s"'handleRequest' with asset source $assetSource" should "process all valid messages in SQS event" in {
       val metadata = metadataJsonString(matchId, defaultFileSize, consignmentId, None, None)
+      val validState = List(
+        ConsignmentStatuses(UploadType.id, CompletedValue.value),
+        ConsignmentStatuses(ClientChecksType.id, InProgressValue.value)
+      )
       authOkJson()
+      mockGraphQlGetConsignmentResponse(validState)
       mockS3GetObjectTagging(objectKey)
       mockS3GetObjectStream(objectKey, metadata)
       mockS3ListBucketResponse(userId, consignmentId, List(matchId), assetSource)
       mockSfnResponseOk()
       mockGraphQlAddFilesAndMetadataResponse
       mockGraphQlUpdateConsignmentStatusResponse
-      mockGraphQlGetConsignmentResponse
       mockGraphQlUpdateParentFolderResponse
       val mockContext = mock[Context]
 
@@ -175,7 +182,7 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
       mockSfnResponseOk()
       mockGraphQlAddFilesAndMetadataResponse
       mockGraphQlUpdateConsignmentStatusResponse
-      mockGraphQlGetConsignmentResponse
+      mockGraphQlGetConsignmentResponse()
       val mockContext = mock[Context]
 
       val message1 = new SQSMessage()
@@ -319,7 +326,7 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
       mockSfnResponseOk()
       mockGraphQlAddFilesAndMetadataResponse
       mockGraphQlUpdateConsignmentStatusResponse
-      mockGraphQlGetConsignmentResponse
+      mockGraphQlGetConsignmentResponse()
       mockGraphQlUpdateParentFolderResponse
 
       val mockContext = mock[Context]
@@ -391,7 +398,7 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
         mockSfnResponseOk()
         mockGraphQlAddFilesAndMetadataResponse
         mockGraphQlUpdateConsignmentStatusResponse
-        mockGraphQlGetConsignmentResponse
+        mockGraphQlGetConsignmentResponse()
         mockGraphQlUpdateParentFolderResponse
         mockGraphQlUpdateDraftMetadataFileNameResponse
 
@@ -463,7 +470,7 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
     mockSfnResponseOk()
     mockGraphQlAddFilesAndMetadataResponse
     mockGraphQlUpdateConsignmentStatusResponse
-    mockGraphQlGetConsignmentResponse
+    mockGraphQlGetConsignmentResponse()
     mockGraphQlUpdateParentFolderResponse
     val mockContext = mock[Context]
 

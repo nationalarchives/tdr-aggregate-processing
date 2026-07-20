@@ -31,6 +31,7 @@ libraryDependencies ++= Seq(
   tdrInputs,
   tdrObjectKeyContext,
   tdrStatuses,
+  tdrTransferState,
   typesafeConfig,
   utf8Validator,
   wiremock % Test

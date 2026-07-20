@@ -8,14 +8,15 @@ import com.amazonaws.services.lambda.runtime.events.SQSEvent.SQSMessage
 import com.amazonaws.services.lambda.runtime.{Context, RequestHandler}
 import com.typesafe.config.{Config, ConfigFactory}
 import com.typesafe.scalalogging.Logger
+import graphql.codegen.GetConsignment.getConsignment.GetConsignment.ConsignmentStatuses
 import graphql.codegen.types.{AddFileAndMetadataInput, UpdateParentFolderInput}
 import io.circe._
 import io.circe.generic.semiauto.deriveDecoder
 import io.circe.parser._
 import uk.gov.nationalarchives.aggregate.processing.AggregateProcessingLambda._
 import uk.gov.nationalarchives.aggregate.processing.config.ApplicationConfig.draftMetadataBucket
-import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorType.{ClientDataLoadError, S3Error}
-import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorValue.{Failure, ReadError}
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorType.{ClientDataLoadError, S3Error, StateError}
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorValue.{Failure, Incorrect, ReadError}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.{AggregateProcessing, AssetProcessing}
 import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling
 import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling.BaseError
@@ -28,6 +29,8 @@ import uk.gov.nationalarchives.aggregate.processing.utilities.DraftMetadataCSVWr
 import uk.gov.nationalarchives.aws.utils.s3.{S3Clients, S3Utils}
 import uk.gov.nationalarchives.tdr.common.utils.objectkeycontext
 import uk.gov.nationalarchives.tdr.common.utils.objectkeycontext.ObjectCategories.{DryRunMetadata, ObjectCategory}
+import uk.gov.nationalarchives.tdr.common.utils.statuses.StatusTypes.{ClientChecksType, UploadType}
+import uk.gov.nationalarchives.tdr.common.utils.statuses.StatusValues.{CompletedValue, InProgressValue}
 
 import java.nio.file.Path
 import java.util.UUID
@@ -71,9 +74,14 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
     val ignoreSiteName = event.ignoreSiteName
     logger.info(s"Starting processing consignment: $consignmentId")
     for {
+      details <- persistenceApi.getConsignmentDetails(consignmentId)
+      incorrectState = !stateCorrect(details.get.consignmentStatuses)
       s3Objects <- IO(s3Utils.listAllObjectsWithPrefix(sourceBucket, objectsPrefix))
       objectKeys = s3Objects.map(_.key())
       assetProcessingResult <- dataLoadErrors match {
+        case _ if incorrectState =>
+          errorHandling.handleError(incorrectStateError(consignmentId), logger)
+          IO(errorProcessingResult)
         case _ if dataLoadErrors =>
           errorHandling.handleError(dataLoadError(consignmentId), logger)
           IO(errorProcessingResult)
@@ -93,11 +101,20 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
     } yield orchestrationResult
   }
 
+  private def stateCorrect(currentStatuses: List[ConsignmentStatuses]): Boolean = {
+    val uploadState: Option[ConsignmentStatuses] = currentStatuses.find(_.statusType == UploadType.id)
+    val clientChecksStatus: Option[ConsignmentStatuses] = currentStatuses.find(_.statusType == ClientChecksType.id)
+    uploadState.nonEmpty && uploadState.get.value == CompletedValue.value && clientChecksStatus.nonEmpty && clientChecksStatus.get.value == InProgressValue.value
+  }
+
   private def dataLoadError(consignmentId: UUID) =
     AggregateProcessingError(Some(consignmentId), s"$AggregateProcessing.$ClientDataLoadError.$Failure", s"Client data load errors for consignment: $consignmentId")
 
   private def noObjectsError(consignmentId: UUID, objectCategory: ObjectCategory) =
     AggregateProcessingError(Some(consignmentId), s"$AggregateProcessing.$S3Error.$ReadError", s"No $objectCategory objects found for consignment: $consignmentId")
+
+  private def incorrectStateError(consignmentId: UUID) =
+    AggregateProcessingError(Some(consignmentId), s"$AggregateProcessing.$StateError.$Incorrect", s"Transfer state incorrect for consignment: $consignmentId")
 
   private def processAssets(
       userId: UUID,

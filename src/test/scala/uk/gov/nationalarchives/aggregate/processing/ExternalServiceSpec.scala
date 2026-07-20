@@ -4,6 +4,7 @@ import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.stubbing.StubMapping
 import graphql.codegen.GetConsignment.getConsignment
+import graphql.codegen.GetConsignment.getConsignment.GetConsignment.ConsignmentStatuses
 import io.circe.Printer
 import io.circe.generic.auto._
 import io.circe.syntax._
@@ -88,7 +89,7 @@ class ExternalServiceSpec extends AnyFlatSpec with BeforeAndAfterEach with Befor
       .willReturn(ok("""{"data": {"updateClientSideDraftMetadataFileName": 1}}""".stripMargin))
   )
 
-  def mockGraphQlGetConsignmentResponse: StubMapping = {
+  def mockGraphQlGetConsignmentResponse(statuses: List[ConsignmentStatuses] = Nil): StubMapping = {
     val data = Some(
       getConsignment.Data(
         Some(
@@ -100,7 +101,7 @@ class ExternalServiceSpec extends AnyFlatSpec with BeforeAndAfterEach with Befor
             None,
             None,
             Some("TransferringBody"),
-            Nil
+            statuses
           )
         )
       )
