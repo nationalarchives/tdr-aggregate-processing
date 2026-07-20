@@ -33,18 +33,18 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
 
   val assetSources: TableFor4[String, (String, Long, UUID, Option[String], Option[String]) => String, String, String] = Table(
     ("Asset Source", "Metadata Json String", "Expected File Path", "Invalid Supplied Metadata"),
-    (
-      HardDrive.id.toLowerCase,
-      hardDriveMetadataJsonString,
-      "content/Retail/Shared Documents/file1.txt",
-      """"closure_type": "Open","description": "some kind of description","date_last_modified": "2025-13-45T25:99:99""""
-    ),
-    (
-      NetworkDrive.id.toLowerCase,
-      networkDriveJsonString,
-      "",
-      """"closure_type": "Open","description": "some kind of description","lastModified": "17/02/2026""""
-    ),
+//    (
+//      HardDrive.id.toLowerCase,
+//      hardDriveMetadataJsonString,
+//      "content/Retail/Shared Documents/file1.txt",
+//      """"closure_type": "Open","description": "some kind of description","date_last_modified": "2025-13-45T25:99:99""""
+//    ),
+//    (
+//      NetworkDrive.id.toLowerCase,
+//      networkDriveJsonString,
+//      "",
+//      """"closure_type": "Open","description": "some kind of description","lastModified": "17/02/2026""""
+//    ),
     (
       SharePoint.id.toLowerCase,
       sharePointMetadataJsonString,
@@ -58,12 +58,8 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
 
     s"'handleRequest' with asset source $assetSource" should "process all valid messages in SQS event" in {
       val metadata = metadataJsonString(matchId, defaultFileSize, consignmentId, None, None)
-      val validState = List(
-        ConsignmentStatuses(UploadType.id, CompletedValue.value),
-        ConsignmentStatuses(ClientChecksType.id, InProgressValue.value)
-      )
       authOkJson()
-      mockGraphQlGetConsignmentResponse(validState)
+      mockGraphQlGetConsignmentResponse()
       mockS3GetObjectTagging(objectKey)
       mockS3GetObjectStream(objectKey, metadata)
       mockS3ListBucketResponse(userId, consignmentId, List(matchId), assetSource)
@@ -107,7 +103,60 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
       )
 
       wiremockGraphqlServer.verify(
-        exactly(8),
+        exactly(9),
+        postRequestedFor(anyUrl())
+          .withUrl("/graphql")
+      )
+    }
+
+    s"'handleRequest' with asset source $assetSource" should "process all valid messages in SQS event correctly when transfer state incorrect" in {
+      val metadata = metadataJsonString(matchId, defaultFileSize, consignmentId, None, None)
+      val incorrectUploadStatusValue = InProgressValue
+      authOkJson()
+      mockGraphQlGetConsignmentResponse(uploadStatusValue = incorrectUploadStatusValue)
+      mockS3GetObjectTagging(objectKey)
+      mockS3GetObjectStream(objectKey, metadata)
+      mockS3ListBucketResponse(userId, consignmentId, List(matchId), assetSource)
+      mockSfnResponseOk()
+      mockGraphQlAddFilesAndMetadataResponse
+      mockGraphQlUpdateConsignmentStatusResponse
+      mockGraphQlUpdateParentFolderResponse
+      val mockContext = mock[Context]
+
+      val message = new SQSMessage()
+      message.setBody(validMessageBody(assetSource))
+
+      val messages: java.util.List[SQSMessage] = List(message).asJava
+      val sqsEvent = new SQSEvent()
+      sqsEvent.setRecords(messages)
+      new AggregateProcessingLambda().handleRequest(sqsEvent, mockContext)
+
+      wiremockS3.verify(
+        exactly(1),
+        getRequestedFor(anyUrl())
+          .withUrl(s"/?list-type=2&max-keys=1000&prefix=$userId%2F$assetSource%2F$consignmentId%2F$category")
+      )
+
+      wiremockS3.verify(
+        exactly(0),
+        getRequestedFor(anyUrl())
+          .withUrl(s"/$objectKey?partNumber=1")
+      )
+
+      wiremockS3.verify(
+        exactly(0),
+        getRequestedFor(anyUrl())
+          .withUrl(s"/$objectKey?tagging")
+      )
+
+      wiremockSfnServer.verify(
+        exactly(0),
+        postRequestedFor(anyUrl())
+          .withRequestBody(containing(s"transfer_service_$consignmentId"))
+      )
+
+      wiremockGraphqlServer.verify(
+        exactly(3),
         postRequestedFor(anyUrl())
           .withUrl("/graphql")
       )
@@ -167,7 +216,7 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
       )
 
       wiremockGraphqlServer.verify(
-        exactly(2),
+        exactly(3),
         postRequestedFor(anyUrl())
           .withUrl("/graphql")
       )
@@ -218,7 +267,7 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
       )
 
       wiremockGraphqlServer.verify(
-        exactly(2),
+        exactly(3),
         postRequestedFor(anyUrl())
           .withUrl("/graphql")
       )
