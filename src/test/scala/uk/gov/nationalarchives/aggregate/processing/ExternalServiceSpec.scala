@@ -3,11 +3,6 @@ package uk.gov.nationalarchives.aggregate.processing
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.stubbing.StubMapping
-import graphql.codegen.GetConsignment.getConsignment
-import graphql.codegen.GetConsignment.getConsignment.GetConsignment.ConsignmentStatuses
-import io.circe.Printer
-import io.circe.generic.auto._
-import io.circe.syntax._
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.time.{Millis, Seconds, Span}
@@ -93,30 +88,15 @@ class ExternalServiceSpec extends AnyFlatSpec with BeforeAndAfterEach with Befor
   def mockGraphQlGetConsignmentResponse(uploadStatusValue: StatusValue = CompletedValue, clientChecksStatusValue: StatusValue = InProgressValue): StubMapping = {
     val consignmentId = UUID.randomUUID()
     val userId = UUID.randomUUID()
-    val data = Some(
-      getConsignment.Data(
-        Some(
-          getConsignment.GetConsignment(
-            userId,
-            None,
-            None,
-            "ConsignmentRef",
-            None,
-            None,
-            Some("TransferringBody"),
-            Nil
-          )
-        )
-      )
-    )
-    val dataString: String = data.asJson.printWith(Printer(dropNullValues = false, "")).stripMargin
+
     val getConsignmentResponse: String = {
       s"""{
          |  "data": {
          |    "getConsignment": {
-         |      "consignmentId": "$consignmentId",
+         |      "consignmentid": "$consignmentId",
          |      "userid": "$userId",
          |      "consignmentReference": "Consignment-Ref",
+         |      "transferringBodyName": "transferringBodyName",
          |      "consignmentStatuses": [
          |        {
          |          "consignmentStatusId": "31657058-a8f7-4b1a-b2d7-529d212a7718",
@@ -137,9 +117,10 @@ class ExternalServiceSpec extends AnyFlatSpec with BeforeAndAfterEach with Befor
          |  }
          |}""".stripMargin
     }
+
     wiremockGraphqlServer.stubFor(
       post(urlEqualTo(graphQlPath))
-        .withRequestBody(containing("query"))
+        .withRequestBody(containing("getConsignment"))
         .willReturn(ok(getConsignmentResponse))
     )
   }

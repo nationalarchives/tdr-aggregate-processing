@@ -37,7 +37,6 @@ object Dependencies {
   lazy val tdrInputs = "uk.gov.nationalarchives" %% "tdr-service-inputs" % tdrCommonUtilsVersion
   lazy val tdrObjectKeyContext = "uk.gov.nationalarchives" %% "tdr-object-key-context" % tdrCommonUtilsVersion
   lazy val tdrStatuses = "uk.gov.nationalarchives" %% "tdr-statuses" % tdrCommonUtilsVersion
-  lazy val tdrTransferState = "uk.gov.nationalarchives" %% "tdr-state-control" % tdrCommonUtilsVersion
   lazy val typesafeConfig = "com.typesafe" % "config" % "1.4.9"
 
   lazy val utf8Validator = "uk.gov.nationalarchives" % "utf8-validator" % "1.2"

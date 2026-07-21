@@ -4,14 +4,12 @@ import com.amazonaws.services.lambda.runtime.Context
 import com.amazonaws.services.lambda.runtime.events.SQSEvent
 import com.amazonaws.services.lambda.runtime.events.SQSEvent.SQSMessage
 import com.github.tomakehurst.wiremock.client.WireMock._
-import graphql.codegen.GetConsignment.getConsignment.GetConsignment.ConsignmentStatuses
 import org.mockito.MockitoSugar.mock
 import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper
 import org.scalatest.prop.{TableDrivenPropertyChecks, TableFor4}
 import uk.gov.nationalarchives.tdr.common.utils.objectkeycontext.AssetSources.{HardDrive, NetworkDrive, SharePoint}
 import uk.gov.nationalarchives.tdr.common.utils.objectkeycontext.ObjectCategories.Metadata
-import uk.gov.nationalarchives.tdr.common.utils.statuses.StatusTypes.{ClientChecksType, UploadType}
-import uk.gov.nationalarchives.tdr.common.utils.statuses.StatusValues.{CompletedValue, InProgressValue}
+import uk.gov.nationalarchives.tdr.common.utils.statuses.StatusValues.InProgressValue
 
 import java.util.UUID
 import scala.jdk.CollectionConverters._
@@ -33,18 +31,18 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
 
   val assetSources: TableFor4[String, (String, Long, UUID, Option[String], Option[String]) => String, String, String] = Table(
     ("Asset Source", "Metadata Json String", "Expected File Path", "Invalid Supplied Metadata"),
-//    (
-//      HardDrive.id.toLowerCase,
-//      hardDriveMetadataJsonString,
-//      "content/Retail/Shared Documents/file1.txt",
-//      """"closure_type": "Open","description": "some kind of description","date_last_modified": "2025-13-45T25:99:99""""
-//    ),
-//    (
-//      NetworkDrive.id.toLowerCase,
-//      networkDriveJsonString,
-//      "",
-//      """"closure_type": "Open","description": "some kind of description","lastModified": "17/02/2026""""
-//    ),
+    (
+      HardDrive.id.toLowerCase,
+      hardDriveMetadataJsonString,
+      "content/Retail/Shared Documents/file1.txt",
+      """"closure_type": "Open","description": "some kind of description","date_last_modified": "2025-13-45T25:99:99""""
+    ),
+    (
+      NetworkDrive.id.toLowerCase,
+      networkDriveJsonString,
+      "",
+      """"closure_type": "Open","description": "some kind of description","lastModified": "17/02/2026""""
+    ),
     (
       SharePoint.id.toLowerCase,
       sharePointMetadataJsonString,
@@ -103,7 +101,7 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
       )
 
       wiremockGraphqlServer.verify(
-        exactly(9),
+        exactly(10),
         postRequestedFor(anyUrl())
           .withUrl("/graphql")
       )
@@ -431,7 +429,7 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
       )
 
       wiremockGraphqlServer.verify(
-        exactly(2),
+        exactly(3),
         postRequestedFor(anyUrl())
           .withUrl("/graphql")
       )
@@ -561,7 +559,7 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
     )
 
     wiremockGraphqlServer.verify(
-      exactly(2),
+      exactly(3),
       postRequestedFor(anyUrl())
         .withUrl("/graphql")
     )
