@@ -167,6 +167,7 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
       mockS3GetObjectStream(objectKey, metadata)
       mockS3ListBucketResponse(userId, consignmentId, List(matchId), assetSource)
       mockSfnResponseOk()
+      mockGraphQlGetConsignmentResponse()
       mockGraphQlAddFilesAndMetadataResponse
       mockGraphQlUpdateConsignmentStatusResponse
       val mockContext = mock[Context]
@@ -470,7 +471,7 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
         new AggregateProcessingLambda().handleRequest(sqsEvent, mockContext)
 
         wiremockGraphqlServer.verify(
-          exactly(5),
+          exactly(6),
           postRequestedFor(anyUrl())
             .withUrl("/graphql")
         )
