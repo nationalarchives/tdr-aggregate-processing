@@ -9,6 +9,7 @@ import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper
 import org.scalatest.prop.{TableDrivenPropertyChecks, TableFor4}
 import uk.gov.nationalarchives.tdr.common.utils.objectkeycontext.AssetSources.{HardDrive, NetworkDrive, SharePoint}
 import uk.gov.nationalarchives.tdr.common.utils.objectkeycontext.ObjectCategories.Metadata
+import uk.gov.nationalarchives.tdr.common.utils.statuses.StatusValues.InProgressValue
 
 import java.util.UUID
 import scala.jdk.CollectionConverters._
@@ -56,13 +57,13 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
     s"'handleRequest' with asset source $assetSource" should "process all valid messages in SQS event" in {
       val metadata = metadataJsonString(matchId, defaultFileSize, consignmentId, None, None)
       authOkJson()
+      mockGraphQlGetConsignmentResponse()
       mockS3GetObjectTagging(objectKey)
       mockS3GetObjectStream(objectKey, metadata)
       mockS3ListBucketResponse(userId, consignmentId, List(matchId), assetSource)
       mockSfnResponseOk()
       mockGraphQlAddFilesAndMetadataResponse
       mockGraphQlUpdateConsignmentStatusResponse
-      mockGraphQlGetConsignmentResponse
       mockGraphQlUpdateParentFolderResponse
       val mockContext = mock[Context]
 
@@ -100,7 +101,60 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
       )
 
       wiremockGraphqlServer.verify(
-        exactly(8),
+        exactly(10),
+        postRequestedFor(anyUrl())
+          .withUrl("/graphql")
+      )
+    }
+
+    s"'handleRequest' with asset source $assetSource" should "process all valid messages in SQS event correctly when transfer state incorrect" in {
+      val metadata = metadataJsonString(matchId, defaultFileSize, consignmentId, None, None)
+      val incorrectUploadStatusValue = InProgressValue
+      authOkJson()
+      mockGraphQlGetConsignmentResponse(uploadStatusValue = incorrectUploadStatusValue)
+      mockS3GetObjectTagging(objectKey)
+      mockS3GetObjectStream(objectKey, metadata)
+      mockS3ListBucketResponse(userId, consignmentId, List(matchId), assetSource)
+      mockSfnResponseOk()
+      mockGraphQlAddFilesAndMetadataResponse
+      mockGraphQlUpdateConsignmentStatusResponse
+      mockGraphQlUpdateParentFolderResponse
+      val mockContext = mock[Context]
+
+      val message = new SQSMessage()
+      message.setBody(validMessageBody(assetSource))
+
+      val messages: java.util.List[SQSMessage] = List(message).asJava
+      val sqsEvent = new SQSEvent()
+      sqsEvent.setRecords(messages)
+      new AggregateProcessingLambda().handleRequest(sqsEvent, mockContext)
+
+      wiremockS3.verify(
+        exactly(1),
+        getRequestedFor(anyUrl())
+          .withUrl(s"/?list-type=2&max-keys=1000&prefix=$userId%2F$assetSource%2F$consignmentId%2F$category")
+      )
+
+      wiremockS3.verify(
+        exactly(0),
+        getRequestedFor(anyUrl())
+          .withUrl(s"/$objectKey?partNumber=1")
+      )
+
+      wiremockS3.verify(
+        exactly(0),
+        getRequestedFor(anyUrl())
+          .withUrl(s"/$objectKey?tagging")
+      )
+
+      wiremockSfnServer.verify(
+        exactly(0),
+        postRequestedFor(anyUrl())
+          .withRequestBody(containing(s"transfer_service_$consignmentId"))
+      )
+
+      wiremockGraphqlServer.verify(
+        exactly(3),
         postRequestedFor(anyUrl())
           .withUrl("/graphql")
       )
@@ -113,6 +167,7 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
       mockS3GetObjectStream(objectKey, metadata)
       mockS3ListBucketResponse(userId, consignmentId, List(matchId), assetSource)
       mockSfnResponseOk()
+      mockGraphQlGetConsignmentResponse()
       mockGraphQlAddFilesAndMetadataResponse
       mockGraphQlUpdateConsignmentStatusResponse
       val mockContext = mock[Context]
@@ -160,7 +215,7 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
       )
 
       wiremockGraphqlServer.verify(
-        exactly(2),
+        exactly(3),
         postRequestedFor(anyUrl())
           .withUrl("/graphql")
       )
@@ -175,7 +230,7 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
       mockSfnResponseOk()
       mockGraphQlAddFilesAndMetadataResponse
       mockGraphQlUpdateConsignmentStatusResponse
-      mockGraphQlGetConsignmentResponse
+      mockGraphQlGetConsignmentResponse()
       val mockContext = mock[Context]
 
       val message1 = new SQSMessage()
@@ -211,7 +266,7 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
       )
 
       wiremockGraphqlServer.verify(
-        exactly(2),
+        exactly(3),
         postRequestedFor(anyUrl())
           .withUrl("/graphql")
       )
@@ -319,7 +374,7 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
       mockSfnResponseOk()
       mockGraphQlAddFilesAndMetadataResponse
       mockGraphQlUpdateConsignmentStatusResponse
-      mockGraphQlGetConsignmentResponse
+      mockGraphQlGetConsignmentResponse()
       mockGraphQlUpdateParentFolderResponse
 
       val mockContext = mock[Context]
@@ -375,7 +430,7 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
       )
 
       wiremockGraphqlServer.verify(
-        exactly(2),
+        exactly(3),
         postRequestedFor(anyUrl())
           .withUrl("/graphql")
       )
@@ -391,7 +446,7 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
         mockSfnResponseOk()
         mockGraphQlAddFilesAndMetadataResponse
         mockGraphQlUpdateConsignmentStatusResponse
-        mockGraphQlGetConsignmentResponse
+        mockGraphQlGetConsignmentResponse()
         mockGraphQlUpdateParentFolderResponse
         mockGraphQlUpdateDraftMetadataFileNameResponse
 
@@ -416,7 +471,7 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
         new AggregateProcessingLambda().handleRequest(sqsEvent, mockContext)
 
         wiremockGraphqlServer.verify(
-          exactly(5),
+          exactly(6),
           postRequestedFor(anyUrl())
             .withUrl("/graphql")
         )
@@ -463,7 +518,7 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
     mockSfnResponseOk()
     mockGraphQlAddFilesAndMetadataResponse
     mockGraphQlUpdateConsignmentStatusResponse
-    mockGraphQlGetConsignmentResponse
+    mockGraphQlGetConsignmentResponse()
     mockGraphQlUpdateParentFolderResponse
     val mockContext = mock[Context]
 
@@ -505,7 +560,7 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
     )
 
     wiremockGraphqlServer.verify(
-      exactly(2),
+      exactly(3),
       postRequestedFor(anyUrl())
         .withUrl("/graphql")
     )

@@ -15,6 +15,7 @@ object Common {
     val EncodingError: Value = Value("ENCODING")
     val EventError: Value = Value("EVENT")
     val FileNameError: Value = Value("FILE_NAME")
+    val StateError: Value = Value("STATE")
     val JsonError: Value = Value("JSON")
     val MalwareScanError: Value = Value("MALWARE_SCAN")
     val MatchIdError: Value = Value("MATCH_ID")
@@ -28,6 +29,7 @@ object Common {
     type ProcessErrorValue = Value
     val Failure: Value = Value("FAILURE")
     val FolderOnly: Value = Value("FOLDER_ONLY")
+    val Incorrect: Value = Value("INCORRECT")
     val Invalid: Value = Value("INVALID")
     val Mismatch: Value = Value("MISMATCH")
     val ReadError: Value = Value("READ_ERROR")
