@@ -19,6 +19,7 @@ object Common {
     val JsonError: Value = Value("JSON")
     val MalwareScanError: Value = Value("MALWARE_SCAN")
     val MatchIdError: Value = Value("MATCH_ID")
+    val ObjectCountError: Value = Value("OBJECT_COUNT")
     val ObjectKeyError: Value = Value("OBJECT_KEY")
     val ObjectSizeError: Value = Value("OBJECT_SIZE")
     val S3Error: Value = Value("S3")

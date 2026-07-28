@@ -25,7 +25,8 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
       "metadataSourceBucket": "$metadataSourceBucket",
       "metadataSourceObjectPrefix": "$userId/$assetSource/$consignmentId/$category",
       "dataLoadErrors": false,
-      "ignoreSiteName": false
+      "ignoreSiteName": false,
+      "loadedNumberOfFiles": 1
     }
     """.stripMargin
 
@@ -178,12 +179,75 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
             "metadataSourceBucket": "$metadataSourceBucket",
             "metadataSourceObjectPrefix": "$userId/$assetSource/$consignmentId/$category",
             "dataLoadErrors": true,
-            "ignoreSiteName": false
+            "ignoreSiteName": false,
+            "loadedNumberOfFiles": 1
           }
           """.stripMargin
 
       val message = new SQSMessage()
       message.setBody(dataLoadErrorsMessageBody)
+
+      val messages: java.util.List[SQSMessage] = List(message).asJava
+      val sqsEvent = new SQSEvent()
+      sqsEvent.setRecords(messages)
+      new AggregateProcessingLambda().handleRequest(sqsEvent, mockContext)
+
+      wiremockS3.verify(
+        exactly(1),
+        getRequestedFor(anyUrl())
+          .withUrl(s"/?list-type=2&max-keys=1000&prefix=$userId%2F$assetSource%2F$consignmentId%2F$category")
+      )
+
+      wiremockS3.verify(
+        exactly(0),
+        getRequestedFor(anyUrl())
+          .withUrl(s"/$objectKey?partNumber=1")
+      )
+
+      wiremockS3.verify(
+        exactly(0),
+        getRequestedFor(anyUrl())
+          .withUrl(s"/$objectKey?tagging")
+      )
+
+      wiremockSfnServer.verify(
+        exactly(0),
+        postRequestedFor(anyUrl())
+          .withRequestBody(containing(s"transfer_service_$consignmentId"))
+      )
+
+      wiremockGraphqlServer.verify(
+        exactly(3),
+        postRequestedFor(anyUrl())
+          .withUrl("/graphql")
+      )
+    }
+
+    s"'handleRequest' with asset source $assetSource" should "process request correctly where there is an object count mis-match" in {
+      val metadata = metadataJsonString(matchId, defaultFileSize, consignmentId, None, None)
+      authOkJson()
+      mockS3GetObjectTagging(objectKey)
+      mockS3GetObjectStream(objectKey, metadata)
+      mockS3ListBucketResponse(userId, consignmentId, List(matchId), assetSource)
+      mockSfnResponseOk()
+      mockGraphQlGetConsignmentResponse()
+      mockGraphQlAddFilesAndMetadataResponse
+      mockGraphQlUpdateConsignmentStatusResponse
+      val mockContext = mock[Context]
+
+      val objectCountErrorsMessageBody: String =
+        s"""
+          {
+            "metadataSourceBucket": "$metadataSourceBucket",
+            "metadataSourceObjectPrefix": "$userId/$assetSource/$consignmentId/$category",
+            "dataLoadErrors": true,
+            "ignoreSiteName": false,
+            "loadedNumberOfFiles": 2
+          }
+          """.stripMargin
+
+      val message = new SQSMessage()
+      message.setBody(objectCountErrorsMessageBody)
 
       val messages: java.util.List[SQSMessage] = List(message).asJava
       val sqsEvent = new SQSEvent()
@@ -385,7 +449,8 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
               "metadataSourceBucket": "$metadataSourceBucket",
               "metadataSourceObjectPrefix": "$userId/$assetSource/$consignmentId/$category",
               "dataLoadErrors": false,
-              "ignoreSiteName": false
+              "ignoreSiteName": false,
+              "loadedNumberOfFiles": 1
             }
             """.stripMargin
 
@@ -458,7 +523,8 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
               "metadataSourceBucket": "$metadataSourceBucket",
               "metadataSourceObjectPrefix": "$userId/$assetSource/$consignmentId/$category",
               "dataLoadErrors": false,
-              "ignoreSiteName": false
+              "ignoreSiteName": false,
+              "loadedNumberOfFiles": 1
             }
             """.stripMargin
 

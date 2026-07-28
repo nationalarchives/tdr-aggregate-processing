@@ -41,6 +41,7 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
       case HardDrive    => HardDriveMetadataHandler.metadataHandler
       case NetworkDrive => NetworkDriveMetadataHandler.metadataHandler
       case SharePoint   => SharePointMetadataHandler.metadataHandler
+      case _            => throw new RuntimeException(s"Unsupported asset source: ${assetSource.id}")
     }
   }
 
