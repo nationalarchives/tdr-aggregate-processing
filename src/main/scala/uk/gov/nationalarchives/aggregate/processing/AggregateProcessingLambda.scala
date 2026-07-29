@@ -72,28 +72,30 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
     val assetSource = objectContext.assetSource.get
     val dryRun = objectsPrefix.contains(DryRunMetadata.id)
     val ignoreSiteName = event.ignoreSiteName
-    val objectsExpectedCount = event.loadedNumberOfFiles
+    val allObjectsExpectedCount = event.loadedNumberOfFiles
     logger.info(s"Starting processing consignment: $consignmentId")
     for {
       details <- persistenceApi.getConsignmentDetails(consignmentId)
       incorrectState = !stateCorrect(details.get.consignmentStatuses)
-      s3Objects <- IO(s3Utils.listAllObjectsWithPrefix(sourceBucket, objectsPrefix))
-      objectKeys = s3Objects.map(_.key())
-      objectKeysCount = objectKeys.size
+      s3MetadataObjects <- IO(s3Utils.listAllObjectsWithPrefix(sourceBucket, objectsPrefix))
+      metadataObjectKeys = s3MetadataObjects.map(_.key())
+      metadataObjectKeysCount = metadataObjectKeys.size
       assetProcessingResult <- dataLoadErrors match {
         case _ if incorrectState =>
           errorHandling.handleError(incorrectStateError(consignmentId), logger)
           IO(errorProcessingResult)
-        case _ if objectKeysCount != objectsExpectedCount =>
-          errorHandling.handleError(objectCountMismatch(consignmentId, objectsExpectedCount, objectKeysCount), logger)
+        // Each metadata object has a digital object associated with it
+        // Double the metadata object count to get the correct number of objects
+        case _ if metadataObjectKeysCount * 2 != allObjectsExpectedCount =>
+          errorHandling.handleError(objectCountMismatch(consignmentId, allObjectsExpectedCount, metadataObjectKeysCount), logger)
           IO(errorProcessingResult)
         case _ if dataLoadErrors =>
           errorHandling.handleError(dataLoadError(consignmentId), logger)
           IO(errorProcessingResult)
-        case _ if objectKeys.isEmpty =>
+        case _ if metadataObjectKeys.isEmpty =>
           errorHandling.handleError(noObjectsError(consignmentId, objectContext.category.get), logger)
           IO(errorProcessingResult)
-        case _ => processAssets(userId, consignmentId, sourceBucket, objectKeys, dryRun, ignoreSiteName)
+        case _ => processAssets(userId, consignmentId, sourceBucket, metadataObjectKeys, dryRun, ignoreSiteName)
       }
       orchestrationEvent = AggregateProcessingEvent(
         assetSource,
