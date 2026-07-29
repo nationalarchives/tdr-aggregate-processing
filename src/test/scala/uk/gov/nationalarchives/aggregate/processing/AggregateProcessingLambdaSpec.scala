@@ -26,7 +26,7 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
       "metadataSourceObjectPrefix": "$userId/$assetSource/$consignmentId/$category",
       "dataLoadErrors": false,
       "ignoreSiteName": false,
-      "loadedNumberOfFiles": 1
+      "loadedNumberOfFiles": 2
     }
     """.stripMargin
 
@@ -180,7 +180,7 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
             "metadataSourceObjectPrefix": "$userId/$assetSource/$consignmentId/$category",
             "dataLoadErrors": true,
             "ignoreSiteName": false,
-            "loadedNumberOfFiles": 1
+            "loadedNumberOfFiles": 2
           }
           """.stripMargin
 
@@ -242,7 +242,7 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
             "metadataSourceObjectPrefix": "$userId/$assetSource/$consignmentId/$category",
             "dataLoadErrors": true,
             "ignoreSiteName": false,
-            "loadedNumberOfFiles": 2
+            "loadedNumberOfFiles": 3
           }
           """.stripMargin
 
@@ -450,7 +450,7 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
               "metadataSourceObjectPrefix": "$userId/$assetSource/$consignmentId/$category",
               "dataLoadErrors": false,
               "ignoreSiteName": false,
-              "loadedNumberOfFiles": 1
+              "loadedNumberOfFiles": 2
             }
             """.stripMargin
 
@@ -524,7 +524,7 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
               "metadataSourceObjectPrefix": "$userId/$assetSource/$consignmentId/$category",
               "dataLoadErrors": false,
               "ignoreSiteName": false,
-              "loadedNumberOfFiles": 1
+              "loadedNumberOfFiles": 2
             }
             """.stripMargin
 
