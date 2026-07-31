@@ -1,6 +1,6 @@
 queue_rules:
   - name: default
-    conditions:
+    merge_conditions:
       - "check-success=test / test"
 pull_request_rules:
   - name: automatic merge for Scala Steward
