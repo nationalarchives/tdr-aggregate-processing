@@ -102,7 +102,7 @@ class TransferOrchestration(
     logger.info(s"Triggering file checks for consignment: $consignmentId")
     triggerStepFunction(
       arnKey = "sfn.backendChecksArn",
-      input = BackendChecksInput(consignmentId.toString, s"${event.userId}/$assetSource/$consignmentId/${Records.id}"),
+      input = BackendChecksInput(consignmentId.toString, Some(s"${event.userId}/$assetSource/$consignmentId/${Records.id}")),
       consignmentId = consignmentId
     )
   }
