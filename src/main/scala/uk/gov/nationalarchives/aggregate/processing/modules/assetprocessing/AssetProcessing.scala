@@ -12,7 +12,7 @@ import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.{
 import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling.BaseError
 import uk.gov.nationalarchives.aggregate.processing.modules._
 import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.AssetProcessing.{AssetProcessingError, AssetProcessingEvent, AssetProcessingResult}
-import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.initialchecks.{FileSizeCheck, FolderOnlyCheck, InitialCheck, InvalidFileName}
+import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.initialchecks.{FileSizeCheck, InitialCheck, InvalidFileName}
 import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.metadata._
 import uk.gov.nationalarchives.aggregate.processing.utilities.UTF8ValidationHandler
 import uk.gov.nationalarchives.aws.utils.s3.{S3Clients, S3Utils}
@@ -27,11 +27,9 @@ import scala.util.{Failure, Success, Try}
 
 class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
   private val fileSizeCheck = FileSizeCheck.apply()
-  private val folderOnlyCheck = FolderOnlyCheck.apply()
   private val invalidFileNameCheck = InvalidFileName.apply()
   private lazy val initialChecks: Set[InitialCheck] = Set(
     fileSizeCheck,
-    folderOnlyCheck,
     invalidFileNameCheck
   )
   private lazy val errorHandling = ErrorHandling()
