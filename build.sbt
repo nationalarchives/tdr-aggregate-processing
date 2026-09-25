@@ -6,6 +6,8 @@ ThisBuild / version := "0.1.0"
 ThisBuild / organization := "uk.gov.nationalarchives"
 ThisBuild / organizationName := "aggregate-processing"
 
+ThisBuild / dependencyOverrides ++= nettyOverrides
+
 libraryDependencies ++= Seq(
   authUtils,
   awsLambdaCore,
@@ -21,7 +23,6 @@ libraryDependencies ++= Seq(
   metadataSchema,
   mockitoScala % Test,
   mockitoScalaTest % Test,
-  nettyOverrides,
   parallelCollections,
   s3Utils,
   scalaLogging,
