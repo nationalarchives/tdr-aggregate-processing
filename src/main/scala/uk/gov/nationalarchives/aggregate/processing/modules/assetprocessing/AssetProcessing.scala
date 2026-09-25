@@ -81,7 +81,7 @@ class AssetProcessing(s3Utils: S3Utils)(implicit logger: Logger) {
 
     checkMalwareScan(objectTags, s3Bucket, objectKey, event) match {
       case Some(result) => result
-      case None =>
+      case None         =>
         Try(s3Utils.getObjectAsStream(s3Bucket, objectKey)) match {
           case Failure(ex) =>
             val error = generateErrorMessage(event, s"$ptAp.$s3e.$ReadError", ex.getMessage)
