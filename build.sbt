@@ -21,6 +21,7 @@ libraryDependencies ++= Seq(
   metadataSchema,
   mockitoScala % Test,
   mockitoScalaTest % Test,
+  nettyOverrides,
   parallelCollections,
   s3Utils,
   scalaLogging,

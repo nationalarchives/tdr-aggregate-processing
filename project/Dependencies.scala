@@ -6,6 +6,8 @@ object Dependencies {
   private val awsUtilsVersion = "0.1.340"
   private val tdrCommonUtilsVersion = "0.0.52"
 
+  private val nettyVersion = "4.1.137.Final"  
+
   lazy val authUtils = "uk.gov.nationalarchives" %% "tdr-auth-utils" % "0.0.303"
   lazy val awsLambdaCore = "com.amazonaws" % "aws-lambda-java-core" % "1.4.0"
   lazy val awsLambdaEvents = "com.amazonaws" % "aws-lambda-java-events" % "3.16.1"
@@ -24,6 +26,19 @@ object Dependencies {
   lazy val metadataSchema = "uk.gov.nationalarchives" % "da-metadata-schema_2.13" % "0.0.143"
   lazy val mockitoScala = "org.mockito" %% "mockito-scala" % mockitoScalaVersion
   lazy val mockitoScalaTest = "org.mockito" %% "mockito-scala-scalatest" % mockitoScalaVersion
+
+  lazy val nettyOverrides: Seq[ModuleID] = Seq(
+    "netty-buffer",
+    "netty-codec",
+    "netty-codec-http",
+    "netty-codec-http2",
+    "netty-common",
+    "netty-handler",
+    "netty-resolver",
+    "netty-transport",
+    "netty-transport-classes-epoll",
+    "netty-transport-native-unix-common"
+  ).map("io.netty" % _ % nettyVersion)
 
   lazy val parallelCollections = "org.scala-lang.modules" %% "scala-parallel-collections" % "1.2.0"
 
