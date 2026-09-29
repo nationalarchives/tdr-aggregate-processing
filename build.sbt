@@ -47,6 +47,7 @@ excludeDependencies ++= Seq(
 )
 
 (Test / fork) := true
+(Test / parallelExecution) := false
 (Test / javaOptions) += s"-Dconfig.file=${sourceDirectory.value}/test/resources/application.conf"
 (Test / envVars) := Map("AWS_ACCESS_KEY_ID" -> "test", "AWS_SECRET_ACCESS_KEY" -> "test")
 
