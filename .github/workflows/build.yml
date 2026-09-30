@@ -14,6 +14,7 @@ jobs:
       lambda-name: aggregate-processing
       repo-name: tdr-aggregate-processing
       artifact-name: aggregate-processing
+      java-version: 17
       build-command: |
         sbt assembly
     secrets:
