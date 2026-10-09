@@ -525,4 +525,125 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
     verify(mockLogger, times(0)).isErrorEnabled
     verify(mockLogger).info("Asset metadata successfully processed for: {}", s"$userId/$sharePointAssetSource/$consignmentId/metadata/$matchId.metadata")
   }
+
+  s"'processAsset'" should "log an error and return asset processing result" +
+    "when initial checks return both an ignore and non-ignore error" in {
+      val mockLogger = mock[UnderlyingLogger]
+      val s3UtilsMock = mock[S3Utils]
+      val jsonMetadataString = s"""{
+      "Length": "99999999999999",
+      "Modified": "2025-07-03T09:19:47Z",
+      "FileLeafRef": "thumbs.db",
+      "FileRef": "/sites/Retail/Shared Documents/aFolder/thumbs.db",
+      "sha256ClientSideChecksum": "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2",
+      "matchId": "$matchId",
+      "transferId": "$consignmentId"
+    }""".stripMargin
+
+      val expectedInput = ClientSideMetadataInput(
+        "Retail/Shared Documents/aFolder/thumbs.db",
+        "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2",
+        1751534387000L,
+        99999999999999L,
+        matchId
+      )
+
+      val expectedResult =
+        AssetProcessingResult(
+          Some(matchId),
+          processingErrors = true,
+          Some(expectedInput),
+          List(),
+          List(),
+          List()
+        )
+
+      when(mockLogger.isInfoEnabled()).thenReturn(true)
+      when(mockLogger.isErrorEnabled).thenReturn(true)
+      when(s3UtilsMock.getObjectTags(any[String], any[String]))
+        .thenReturn(Map(malwareScanKey -> "NO_THREATS_FOUND"))
+      when(s3UtilsMock.getObjectAsStream(any[String], any[String]))
+        .thenReturn(new ByteArrayInputStream(jsonMetadataString.getBytes("UTF-8")))
+
+      val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
+      val result = assetProcessing.processAsset(metadataSourceBucket, s"$userId/sharepoint/$consignmentId/metadata/$matchId.metadata", ignoreSiteName = false)
+
+      result shouldEqual expectedResult
+
+      verify(s3UtilsMock, times(0)).addObjectTags(
+        metadataSourceBucket,
+        s"$userId/sharepoint/$consignmentId/metadata/$matchId.metadata",
+        Map("IGNORE_OBJECT" -> "TRUE")
+      )
+
+      verify(s3UtilsMock, times(0)).addObjectTags(
+        metadataSourceBucket,
+        s"$userId/sharepoint/$consignmentId/records/$matchId",
+        Map("IGNORE_OBJECT" -> "TRUE")
+      )
+
+      verify(mockLogger).error(
+        s"AssetProcessingError: consignmentId: Some($consignmentId), matchId: Some($matchId), source: Some(sharepoint), errorCode: INITIAL_CHECKS.OBJECT_SIZE.TOO_BIG, errorMessage: File size: 99999999999999 bytes"
+      )
+    }
+
+  s"'processAsset'" should "not log an error, tag asset as ignore and return asset processing result when initial checks only contain ignore errors" in {
+    val mockLogger = mock[UnderlyingLogger]
+    val s3UtilsMock = mock[S3Utils]
+    val jsonMetadataString = s"""{
+      "Length": "12",
+      "Modified": "2025-07-03T09:19:47Z",
+      "FileLeafRef": "thumbs.db",
+      "FileRef": "/sites/Retail/Shared Documents/aFolder/thumbs.db",
+      "sha256ClientSideChecksum": "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2",
+      "matchId": "$matchId",
+      "transferId": "$consignmentId"
+    }""".stripMargin
+
+    val expectedInput = ClientSideMetadataInput(
+      "Retail/Shared Documents/aFolder/thumbs.db",
+      "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2",
+      1751534387000L,
+      12L,
+      matchId
+    )
+
+    val expectedResult =
+      AssetProcessingResult(
+        Some(matchId),
+        processingErrors = false,
+        Some(expectedInput),
+        List(),
+        List(),
+        List(),
+        ignoreAsset = true
+      )
+
+    when(mockLogger.isInfoEnabled()).thenReturn(true)
+    when(mockLogger.isErrorEnabled).thenReturn(true)
+    when(s3UtilsMock.getObjectTags(any[String], any[String]))
+      .thenReturn(Map(malwareScanKey -> "NO_THREATS_FOUND"))
+    when(s3UtilsMock.getObjectAsStream(any[String], any[String]))
+      .thenReturn(new ByteArrayInputStream(jsonMetadataString.getBytes("UTF-8")))
+
+    val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
+    val result = assetProcessing.processAsset(metadataSourceBucket, s"$userId/sharepoint/$consignmentId/metadata/$matchId.metadata", ignoreSiteName = false)
+
+    result shouldEqual expectedResult
+
+    verify(s3UtilsMock, times(1)).addObjectTags(
+      metadataSourceBucket,
+      s"$userId/sharepoint/$consignmentId/metadata/$matchId.metadata",
+      Map("IGNORE_OBJECT" -> "TRUE")
+    )
+
+    verify(s3UtilsMock, times(1)).addObjectTags(
+      metadataSourceBucket,
+      s"$userId/sharepoint/$consignmentId/records/$matchId",
+      Map("IGNORE_OBJECT" -> "TRUE")
+    )
+
+    verify(mockLogger, times(0)).isErrorEnabled
+    verify(mockLogger).info(s"Asset ignored: $userId/sharepoint/$consignmentId/metadata/$matchId.metadata with error codes INITIAL_CHECKS.FILE_NAME.INVALID")
+  }
 }

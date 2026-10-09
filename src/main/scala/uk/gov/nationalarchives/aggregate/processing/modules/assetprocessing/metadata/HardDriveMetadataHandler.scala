@@ -53,9 +53,9 @@ object HardDriveMetadataHandler {
 
   private object NormalisePropertyValue {
     def normalise(input: NormaliseValueInput): Json = input.property match {
-      case DateLastModifiedProperty.id => normaliseDateTime(input.value)
-      case FilePathProperty.id         => normaliseFilePath(input.value)
-      case FoiExemptionCodeProperty.id => normaliseFoiExemptionCode(input.value)
+      case DateLastModifiedProperty.id                                                                               => normaliseDateTime(input.value)
+      case FilePathProperty.id                                                                                       => normaliseFilePath(input.value)
+      case FoiExemptionCodeProperty.id                                                                               => normaliseFoiExemptionCode(input.value)
       case ClosureTypeProperty.id | TitleClosedProperty.id | DescriptionClosedProperty.id | ClosurePeriodProperty.id =>
         switchToAlternateValue(input.value)
       case _ => input.value

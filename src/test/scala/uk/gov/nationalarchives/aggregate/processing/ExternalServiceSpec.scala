@@ -3,14 +3,11 @@ package uk.gov.nationalarchives.aggregate.processing
 import com.github.tomakehurst.wiremock.WireMockServer
 import com.github.tomakehurst.wiremock.client.WireMock._
 import com.github.tomakehurst.wiremock.stubbing.StubMapping
-import graphql.codegen.GetConsignment.getConsignment
-import io.circe.Printer
-import io.circe.generic.auto._
-import io.circe.syntax._
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.flatspec.AnyFlatSpec
 import org.scalatest.time.{Millis, Seconds, Span}
 import org.scalatest.{BeforeAndAfterAll, BeforeAndAfterEach}
+import uk.gov.nationalarchives.tdr.common.utils.statuses.StatusValues.{CompletedValue, InProgressValue, StatusValue}
 
 import java.util.UUID
 import scala.jdk.CollectionConverters.MapHasAsJava
@@ -88,28 +85,43 @@ class ExternalServiceSpec extends AnyFlatSpec with BeforeAndAfterEach with Befor
       .willReturn(ok("""{"data": {"updateClientSideDraftMetadataFileName": 1}}""".stripMargin))
   )
 
-  def mockGraphQlGetConsignmentResponse: StubMapping = {
-    val data = Some(
-      getConsignment.Data(
-        Some(
-          getConsignment.GetConsignment(
-            UUID.randomUUID(),
-            None,
-            None,
-            "ConsignmentRef",
-            None,
-            None,
-            Some("TransferringBody"),
-            Nil
-          )
-        )
-      )
-    )
-    val dataString: String = data.asJson.printWith(Printer(dropNullValues = false, ""))
+  def mockGraphQlGetConsignmentResponse(uploadStatusValue: StatusValue = CompletedValue, clientChecksStatusValue: StatusValue = InProgressValue): StubMapping = {
+    val consignmentId = UUID.randomUUID()
+    val userId = UUID.randomUUID()
+
+    val getConsignmentResponse: String = {
+      s"""{
+         |  "data": {
+         |    "getConsignment": {
+         |      "consignmentid": "$consignmentId",
+         |      "userid": "$userId",
+         |      "consignmentReference": "Consignment-Ref",
+         |      "transferringBodyName": "transferringBodyName",
+         |      "consignmentStatuses": [
+         |        {
+         |          "consignmentStatusId": "31657058-a8f7-4b1a-b2d7-529d212a7718",
+         |          "consignmentId": "$consignmentId",
+         |          "statusType": "Upload",
+         |          "value": "${uploadStatusValue.value}",
+         |          "createdDatetime": "2020-01-01T09:00:00Z"
+         |        },
+         |        {
+         |          "consignmentStatusId": "31657058-a8f7-4b1a-b2d7-529d212a7718",
+         |          "consignmentId": "$consignmentId",
+         |          "statusType": "ClientChecks",
+         |          "value": "${clientChecksStatusValue.value}",
+         |          "createdDatetime": "2020-01-01T09:00:00Z"
+         |        }
+         |      ]
+         |    }
+         |  }
+         |}""".stripMargin
+    }
+
     wiremockGraphqlServer.stubFor(
       post(urlEqualTo(graphQlPath))
         .withRequestBody(containing("getConsignment"))
-        .willReturn(ok(dataString))
+        .willReturn(ok(getConsignmentResponse))
     )
   }
 

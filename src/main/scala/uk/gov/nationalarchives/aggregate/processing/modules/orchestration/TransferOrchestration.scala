@@ -38,7 +38,7 @@ class TransferOrchestration(
   def orchestrate[T <: Product](orchestrationEvent: T): IO[OrchestrationResult] = {
     orchestrationEvent match {
       case aggregateProcessingEvent: AggregateProcessingEvent => orchestrateProcessingEvent(aggregateProcessingEvent)
-      case _ =>
+      case _                                                  =>
         val error = TransferError(None, s"$Orchestration.$EventError.$Invalid", s"Unrecognized orchestration event: ${orchestrationEvent.getClass.getName}")
         errorHandling.handleError(error, logger)
         IO(OrchestrationResult(None, success = false, Some(error)))
@@ -102,7 +102,7 @@ class TransferOrchestration(
     logger.info(s"Triggering file checks for consignment: $consignmentId")
     triggerStepFunction(
       arnKey = "sfn.backendChecksArn",
-      input = BackendChecksInput(consignmentId.toString, s"${event.userId}/$assetSource/$consignmentId/${Records.id}"),
+      input = BackendChecksInput(consignmentId.toString, Some(s"${event.userId}/$assetSource/$consignmentId/${Records.id}")),
       consignmentId = consignmentId
     )
   }

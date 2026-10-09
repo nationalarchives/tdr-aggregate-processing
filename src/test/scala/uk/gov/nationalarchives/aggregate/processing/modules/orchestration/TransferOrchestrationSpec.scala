@@ -99,7 +99,7 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     sfnArnCaptor.getValue shouldBe config.getString("sfn.backendChecksArn")
     sfnInputCaptor.getValue shouldBe BackendChecksInput(
       consignmentId.toString,
-      s"$userId/sharepoint/$consignmentId/records"
+      Some(s"$userId/sharepoint/$consignmentId/records")
     )
     sfnNameCaptor.getValue shouldBe Some(s"transfer_service_$consignmentId")
 
@@ -201,7 +201,7 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
     draftMetadataSfnArnCaptor.getValue shouldBe config.getString("sfn.metadataChecksArn")
     backendSfnInputCaptor.getValue shouldBe BackendChecksInput(
       consignmentId.toString,
-      s"$userId/sharepoint/$consignmentId/records"
+      Some(s"$userId/sharepoint/$consignmentId/records")
     )
     draftMetadataSfnInputCaptor.getValue shouldBe MetadataValidationInput(consignmentId.toString, "draft-metadata.csv")
     backendSfnNameCaptor.getValue shouldBe Some(s"transfer_service_$consignmentId")
@@ -350,7 +350,7 @@ class TransferOrchestrationSpec extends ExternalServiceSpec {
 
     sfnInputCaptor.getValue shouldBe BackendChecksInput(
       consignmentId.toString,
-      s"$userId/sharepoint/$consignmentId/records"
+      Some(s"$userId/sharepoint/$consignmentId/records")
     )
 
     verify(mockGraphQlApi).updateConsignmentStatus(consignmentStatusInputCaptor.capture())
