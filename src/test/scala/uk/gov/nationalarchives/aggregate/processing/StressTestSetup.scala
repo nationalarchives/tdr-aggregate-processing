@@ -19,8 +19,11 @@ object StressTestSetup extends App {
    * 4. Set the 'numberOfAssets' to the desired number of files to process
    * 5. Add AWS credentials giving permission to put objects into the relevant S3 bucket
    * 6. Run the app to upload the generated records / metadata to the S3 bucket
-   * 7. Send SQS message to trigger the lambda to process the consignment
-   * 8. Enable AWS GuardDuty malware scan on the S3 bucket: AWS Console -> GuardDuty -> Malware Protection -> S3
+   * 7. Update the consignment statuses to get the transfer into the correct state to trigger processing:
+   *    - Upload = Completed
+   *    - ClientChecks = InProgress
+   * 8. Send SQS message to trigger the lambda to process the consignment
+   * 9. Enable AWS GuardDuty malware scan on the S3 bucket: AWS Console -> GuardDuty -> Malware Protection -> S3
    * */
 
   val s3Client = s3("https://s3.eu-west-2.amazonaws.com/")
