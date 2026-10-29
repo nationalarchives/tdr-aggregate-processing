@@ -10,7 +10,7 @@ permissions:
   contents: write
 jobs:
   test:
-    uses: nationalarchives/tdr-github-actions/.github/workflows/tdr_test.yml@f563794aa48b4ea16cae01caf704aa241a37539f # v.0.0.48
+    uses: nationalarchives/tdr-github-actions/.github/workflows/tdr_test.yml@51a06bbc08eb65018238b144d0ad8bfd707a8ffa # v.0.0.50
     with:
       repo-name: tdr-aggregate-processing
       test-command: |
