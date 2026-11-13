@@ -26,7 +26,8 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
       "metadataSourceObjectPrefix": "$userId/$assetSource/$consignmentId/$category",
       "dataLoadErrors": false,
       "ignoreSiteName": false,
-      "loadedNumberOfFiles": 2
+      "loadedNumberOfFiles": 2,
+      "anotherField": "some field value"
     }
     """.stripMargin
 
