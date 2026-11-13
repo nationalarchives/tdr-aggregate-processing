@@ -1,15 +1,15 @@
 import sbt.*
 
 object Dependencies {
-  private val circeVersion = "0.14.16"
+  private val circeVersion = "0.14.17"
   private val mockitoScalaVersion = "2.2.3"
-  private val awsUtilsVersion = "0.1.340"
-  private val tdrCommonUtilsVersion = "0.0.52"
+  private val awsUtilsVersion = "0.1.343"
+  private val tdrCommonUtilsVersion = "0.0.55"
 
   private val nettyVersion = "4.1.137.Final"  
 
-  lazy val authUtils = "uk.gov.nationalarchives" %% "tdr-auth-utils" % "0.0.303"
-  lazy val awsLambdaCore = "com.amazonaws" % "aws-lambda-java-core" % "1.4.0"
+  lazy val authUtils = "uk.gov.nationalarchives" %% "tdr-auth-utils" % "0.0.309"
+  lazy val awsLambdaCore = "com.amazonaws" % "aws-lambda-java-core" % "1.4.1"
   lazy val awsLambdaEvents = "com.amazonaws" % "aws-lambda-java-events" % "3.16.1"
 
   lazy val circeCore = "io.circe" %% "circe-core" % circeVersion
@@ -17,13 +17,13 @@ object Dependencies {
   lazy val circeParser = "io.circe" %% "circe-parser" % circeVersion
   lazy val csvParser = "com.github.tototoshi" %% "scala-csv" % "2.0.0"
 
-  lazy val generatedGraphql = "uk.gov.nationalarchives" %% "tdr-generated-graphql" % "0.0.486"
-  lazy val graphqlClient = "uk.gov.nationalarchives" %% "tdr-graphql-client" % "0.0.307"
+  lazy val generatedGraphql = "uk.gov.nationalarchives" %% "tdr-generated-graphql" % "0.0.496"
+  lazy val graphqlClient = "uk.gov.nationalarchives" %% "tdr-graphql-client" % "0.0.308"
 
-  lazy val logback = "ch.qos.logback" % "logback-classic" % "1.6.3"
+  lazy val logback = "ch.qos.logback" % "logback-classic" % "1.6.6"
   lazy val logstash = "net.logstash.logback" % "logstash-logback-encoder" % "9.0"
 
-  lazy val metadataSchema = "uk.gov.nationalarchives" % "da-metadata-schema_2.13" % "0.0.143"
+  lazy val metadataSchema = "uk.gov.nationalarchives" % "da-metadata-schema_2.13" % "0.0.153"
   lazy val mockitoScala = "org.mockito" %% "mockito-scala" % mockitoScalaVersion
   lazy val mockitoScalaTest = "org.mockito" %% "mockito-scala-scalatest" % mockitoScalaVersion
 
@@ -40,7 +40,7 @@ object Dependencies {
     "netty-transport-native-unix-common"
   ).map("io.netty" % _ % nettyVersion)
 
-  lazy val parallelCollections = "org.scala-lang.modules" %% "scala-parallel-collections" % "1.2.0"
+  lazy val parallelCollections = "org.scala-lang.modules" %% "scala-parallel-collections" % "1.3.0"
 
   lazy val s3Utils = "uk.gov.nationalarchives" %% "s3-utils" % awsUtilsVersion
   lazy val scalaLogging = "com.typesafe.scala-logging" %% "scala-logging" % "3.9.6"
@@ -52,7 +52,7 @@ object Dependencies {
   lazy val tdrInputs = "uk.gov.nationalarchives" %% "tdr-service-inputs" % tdrCommonUtilsVersion
   lazy val tdrObjectKeyContext = "uk.gov.nationalarchives" %% "tdr-object-key-context" % tdrCommonUtilsVersion
   lazy val tdrStatuses = "uk.gov.nationalarchives" %% "tdr-statuses" % tdrCommonUtilsVersion
-  lazy val typesafeConfig = "com.typesafe" % "config" % "1.4.9"
+  lazy val typesafeConfig = "com.typesafe" % "config" % "1.4.10"
 
   lazy val utf8Validator = "uk.gov.nationalarchives" % "utf8-validator" % "1.2"
 
