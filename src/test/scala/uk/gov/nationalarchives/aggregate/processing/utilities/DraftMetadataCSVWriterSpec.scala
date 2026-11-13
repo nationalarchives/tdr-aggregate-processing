@@ -75,8 +75,32 @@ class DraftMetadataCSVWriterSpec extends AnyFlatSpec with Matchers with MockitoS
     val csvContent: List[List[String]] = CSVReader.open(actual).all()
     checkHeaders(csvContent)
     csvContent(1) shouldBe List(
-      "", "", "2022-03-15", "", "", "", "Open", "", "", "", "", "No", "", "No", "", "English", "", "Crown",
-      "", "", "", "", "", "", "", ""
+      "",
+      "",
+      "2022-03-15",
+      "",
+      "",
+      "",
+      "Open",
+      "",
+      "",
+      "",
+      "",
+      "No",
+      "",
+      "No",
+      "",
+      "English",
+      "",
+      "Crown",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      ""
     )
   }
 
@@ -93,8 +117,32 @@ class DraftMetadataCSVWriterSpec extends AnyFlatSpec with Matchers with MockitoS
     val csvContent: List[List[String]] = CSVReader.open(actual).all()
     checkHeaders(csvContent)
     csvContent(1) shouldBe List(
-      "", "", "", "", "", "", "Open", "", "", "", "", "No", "", "No", "", "English", "", "Crown", "", "", "", "",
-      "", "", "", ""
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "Open",
+      "",
+      "",
+      "",
+      "",
+      "No",
+      "",
+      "No",
+      "",
+      "English",
+      "",
+      "Crown",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      ""
     )
   }
 
@@ -112,8 +160,32 @@ class DraftMetadataCSVWriterSpec extends AnyFlatSpec with Matchers with MockitoS
     val csvContent: List[List[String]] = CSVReader.open(actual).all()
     checkHeaders(csvContent)
     csvContent(1) shouldBe List(
-      "", "", "", "", "", "", "Open", "", "", "", "", "Yes", "", "No", "", "English", "", "Crown",
-      "", "", "", "", "", "", "", ""
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "Open",
+      "",
+      "",
+      "",
+      "",
+      "Yes",
+      "",
+      "No",
+      "",
+      "English",
+      "",
+      "Crown",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      ""
     )
   }
 
