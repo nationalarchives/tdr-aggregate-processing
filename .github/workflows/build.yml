@@ -1,5 +1,12 @@
 name: TDR Tag and pre deploy
 on:
+  workflow_dispatch:
+    inputs:
+      snapshot:
+        description: 'Build a dev snapshot from the current branch instead of the next release version'
+        type: boolean
+        required: false
+        default: false
   push:
     branches:
       - main
@@ -14,6 +21,7 @@ jobs:
       lambda-name: aggregate-processing
       repo-name: tdr-aggregate-processing
       artifact-name: aggregate-processing
+      snapshot: ${{ inputs.snapshot == true }}
       java-version: 17
       build-command: |
         sbt assembly
@@ -29,7 +37,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - run: gh workflow run deploy.yml -f environment=intg -f to-deploy=$NEXT_VERSION
+      - run: |
+          if [ "$SNAPSHOT" = "true" ]; then
+            gh workflow run deploy.yml -f environment=dev -f to-deploy="$NEXT_VERSION"
+          else
+            gh workflow run deploy.yml -f environment=intg -f to-deploy="$NEXT_VERSION"
+          fi
         env:
           GITHUB_TOKEN: ${{ secrets.WORKFLOW_PAT }}
           NEXT_VERSION: ${{ needs.pre-deploy.outputs.next-version }}
+          SNAPSHOT: ${{ inputs.snapshot == true }}
