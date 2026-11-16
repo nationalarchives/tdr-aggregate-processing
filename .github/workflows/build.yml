@@ -9,7 +9,7 @@ jobs:
     permissions:
       id-token: write
       contents: write
-    uses: nationalarchives/tdr-github-actions/.github/workflows/lambda_build.yml@fc52a93f9636579d7478f01a8a960007134ad30f # v0.0.51
+    uses: nationalarchives/tdr-github-actions/.github/workflows/lambda_build.yml@5a96b84cf82bce1371168cc31cb89f88cad86763 # v0.0.53
     with:
       lambda-name: aggregate-processing
       repo-name: tdr-aggregate-processing
