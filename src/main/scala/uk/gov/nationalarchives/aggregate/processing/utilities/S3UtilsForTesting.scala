@@ -1,6 +1,5 @@
 package uk.gov.nationalarchives.aggregate.processing.utilities
 
-import cats.effect.IO
 import software.amazon.awssdk.http.nio.netty.NettyNioAsyncHttpClient
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.s3.S3AsyncClient

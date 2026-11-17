@@ -42,7 +42,6 @@ object Dependencies {
 
   lazy val parallelCollections = "org.scala-lang.modules" %% "scala-parallel-collections" % "1.3.0"
 
-  lazy val s3Sdk = "software.amazon.awssdk" % "s3" % "2.59.1"
   lazy val s3Utils = "uk.gov.nationalarchives" %% "s3-utils" % awsUtilsVersion
   lazy val scalaLogging = "com.typesafe.scala-logging" %% "scala-logging" % "3.9.6"
   lazy val scalaTest = "org.scalatest" %% "scalatest" % "3.2.20"
