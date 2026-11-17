@@ -17,13 +17,13 @@ object Dependencies {
   lazy val circeParser = "io.circe" %% "circe-parser" % circeVersion
   lazy val csvParser = "com.github.tototoshi" %% "scala-csv" % "2.0.0"
 
-  lazy val generatedGraphql = "uk.gov.nationalarchives" %% "tdr-generated-graphql" % "0.0.496"
+  lazy val generatedGraphql = "uk.gov.nationalarchives" %% "tdr-generated-graphql" % "0.0.497"
   lazy val graphqlClient = "uk.gov.nationalarchives" %% "tdr-graphql-client" % "0.0.308"
 
-  lazy val logback = "ch.qos.logback" % "logback-classic" % "1.6.6"
+  lazy val logback = "ch.qos.logback" % "logback-classic" % "1.6.7"
   lazy val logstash = "net.logstash.logback" % "logstash-logback-encoder" % "9.0"
 
-  lazy val metadataSchema = "uk.gov.nationalarchives" % "da-metadata-schema_2.13" % "0.0.153"
+  lazy val metadataSchema = "uk.gov.nationalarchives" % "da-metadata-schema_2.13" % "0.0.156"
   lazy val mockitoScala = "org.mockito" %% "mockito-scala" % mockitoScalaVersion
   lazy val mockitoScalaTest = "org.mockito" %% "mockito-scala-scalatest" % mockitoScalaVersion
 
@@ -42,7 +42,8 @@ object Dependencies {
 
   lazy val parallelCollections = "org.scala-lang.modules" %% "scala-parallel-collections" % "1.3.0"
 
-  lazy val s3Utils = "uk.gov.nationalarchives" %% "s3-utils" % "0.1.344-SNAPSHOT"
+  lazy val s3Sdk = "software.amazon.awssdk" % "s3" % "2.59.1"
+  lazy val s3Utils = "uk.gov.nationalarchives" %% "s3-utils" % awsUtilsVersion
   lazy val scalaLogging = "com.typesafe.scala-logging" %% "scala-logging" % "3.9.6"
   lazy val scalaTest = "org.scalatest" %% "scalatest" % "3.2.20"
   lazy val snsUtils =  "uk.gov.nationalarchives" %% "sns-utils" % awsUtilsVersion
