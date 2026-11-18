@@ -23,7 +23,7 @@ object Dependencies {
   lazy val logback = "ch.qos.logback" % "logback-classic" % "1.6.7"
   lazy val logstash = "net.logstash.logback" % "logstash-logback-encoder" % "9.0"
 
-  lazy val metadataSchema = "uk.gov.nationalarchives" % "da-metadata-schema_2.13" % "0.0.154"
+  lazy val metadataSchema = "uk.gov.nationalarchives" % "da-metadata-schema_2.13" % "0.0.156"
   lazy val mockitoScala = "org.mockito" %% "mockito-scala" % mockitoScalaVersion
   lazy val mockitoScalaTest = "org.mockito" %% "mockito-scala-scalatest" % mockitoScalaVersion
 
