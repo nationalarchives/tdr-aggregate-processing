@@ -22,7 +22,7 @@ jobs:
       repo-name: tdr-aggregate-processing
       artifact-name: aggregate-processing
       snapshot: ${{ inputs.snapshot == true }}
-      java-version: 17
+      java-version: ${{vars.JAVA_RUNTIME}}
       build-command: |
         sbt assembly
     secrets:
