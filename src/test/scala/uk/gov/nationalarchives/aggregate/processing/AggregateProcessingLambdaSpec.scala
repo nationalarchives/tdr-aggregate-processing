@@ -8,7 +8,7 @@ import org.mockito.MockitoSugar.mock
 import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper
 import org.scalatest.prop.{TableDrivenPropertyChecks, TableFor4}
 import uk.gov.nationalarchives.tdr.common.utils.objectkeycontext.AssetSources.{HardDrive, NetworkDrive, SharePoint}
-import uk.gov.nationalarchives.tdr.common.utils.objectkeycontext.ObjectCategories.Metadata
+import uk.gov.nationalarchives.tdr.common.utils.objectkeycontext.ObjectCategories.{Metadata, Records}
 import uk.gov.nationalarchives.tdr.common.utils.statuses.StatusValues.InProgressValue
 
 import java.util.UUID
@@ -23,7 +23,9 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
     s"""
     {
       "metadataSourceBucket": "$metadataSourceBucket",
-      "metadataSourceObjectPrefix": "$userId/$assetSource/$consignmentId/$category",
+      "metadataSourceObjectPrefix": "$userId/$assetSource/$consignmentId/${Metadata.id}",
+      "recordsSourceBucket": "$recordsSourceBucket",
+      "recordsSourceObjectPrefix": "$userId/$assetSource/$consignmentId/${Records.id}",
       "dataLoadErrors": false,
       "ignoreSiteName": false,
       "loadedNumberOfFiles": 2,
