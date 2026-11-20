@@ -124,16 +124,19 @@ class AssetProcessing(s3Utils: S3Utils, appConfig: ApplicationConfig.type)(impli
       utf8Validator.validate(inputStream)
       inputStream.reset()
       parser.parse(inputStream.readAllBytes().map(_.toChar).mkString)
-    } match {
-      case Failure(utfEx) =>
+    }.fold(
+      utfEx => {
         val error = generateErrorMessage(event, s"$ptAp.$EncodingError.$Invalid", utfEx.getMessage)
         handleProcessError(List(error), s3Bucket, objectKey)
-      case Success(Left(parseEx)) =>
-        val error = generateErrorMessage(event, s"$ptAp.$JsonError.$Invalid", parseEx.getMessage())
-        handleProcessError(List(error), s3Bucket, objectKey)
-      case Success(Right(json)) =>
-        parseMetadataJson(json, event)
-    }
+      },
+      {
+        case Left(parseEx) =>
+          val error = generateErrorMessage(event, s"$ptAp.$JsonError.$Invalid", parseEx.getMessage())
+          handleProcessError(List(error), s3Bucket, objectKey)
+        case Right(json) =>
+          parseMetadataJson(json, event)
+      }
+    )
   }
 
   private val ignoreInitialChecksErrorCodes = invalidFileNameCheck.errorCodes
@@ -163,45 +166,44 @@ class AssetProcessing(s3Utils: S3Utils, appConfig: ApplicationConfig.type)(impli
     val objectKey = event.metadataObjectKey
     val baseMetadata = handler.convertToBaseMetadata(sourceJson, Some(event.ignoreSiteName))
 
-    handler
-      .toClientSideMetadataInput(baseMetadata)
-      .fold(
-        err => {
-          val error = AssetProcessingError(
-            Some(event.consignmentId),
-            Some(event.matchId),
-            Some(event.source.id),
-            s"$ptAp.$JsonError.$Invalid",
-            err.getMessage()
-          )
+    def processConvertedMetadata(input: ClientSideMetadataInput): AssetProcessingResult = {
+      validateRecord(event, input) match {
+        case Some(error) =>
           handleProcessError(List(error), bucket, objectKey)
-        },
-        input => {
-          val validationError = validateRecord(event, input)
+        case None =>
+          val initialChecksErrors = initialChecks.flatMap(_.runCheck(event, input)).toList
+          if (initialChecksErrors.nonEmpty) {
+            handleInitialChecksErrors(event, initialChecksErrors, input)
+          } else {
+            val classified = handler.classifyBaseMetadata(baseMetadata)
+            logger.info(s"Asset metadata successfully processed for: $objectKey")
+            s3Utils.addObjectTags(bucket, objectKey, Map(ptAp.toString -> CompletedValue.value))
 
-          validationError match {
-            case Some(error) =>
-              handleProcessError(List(error), bucket, objectKey)
-            case None =>
-              val errors = initialChecks.flatMap(_.runCheck(event, input)).toList
-              if (errors.nonEmpty) {
-                handleInitialChecksErrors(event, errors, input)
-              } else {
-                val classified = handler.classifyBaseMetadata(baseMetadata)
-                logger.info(s"Asset metadata successfully processed for: $objectKey")
-                s3Utils.addObjectTags(bucket, objectKey, Map(ptAp.toString -> CompletedValue.value))
-                AssetProcessingResult(
-                  Some(event.matchId),
-                  processingErrors = false,
-                  Some(input),
-                  classified.getOrElse(MetadataClassification.System, Nil),
-                  classified.getOrElse(MetadataClassification.Supplied, Nil),
-                  classified.getOrElse(MetadataClassification.Custom, Nil)
-                )
-              }
+            AssetProcessingResult(
+              Some(event.matchId),
+              processingErrors = false,
+              Some(input),
+              classified.getOrElse(MetadataClassification.System, Nil),
+              classified.getOrElse(MetadataClassification.Supplied, Nil),
+              classified.getOrElse(MetadataClassification.Custom, Nil)
+            )
           }
-        }
-      )
+      }
+    }
+
+    handler.toClientSideMetadataInput(baseMetadata) match {
+      case Left(err) =>
+        val error = AssetProcessingError(
+          Some(event.consignmentId),
+          Some(event.matchId),
+          Some(event.source.id),
+          s"$ptAp.$JsonError.$Invalid",
+          err.getMessage()
+        )
+        handleProcessError(List(error), bucket, objectKey)
+      case Right(input) =>
+        processConvertedMetadata(input)
+    }
   }
 
   private def validateRecord(event: AssetProcessingEvent, input: ClientSideMetadataInput): Option[AssetProcessingError] = {
@@ -214,13 +216,14 @@ class AssetProcessing(s3Utils: S3Utils, appConfig: ApplicationConfig.type)(impli
         message
       )
 
-    event match {
-      case _ if event.matchId != input.matchId =>
-        Some(matchIdError(s"Mismatched match ids: ${event.matchId} and ${input.matchId}", MatchIdError, Mismatch))
-      case _ if !appConfig.blockCheckRecordExists && !s3Utils.objectKeyExists(event.recordsS3Bucket, s"${event.recordsKeyPrefix}/${event.matchId}") =>
-        Some(matchIdError(s"Record does not exist: ${event.matchId}", MissingError, Record))
-      case _ => None
-    }
+    if (event.matchId != input.matchId) {
+      Some(matchIdError(s"Mismatched match ids: ${event.matchId} and ${input.matchId}", MatchIdError, Mismatch))
+    } else if (
+      !appConfig.blockCheckRecordExists &&
+      !s3Utils.objectKeyExists(event.recordsS3Bucket, s"${event.recordsKeyPrefix}/${event.matchId}")
+    ) {
+      Some(matchIdError(s"Record does not exist: ${event.matchId}", MissingError, Record))
+    } else None
   }
 
   private def generateErrorMessage(event: AssetProcessingEvent, errorCode: String, errorMessage: String): AssetProcessingError = {
