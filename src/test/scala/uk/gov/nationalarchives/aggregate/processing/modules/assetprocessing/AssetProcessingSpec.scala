@@ -12,6 +12,7 @@ import software.amazon.awssdk.core.async.AsyncResponseTransformer
 import software.amazon.awssdk.services.s3.S3AsyncClient
 import software.amazon.awssdk.services.s3.model._
 import software.amazon.awssdk.utils.CompletableFutureUtils.failedFuture
+import uk.gov.nationalarchives.aggregate.processing.config.ApplicationConfig
 import uk.gov.nationalarchives.aggregate.processing.config.ApplicationConfig.malwareScanKey
 import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.AssetProcessing.{AssetProcessingResult, ProcessAssetInput}
 import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.metadata.MetadataProperty
@@ -27,6 +28,15 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
   private val userId = UUID.randomUUID()
   private val consignmentId = UUID.randomUUID()
   private val matchId = UUID.randomUUID().toString
+  private val appConfigMock = mock[ApplicationConfig.type]
+
+  private def expectedMetadataInput(expectedParsedFilePath: String) = ClientSideMetadataInput(
+    expectedParsedFilePath,
+    "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2",
+    1751534387000L,
+    defaultFileSize,
+    matchId
+  )
 
   val assetSources: TableFor6[String, (String, Long, UUID, Option[String], Option[String]) => String, String, String, String, String] = Table(
     ("Source", "Default Metadata Json String", "Expected Parsed File Path", "Missing Required Field", "Supplied Metadata Json", "Custom Metadata Json"),
@@ -62,13 +72,7 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
         val mockLogger = mock[UnderlyingLogger]
         val s3UtilsMock = mock[S3Utils]
 
-        val expectedInput = ClientSideMetadataInput(
-          s"$expectedParsedFilePath",
-          "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2",
-          1751534387000L,
-          defaultFileSize,
-          matchId
-        )
+        val expectedInput = expectedMetadataInput(expectedParsedFilePath)
 
         val expectedResult = AssetProcessingResult(
           Some(matchId),
@@ -89,8 +93,10 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
           .thenReturn(new ByteArrayInputStream(defaultMetadataJsonString(matchId, defaultFileSize, consignmentId, None, None).getBytes("UTF-8")))
         when(s3UtilsMock.getObjectTags(any[String], any[String]))
           .thenReturn(Map(malwareScanKey -> "NO_THREATS_FOUND"))
+        when(s3UtilsMock.objectKeyExists(any[String], any[String])).thenReturn(true)
+        when(appConfigMock.blockCheckRecordExists).thenReturn(false)
 
-        val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
+        val assetProcessing = new AssetProcessing(s3UtilsMock, appConfigMock)(Logger(mockLogger))
         val input = ProcessAssetInput(metadataSourceBucket, s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata", ignoreSiteName = false, "", "")
         val result = assetProcessing.processAsset(input)
 
@@ -112,8 +118,10 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
         when(mockLogger.isErrorEnabled()).thenReturn(true)
         when(s3UtilsMock.getObjectTags(any[String], any[String]))
           .thenReturn(Map(malwareScanKey -> "NO_THREATS_FOUND"))
+        when(s3UtilsMock.objectKeyExists(any[String], any[String])).thenReturn(true)
+        when(appConfigMock.blockCheckRecordExists).thenReturn(false)
 
-        val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
+        val assetProcessing = new AssetProcessing(s3UtilsMock, appConfigMock)(Logger(mockLogger))
         val input = ProcessAssetInput(metadataSourceBucket, "incorrect/object/key/format.txt", ignoreSiteName = false, "", "")
 
         val result = assetProcessing.processAsset(input)
@@ -140,8 +148,10 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
           .thenReturn(Map(malwareScanKey -> "NO_THREATS_FOUND"))
         when(s3UtilsMock.getObjectAsStream(any[String], any[String]))
           .thenReturn(new ByteArrayInputStream(missingFieldJson.getBytes("UTF-8")))
+        when(s3UtilsMock.objectKeyExists(any[String], any[String])).thenReturn(true)
+        when(appConfigMock.blockCheckRecordExists).thenReturn(false)
 
-        val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
+        val assetProcessing = new AssetProcessing(s3UtilsMock, appConfigMock)(Logger(mockLogger))
 
         val input = ProcessAssetInput(metadataSourceBucket, s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata", ignoreSiteName = false, "", "")
 
@@ -182,10 +192,12 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
             any(classOf[AsyncResponseTransformer[GetObjectResponse, ResponseBytes[GetObjectResponse]]])
           )
         ).thenReturn(failedFuture(new RuntimeException("read failed")))
+        when(s3AsyncClient.headObject(any[HeadObjectRequest])).thenReturn(CompletableFuture.completedFuture(HeadObjectResponse.builder().build()))
+        when(appConfigMock.blockCheckRecordExists).thenReturn(false)
 
         val expectedResult = AssetProcessingResult(Some(matchId), processingErrors = true, None)
 
-        val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
+        val assetProcessing = new AssetProcessing(s3UtilsMock, appConfigMock)(Logger(mockLogger))
         val input = ProcessAssetInput(metadataSourceBucket, s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata", ignoreSiteName = false, "", "")
         val result = assetProcessing.processAsset(input)
 
@@ -217,8 +229,10 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
           .thenReturn(Map(malwareScanKey -> "NO_THREATS_FOUND"))
         when(s3UtilsMock.getObjectAsStream(any[String], any[String]))
           .thenReturn(new ByteArrayInputStream(invalidUtf8))
+        when(s3UtilsMock.objectKeyExists(any[String], any[String])).thenReturn(true)
+        when(appConfigMock.blockCheckRecordExists).thenReturn(false)
 
-        val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
+        val assetProcessing = new AssetProcessing(s3UtilsMock, appConfigMock)(Logger(mockLogger))
         val input = ProcessAssetInput(metadataSourceBucket, s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata", ignoreSiteName = false, "", "")
 
         val result = assetProcessing.processAsset(input)
@@ -249,8 +263,10 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
           .thenReturn(Map(malwareScanKey -> "NO_THREATS_FOUND"))
         when(s3UtilsMock.getObjectAsStream(any[String], any[String]))
           .thenReturn(new ByteArrayInputStream(nonJsonString))
+        when(s3UtilsMock.objectKeyExists(any[String], any[String])).thenReturn(true)
+        when(appConfigMock.blockCheckRecordExists).thenReturn(false)
 
-        val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
+        val assetProcessing = new AssetProcessing(s3UtilsMock, appConfigMock)(Logger(mockLogger))
         val input = ProcessAssetInput(metadataSourceBucket, s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata", ignoreSiteName = false, "", "")
         val result = assetProcessing.processAsset(input)
 
@@ -280,8 +296,10 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
           .thenReturn(Map(malwareScanKey -> "NO_THREATS_FOUND"))
         when(s3UtilsMock.getObjectAsStream(any[String], any[String]))
           .thenReturn(new ByteArrayInputStream(unknownJsonString.getBytes("UTF-8")))
+        when(s3UtilsMock.objectKeyExists(any[String], any[String])).thenReturn(true)
+        when(appConfigMock.blockCheckRecordExists).thenReturn(false)
 
-        val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
+        val assetProcessing = new AssetProcessing(s3UtilsMock, appConfigMock)(Logger(mockLogger))
         val input = ProcessAssetInput(metadataSourceBucket, s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata", ignoreSiteName = false, "", "")
 
         val result = assetProcessing.processAsset(input)
@@ -312,8 +330,10 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
           .thenReturn(Map(malwareScanKey -> "NO_THREATS_FOUND"))
         when(s3UtilsMock.getObjectAsStream(any[String], any[String]))
           .thenReturn(new ByteArrayInputStream(defaultMetadataJsonString(matchId, defaultFileSize, consignmentId, None, None).getBytes("UTF-8")))
+        when(s3UtilsMock.objectKeyExists(any[String], any[String])).thenReturn(true)
+        when(appConfigMock.blockCheckRecordExists).thenReturn(false)
 
-        val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
+        val assetProcessing = new AssetProcessing(s3UtilsMock, appConfigMock)(Logger(mockLogger))
         val input = ProcessAssetInput(metadataSourceBucket, s"$userId/$assetSource/$consignmentId/metadata/$differentMatchId.metadata", ignoreSiteName = false, "", "")
         val result = assetProcessing.processAsset(input)
 
@@ -331,6 +351,82 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
       }
 
     s"'processAsset' with asset source of $assetSource" should
+      "log an error and return asset processing result when there is no record" in {
+        val mockLogger = mock[UnderlyingLogger]
+        val s3UtilsMock = mock[S3Utils]
+        val expectedResult = AssetProcessingResult(None, processingErrors = true, None)
+
+        when(mockLogger.isErrorEnabled()).thenReturn(true)
+        when(mockLogger.isInfoEnabled()).thenReturn(true)
+        when(s3UtilsMock.getObjectTags(any[String], any[String]))
+          .thenReturn(Map(malwareScanKey -> "NO_THREATS_FOUND"))
+        when(s3UtilsMock.getObjectAsStream(any[String], any[String]))
+          .thenReturn(new ByteArrayInputStream(defaultMetadataJsonString(matchId, defaultFileSize, consignmentId, None, None).getBytes("UTF-8")))
+        when(s3UtilsMock.objectKeyExists(any[String], any[String])).thenReturn(false)
+        when(appConfigMock.blockCheckRecordExists).thenReturn(false)
+
+        val assetProcessing = new AssetProcessing(s3UtilsMock, appConfigMock)(Logger(mockLogger))
+        val input = ProcessAssetInput(metadataSourceBucket, s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata", ignoreSiteName = false, "", "")
+        val result = assetProcessing.processAsset(input)
+
+        result shouldEqual expectedResult
+
+        verify(s3UtilsMock, times(1)).addObjectTags(
+          metadataSourceBucket,
+          s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata",
+          Map("ASSET_PROCESSING" -> "CompletedWithIssues")
+        )
+
+        verify(mockLogger).error(
+          s"AssetProcessingError: consignmentId: Some($consignmentId), matchId: None, source: Some($assetSource), errorCode: ASSET_PROCESSING.MISSING.RECORD, errorMessage: Record does not exist: $matchId"
+        )
+      }
+
+    s"'processAsset' with asset source of $assetSource" should
+      "not log an error and return asset processing result when there is no record and FAB is 'true'" in {
+        val mockLogger = mock[UnderlyingLogger]
+        val s3UtilsMock = mock[S3Utils]
+        val expectedInput = expectedMetadataInput(expectedParsedFilePath)
+        val expectedResult = AssetProcessingResult(
+          Some(matchId),
+          processingErrors = false,
+          Some(expectedInput),
+          systemMetadata = List(
+            MetadataProperty("file_path", s"$expectedParsedFilePath"),
+            MetadataProperty("file_name", "file1.txt"),
+            MetadataProperty("date_last_modified", "1751534387000"),
+            MetadataProperty("file_size", s"${defaultFileSize.toString}"),
+            MetadataProperty("client_side_checksum", "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2")
+          )
+        )
+
+        when(mockLogger.isErrorEnabled()).thenReturn(true)
+        when(mockLogger.isInfoEnabled()).thenReturn(true)
+        when(s3UtilsMock.getObjectTags(any[String], any[String]))
+          .thenReturn(Map(malwareScanKey -> "NO_THREATS_FOUND"))
+        when(s3UtilsMock.getObjectAsStream(any[String], any[String]))
+          .thenReturn(new ByteArrayInputStream(defaultMetadataJsonString(matchId, defaultFileSize, consignmentId, None, None).getBytes("UTF-8")))
+        when(s3UtilsMock.objectKeyExists(any[String], any[String])).thenReturn(false)
+        when(appConfigMock.blockCheckRecordExists).thenReturn(true)
+
+        val assetProcessing = new AssetProcessing(s3UtilsMock, appConfigMock)(Logger(mockLogger))
+        val input = ProcessAssetInput(metadataSourceBucket, s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata", ignoreSiteName = false, "", "")
+        val result = assetProcessing.processAsset(input)
+
+        result shouldEqual expectedResult
+
+        verify(s3UtilsMock, times(1)).addObjectTags(
+          metadataSourceBucket,
+          s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata",
+          Map("ASSET_PROCESSING" -> "Completed")
+        )
+
+        verify(mockLogger, times(0)).isErrorEnabled
+        verify(mockLogger).info("Asset metadata successfully processed for: {}", s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata")
+
+      }
+
+    s"'processAsset' with asset source of $assetSource" should
       "log an error and return asset processing result when malware threat is found" in {
         val mockLogger = mock[UnderlyingLogger]
         val s3UtilsMock = mock[S3Utils]
@@ -341,8 +437,10 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
         when(mockLogger.isInfoEnabled()).thenReturn(true)
         when(s3UtilsMock.getObjectTags(any[String], any[String]))
           .thenReturn(Map(malwareScanKey -> malwareScanThreatFound))
+        when(s3UtilsMock.objectKeyExists(any[String], any[String])).thenReturn(true)
+        when(appConfigMock.blockCheckRecordExists).thenReturn(false)
 
-        val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
+        val assetProcessing = new AssetProcessing(s3UtilsMock, appConfigMock)(Logger(mockLogger))
         val input = ProcessAssetInput(metadataSourceBucket, s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata", ignoreSiteName = false, "", "")
         val result = assetProcessing.processAsset(input)
 
@@ -385,8 +483,10 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
           .thenReturn(Map(malwareScanKey -> "NO_THREATS_FOUND"))
         when(s3UtilsMock.getObjectAsStream(any[String], any[String]))
           .thenReturn(new ByteArrayInputStream(defaultMetadataJsonString(matchId, 0, consignmentId, None, None).getBytes("UTF-8")))
+        when(s3UtilsMock.objectKeyExists(any[String], any[String])).thenReturn(true)
+        when(appConfigMock.blockCheckRecordExists).thenReturn(false)
 
-        val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
+        val assetProcessing = new AssetProcessing(s3UtilsMock, appConfigMock)(Logger(mockLogger))
         val input = ProcessAssetInput(metadataSourceBucket, s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata", ignoreSiteName = false, "", "")
         val result = assetProcessing.processAsset(input)
 
@@ -409,13 +509,7 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
         val s3UtilsMock = mock[S3Utils]
         val jsonMetadataString = defaultMetadataJsonString(matchId, defaultFileSize, consignmentId, Some(suppliedFieldJson), None)
 
-        val expectedInput = ClientSideMetadataInput(
-          expectedParsedFilePath,
-          "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2",
-          1751534387000L,
-          12L,
-          matchId
-        )
+        val expectedInput = expectedMetadataInput(expectedParsedFilePath)
 
         val expectedResult =
           AssetProcessingResult(
@@ -438,8 +532,10 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
           .thenReturn(Map(malwareScanKey -> "NO_THREATS_FOUND"))
         when(s3UtilsMock.getObjectAsStream(any[String], any[String]))
           .thenReturn(new ByteArrayInputStream(jsonMetadataString.getBytes("UTF-8")))
+        when(s3UtilsMock.objectKeyExists(any[String], any[String])).thenReturn(true)
+        when(appConfigMock.blockCheckRecordExists).thenReturn(false)
 
-        val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
+        val assetProcessing = new AssetProcessing(s3UtilsMock, appConfigMock)(Logger(mockLogger))
         val input = ProcessAssetInput(metadataSourceBucket, s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata", ignoreSiteName = false, "", "")
         val result = assetProcessing.processAsset(input)
 
@@ -455,13 +551,7 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
         val s3UtilsMock = mock[S3Utils]
         val jsonMetadataString = defaultMetadataJsonString(matchId, defaultFileSize, consignmentId, Some(suppliedFieldJson), Some(customFieldJson))
 
-        val expectedInput = ClientSideMetadataInput(
-          expectedParsedFilePath,
-          "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2",
-          1751534387000L,
-          12L,
-          matchId
-        )
+        val expectedInput = expectedMetadataInput(expectedParsedFilePath)
 
         val expectedResult =
           AssetProcessingResult(
@@ -485,8 +575,10 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
           .thenReturn(Map(malwareScanKey -> "NO_THREATS_FOUND"))
         when(s3UtilsMock.getObjectAsStream(any[String], any[String]))
           .thenReturn(new ByteArrayInputStream(jsonMetadataString.getBytes("UTF-8")))
+        when(s3UtilsMock.objectKeyExists(any[String], any[String])).thenReturn(true)
+        when(appConfigMock.blockCheckRecordExists).thenReturn(false)
 
-        val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
+        val assetProcessing = new AssetProcessing(s3UtilsMock, appConfigMock)(Logger(mockLogger))
         val input = ProcessAssetInput(metadataSourceBucket, s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata", ignoreSiteName = false, "", "")
         val result = assetProcessing.processAsset(input)
 
@@ -504,13 +596,7 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
     val sharePointAssetSource = SharePoint.id.toLowerCase
     val expectedFilePath: String = "Shared Documents/aFolder/file1.txt"
 
-    val expectedInput = ClientSideMetadataInput(
-      expectedFilePath,
-      "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2",
-      1751534387000L,
-      12L,
-      matchId
-    )
+    val expectedInput = expectedMetadataInput(expectedFilePath)
 
     val expectedResult =
       AssetProcessingResult(
@@ -532,8 +618,10 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
       .thenReturn(Map(malwareScanKey -> "NO_THREATS_FOUND"))
     when(s3UtilsMock.getObjectAsStream(any[String], any[String]))
       .thenReturn(new ByteArrayInputStream(jsonMetadataString.getBytes("UTF-8")))
+    when(s3UtilsMock.objectKeyExists(any[String], any[String])).thenReturn(true)
+    when(appConfigMock.blockCheckRecordExists).thenReturn(false)
 
-    val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
+    val assetProcessing = new AssetProcessing(s3UtilsMock, appConfigMock)(Logger(mockLogger))
     val input = ProcessAssetInput(metadataSourceBucket, s"$userId/$sharePointAssetSource/$consignmentId/metadata/$matchId.metadata", ignoreSiteName = true, "", "")
     val result = assetProcessing.processAsset(input)
 
@@ -581,8 +669,10 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
         .thenReturn(Map(malwareScanKey -> "NO_THREATS_FOUND"))
       when(s3UtilsMock.getObjectAsStream(any[String], any[String]))
         .thenReturn(new ByteArrayInputStream(jsonMetadataString.getBytes("UTF-8")))
+      when(s3UtilsMock.objectKeyExists(any[String], any[String])).thenReturn(true)
+      when(appConfigMock.blockCheckRecordExists).thenReturn(false)
 
-      val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
+      val assetProcessing = new AssetProcessing(s3UtilsMock, appConfigMock)(Logger(mockLogger))
       val input = ProcessAssetInput(metadataSourceBucket, s"$userId/sharepoint/$consignmentId/metadata/$matchId.metadata", ignoreSiteName = false, "", "")
       val result = assetProcessing.processAsset(input)
 
@@ -618,13 +708,7 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
       "transferId": "$consignmentId"
     }""".stripMargin
 
-    val expectedInput = ClientSideMetadataInput(
-      "Retail/Shared Documents/aFolder/thumbs.db",
-      "1b47903dfdf5f21abeb7b304efb8e801656bff31225f522406f45c21a68eddf2",
-      1751534387000L,
-      12L,
-      matchId
-    )
+    val expectedInput = expectedMetadataInput("Retail/Shared Documents/aFolder/thumbs.db")
 
     val expectedResult =
       AssetProcessingResult(
@@ -643,8 +727,10 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
       .thenReturn(Map(malwareScanKey -> "NO_THREATS_FOUND"))
     when(s3UtilsMock.getObjectAsStream(any[String], any[String]))
       .thenReturn(new ByteArrayInputStream(jsonMetadataString.getBytes("UTF-8")))
+    when(s3UtilsMock.objectKeyExists(any[String], any[String])).thenReturn(true)
+    when(appConfigMock.blockCheckRecordExists).thenReturn(false)
 
-    val assetProcessing = new AssetProcessing(s3UtilsMock)(Logger(mockLogger))
+    val assetProcessing = new AssetProcessing(s3UtilsMock, appConfigMock)(Logger(mockLogger))
     val input = ProcessAssetInput(metadataSourceBucket, s"$userId/sharepoint/$consignmentId/metadata/$matchId.metadata", ignoreSiteName = false, "", "")
     val result = assetProcessing.processAsset(input)
 

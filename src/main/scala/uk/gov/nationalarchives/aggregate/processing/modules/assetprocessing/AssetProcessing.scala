@@ -1,33 +1,40 @@
 package uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing
 
-import cats.effect.IO
-import com.typesafe.config.{Config, ConfigFactory}
 import com.typesafe.scalalogging.Logger
 import graphql.codegen.types.ClientSideMetadataInput
 import io.circe.{Json, parser}
 import uk.gov.nationalarchives.aggregate.processing.config.ApplicationConfig
 import uk.gov.nationalarchives.aggregate.processing.config.ApplicationConfig.{malwareScanKey, malwareScanThreatFound}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.MetadataClassification
-import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorType.{EncodingError, JsonError, MalwareScanError, MatchIdError, ObjectKeyError, S3Error => s3e}
-import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorValue.{Invalid, Mismatch, ReadError, ThreatFound}
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorType.{
+  EncodingError,
+  JsonError,
+  MalwareScanError,
+  MatchIdError,
+  MissingError,
+  ObjectKeyError,
+  ProcessErrorType,
+  S3Error => s3e
+}
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorValue.{Invalid, Mismatch, ProcessErrorValue, ReadError, Record, ThreatFound}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.{AssetProcessing => ptAp}
-import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling.{BaseError, config}
+import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling.BaseError
 import uk.gov.nationalarchives.aggregate.processing.modules._
-import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.AssetProcessing.{AssetProcessingError, AssetProcessingEvent, AssetProcessingResult, ProcessAssetInput, appConfig}
+import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.AssetProcessing._
 import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.initialchecks.{FileSizeCheck, InitialCheck, InvalidFileName}
 import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.metadata._
-import uk.gov.nationalarchives.aggregate.processing.utilities.{S3UtilsForTesting, UTF8ValidationHandler}
+import uk.gov.nationalarchives.aggregate.processing.utilities.UTF8ValidationHandler
 import uk.gov.nationalarchives.aws.utils.s3.{S3Clients, S3Utils}
 import uk.gov.nationalarchives.tdr.common.utils.objectkeycontext.AssetSources.{AssetSource, HardDrive, NetworkDrive, SharePoint}
-import uk.gov.nationalarchives.tdr.common.utils.objectkeycontext.{Context, ObjectCategories, ObjectTypes}
 import uk.gov.nationalarchives.tdr.common.utils.objectkeycontext.ObjectTypes.ObjectType
+import uk.gov.nationalarchives.tdr.common.utils.objectkeycontext.{Context, ObjectCategories}
 import uk.gov.nationalarchives.tdr.common.utils.statuses.StatusValues.{CompletedValue, CompletedWithIssuesValue}
 import uk.gov.nationalarchives.utf8.validator.Utf8Validator
 
 import java.util.UUID
 import scala.util.{Failure, Success, Try}
 
-class AssetProcessing(s3Utils: S3Utils, s3UtilsForTesting: S3UtilsForTesting)(implicit logger: Logger) {
+class AssetProcessing(s3Utils: S3Utils, appConfig: ApplicationConfig.type)(implicit logger: Logger) {
   private val fileSizeCheck = FileSizeCheck.apply()
   private val invalidFileNameCheck = InvalidFileName.apply()
   private lazy val initialChecks: Set[InitialCheck] = Set(
@@ -198,20 +205,20 @@ class AssetProcessing(s3Utils: S3Utils, s3UtilsForTesting: S3UtilsForTesting)(im
   }
 
   private def validateRecord(event: AssetProcessingEvent, input: ClientSideMetadataInput): Option[AssetProcessingError] = {
-    def matchIdError(message: String): AssetProcessingError =
+    def matchIdError(message: String, errorType: ProcessErrorType, errorValue: ProcessErrorValue): AssetProcessingError =
       AssetProcessingError(
         Some(event.consignmentId),
         None,
         Some(event.source.id),
-        s"$ptAp.$MatchIdError.$Mismatch",
+        s"$ptAp.$errorType.$errorValue",
         message
       )
 
     event match {
       case _ if event.matchId != input.matchId =>
-        Some(matchIdError(s"Mismatched match ids: ${event.matchId} and ${input.matchId}"))
-      case _ if !appConfig.blockCheckRecordExists && !s3UtilsForTesting.objectKeyExists(event.recordsS3Bucket, s"${event.recordsKeyPrefix}/${event.matchId}") =>
-        Some(matchIdError(s"Record does not exist: ${event.matchId} and ${input.matchId}"))
+        Some(matchIdError(s"Mismatched match ids: ${event.matchId} and ${input.matchId}", MatchIdError, Mismatch))
+      case _ if !appConfig.blockCheckRecordExists && !s3Utils.objectKeyExists(event.recordsS3Bucket, s"${event.recordsKeyPrefix}/${event.matchId}") =>
+        Some(matchIdError(s"Record does not exist: ${event.matchId}", MissingError, Record))
       case _ => None
     }
   }
@@ -264,10 +271,7 @@ object AssetProcessing {
   }
 
   val logger: Logger = Logger[AssetProcessing]
-  val appConfig: ApplicationConfig.type = ApplicationConfig
-
-  private val configFactory: Config = ConfigFactory.load()
-  val s3Utils: S3Utils = S3Utils(S3Clients.s3Async(configFactory.getString("s3.endpoint")))
-  private val s3UtilsForTesting = S3UtilsForTesting()
-  def apply() = new AssetProcessing(s3Utils, s3UtilsForTesting)(logger)
+  private val appConfig: ApplicationConfig.type = ApplicationConfig
+  val s3Utils: S3Utils = S3Utils(S3Clients.s3Async(appConfig.s3Endpoint))
+  def apply() = new AssetProcessing(s3Utils, appConfig)(logger)
 }

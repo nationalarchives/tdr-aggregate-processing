@@ -3,8 +3,8 @@ import sbt.*
 object Dependencies {
   private val circeVersion = "0.14.17"
   private val mockitoScalaVersion = "2.2.3"
-  private val awsUtilsVersion = "0.1.343"
-  private val tdrCommonUtilsVersion = "0.0.55"
+  private val awsUtilsVersion = "0.1.345"
+  private val tdrCommonUtilsVersion = "0.0.56"
 
   private val nettyVersion = "4.1.137.Final"  
 
@@ -17,10 +17,10 @@ object Dependencies {
   lazy val circeParser = "io.circe" %% "circe-parser" % circeVersion
   lazy val csvParser = "com.github.tototoshi" %% "scala-csv" % "2.0.0"
 
-  lazy val generatedGraphql = "uk.gov.nationalarchives" %% "tdr-generated-graphql" % "0.0.497"
-  lazy val graphqlClient = "uk.gov.nationalarchives" %% "tdr-graphql-client" % "0.0.308"
+  lazy val generatedGraphql = "uk.gov.nationalarchives" %% "tdr-generated-graphql" % "0.0.498"
+  lazy val graphqlClient = "uk.gov.nationalarchives" %% "tdr-graphql-client" % "0.0.309"
 
-  lazy val logback = "ch.qos.logback" % "logback-classic" % "1.6.7"
+  lazy val logback = "ch.qos.logback" % "logback-classic" % "1.6.8"
   lazy val logstash = "net.logstash.logback" % "logstash-logback-encoder" % "9.0"
 
   lazy val metadataSchema = "uk.gov.nationalarchives" % "da-metadata-schema_2.13" % "0.0.156"

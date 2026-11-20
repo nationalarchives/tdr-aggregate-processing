@@ -22,6 +22,7 @@ object ApplicationConfig {
   val maxIndividualFileSizeMb: Long = configFactory.getLong("maxIndividualFileSizeMb")
   val blockInvalidFileNameCheck: Boolean = configFactory.getBoolean("featureAccessBlocks.blockInvalidFileNameCheck")
   val blockCheckRecordExists: Boolean = configFactory.getBoolean("featureAccessBlocks.blockCheckRecordExists")
+  val s3Endpoint: String = configFactory.getString("s3.endpoint")
 
   def getClientSecret(secretPath: String = authClientSecretPath): String = {
     val ssmClient = SSMClients.ssm(ssmEndpoint)
