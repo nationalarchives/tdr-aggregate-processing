@@ -118,14 +118,6 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
   private def incorrectStateError(consignmentId: UUID) =
     AggregateProcessingError(Some(consignmentId), s"$AggregateProcessing.$StateError.$Incorrect", s"Transfer state incorrect for consignment: $consignmentId")
 
-  private def objectCountMismatch(consignmentId: UUID, expectedObjectCount: Int, objectKeyCount: Int) = {
-    AggregateProcessingError(
-      Some(consignmentId),
-      s"$AggregateProcessing.$ObjectCountError.$Mismatch",
-      s"Object count incorrect for consignment: $consignmentId. Expected count: $expectedObjectCount; object key count: $objectKeyCount"
-    )
-  }
-
   private def processAssets(
       userId: UUID,
       consignmentId: UUID,

@@ -18,14 +18,15 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
   private val userId: UUID = UUID.randomUUID()
   private val consignmentId: UUID = UUID.randomUUID()
   private val matchId = "match-id"
-  private val category: String = Metadata.id
+  private val metadataCategory: String = Metadata.id
+  private val recordsCategory: String = Records.id
   private def validMessageBody(assetSource: String): String =
     s"""
     {
       "metadataSourceBucket": "$metadataSourceBucket",
-      "metadataSourceObjectPrefix": "$userId/$assetSource/$consignmentId/${Metadata.id}",
+      "metadataSourceObjectPrefix": "$userId/$assetSource/$consignmentId/$metadataCategory",
       "recordsSourceBucket": "$recordsSourceBucket",
-      "recordsSourceObjectPrefix": "$userId/$assetSource/$consignmentId/${Records.id}",
+      "recordsSourceObjectPrefix": "$userId/$assetSource/$consignmentId/$recordsCategory",
       "dataLoadErrors": false,
       "ignoreSiteName": false,
       "loadedNumberOfFiles": 2,
@@ -56,14 +57,15 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
   )
 
   forAll(assetSources) { (assetSource, metadataJsonString, expectedFilePath, invalidSuppliedMetadata) =>
-    val objectKey = s"$userId/$assetSource/$consignmentId/$category/$matchId.metadata"
+    val metadataObjectKey = s"$userId/$assetSource/$consignmentId/$metadataCategory/$matchId.metadata"
+    val recordObjectKey = s"$userId/$assetSource/$consignmentId/$recordsCategory/$matchId"
 
     s"'handleRequest' with asset source $assetSource" should "process all valid messages in SQS event" in {
       val metadata = metadataJsonString(matchId, defaultFileSize, consignmentId, None, None)
       authOkJson()
       mockGraphQlGetConsignmentResponse()
-      mockS3GetObjectTagging(objectKey)
-      mockS3GetObjectStream(objectKey, metadata)
+      mockS3GetObjectTagging(metadataObjectKey)
+      mockS3GetObjectStream(metadataObjectKey, metadata)
       mockS3ListBucketResponse(userId, consignmentId, List(matchId), assetSource)
       mockSfnResponseOk()
       mockGraphQlAddFilesAndMetadataResponse
@@ -83,19 +85,19 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
       wiremockS3.verify(
         exactly(2),
         getRequestedFor(anyUrl())
-          .withUrl(s"/?list-type=2&max-keys=1000&prefix=$userId%2F$assetSource%2F$consignmentId%2F$category")
+          .withUrl(s"/?list-type=2&max-keys=1000&prefix=$userId%2F$assetSource%2F$consignmentId%2F$metadataCategory")
       )
 
       wiremockS3.verify(
         exactly(2),
         getRequestedFor(anyUrl())
-          .withUrl(s"/$objectKey?partNumber=1")
+          .withUrl(s"/$metadataObjectKey?partNumber=1")
       )
 
       wiremockS3.verify(
         exactly(4),
         getRequestedFor(anyUrl())
-          .withUrl(s"/$objectKey?tagging")
+          .withUrl(s"/$metadataObjectKey?tagging")
       )
 
       wiremockSfnServer.verify(
@@ -116,8 +118,8 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
       val incorrectUploadStatusValue = InProgressValue
       authOkJson()
       mockGraphQlGetConsignmentResponse(uploadStatusValue = incorrectUploadStatusValue)
-      mockS3GetObjectTagging(objectKey)
-      mockS3GetObjectStream(objectKey, metadata)
+      mockS3GetObjectTagging(metadataObjectKey)
+      mockS3GetObjectStream(metadataObjectKey, metadata)
       mockS3ListBucketResponse(userId, consignmentId, List(matchId), assetSource)
       mockSfnResponseOk()
       mockGraphQlAddFilesAndMetadataResponse
@@ -136,19 +138,19 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
       wiremockS3.verify(
         exactly(1),
         getRequestedFor(anyUrl())
-          .withUrl(s"/?list-type=2&max-keys=1000&prefix=$userId%2F$assetSource%2F$consignmentId%2F$category")
+          .withUrl(s"/?list-type=2&max-keys=1000&prefix=$userId%2F$assetSource%2F$consignmentId%2F$metadataCategory")
       )
 
       wiremockS3.verify(
         exactly(0),
         getRequestedFor(anyUrl())
-          .withUrl(s"/$objectKey?partNumber=1")
+          .withUrl(s"/$metadataObjectKey?partNumber=1")
       )
 
       wiremockS3.verify(
         exactly(0),
         getRequestedFor(anyUrl())
-          .withUrl(s"/$objectKey?tagging")
+          .withUrl(s"/$metadataObjectKey?tagging")
       )
 
       wiremockSfnServer.verify(
@@ -167,8 +169,8 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
     s"'handleRequest' with asset source $assetSource" should "process request correctly where client side data load errors are present" in {
       val metadata = metadataJsonString(matchId, defaultFileSize, consignmentId, None, None)
       authOkJson()
-      mockS3GetObjectTagging(objectKey)
-      mockS3GetObjectStream(objectKey, metadata)
+      mockS3GetObjectTagging(metadataObjectKey)
+      mockS3GetObjectStream(metadataObjectKey, metadata)
       mockS3ListBucketResponse(userId, consignmentId, List(matchId), assetSource)
       mockSfnResponseOk()
       mockGraphQlGetConsignmentResponse()
@@ -180,7 +182,9 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
         s"""
           {
             "metadataSourceBucket": "$metadataSourceBucket",
-            "metadataSourceObjectPrefix": "$userId/$assetSource/$consignmentId/$category",
+            "metadataSourceObjectPrefix": "$userId/$assetSource/$consignmentId/$metadataCategory",
+            "recordsSourceBucket": "$recordsSourceBucket",
+            "recordsSourceObjectPrefix": "$userId/$assetSource/$consignmentId/$recordsCategory",
             "dataLoadErrors": true,
             "ignoreSiteName": false,
             "loadedNumberOfFiles": 2
@@ -198,81 +202,19 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
       wiremockS3.verify(
         exactly(1),
         getRequestedFor(anyUrl())
-          .withUrl(s"/?list-type=2&max-keys=1000&prefix=$userId%2F$assetSource%2F$consignmentId%2F$category")
+          .withUrl(s"/?list-type=2&max-keys=1000&prefix=$userId%2F$assetSource%2F$consignmentId%2F$metadataCategory")
       )
 
       wiremockS3.verify(
         exactly(0),
         getRequestedFor(anyUrl())
-          .withUrl(s"/$objectKey?partNumber=1")
+          .withUrl(s"/$metadataObjectKey?partNumber=1")
       )
 
       wiremockS3.verify(
         exactly(0),
         getRequestedFor(anyUrl())
-          .withUrl(s"/$objectKey?tagging")
-      )
-
-      wiremockSfnServer.verify(
-        exactly(0),
-        postRequestedFor(anyUrl())
-          .withRequestBody(containing(s"transfer_service_$consignmentId"))
-      )
-
-      wiremockGraphqlServer.verify(
-        exactly(3),
-        postRequestedFor(anyUrl())
-          .withUrl("/graphql")
-      )
-    }
-
-    s"'handleRequest' with asset source $assetSource" should "process request correctly where there is an object count mis-match" in {
-      val metadata = metadataJsonString(matchId, defaultFileSize, consignmentId, None, None)
-      authOkJson()
-      mockS3GetObjectTagging(objectKey)
-      mockS3GetObjectStream(objectKey, metadata)
-      mockS3ListBucketResponse(userId, consignmentId, List(matchId), assetSource)
-      mockSfnResponseOk()
-      mockGraphQlGetConsignmentResponse()
-      mockGraphQlAddFilesAndMetadataResponse
-      mockGraphQlUpdateConsignmentStatusResponse
-      val mockContext = mock[Context]
-
-      val objectCountErrorsMessageBody: String =
-        s"""
-          {
-            "metadataSourceBucket": "$metadataSourceBucket",
-            "metadataSourceObjectPrefix": "$userId/$assetSource/$consignmentId/$category",
-            "dataLoadErrors": true,
-            "ignoreSiteName": false,
-            "loadedNumberOfFiles": 3
-          }
-          """.stripMargin
-
-      val message = new SQSMessage()
-      message.setBody(objectCountErrorsMessageBody)
-
-      val messages: java.util.List[SQSMessage] = List(message).asJava
-      val sqsEvent = new SQSEvent()
-      sqsEvent.setRecords(messages)
-      new AggregateProcessingLambda().handleRequest(sqsEvent, mockContext)
-
-      wiremockS3.verify(
-        exactly(1),
-        getRequestedFor(anyUrl())
-          .withUrl(s"/?list-type=2&max-keys=1000&prefix=$userId%2F$assetSource%2F$consignmentId%2F$category")
-      )
-
-      wiremockS3.verify(
-        exactly(0),
-        getRequestedFor(anyUrl())
-          .withUrl(s"/$objectKey?partNumber=1")
-      )
-
-      wiremockS3.verify(
-        exactly(0),
-        getRequestedFor(anyUrl())
-          .withUrl(s"/$objectKey?tagging")
+          .withUrl(s"/$metadataObjectKey?tagging")
       )
 
       wiremockSfnServer.verify(
@@ -291,8 +233,8 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
     s"'handleRequest' with asset source $assetSource" should "process request correctly when no objects are found for supplied object prefix" in {
       val metadata = metadataJsonString(matchId, defaultFileSize, consignmentId, None, None)
       authOkJson()
-      mockS3GetObjectTagging(objectKey)
-      mockS3GetObjectStream(objectKey, metadata)
+      mockS3GetObjectTagging(metadataObjectKey)
+      mockS3GetObjectStream(metadataObjectKey, metadata)
       mockS3ListBucketResponseEmpty(userId, consignmentId, assetSource)
       mockSfnResponseOk()
       mockGraphQlAddFilesAndMetadataResponse
@@ -311,19 +253,19 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
       wiremockS3.verify(
         exactly(1),
         getRequestedFor(anyUrl())
-          .withUrl(s"/?list-type=2&max-keys=1000&prefix=$userId%2F$assetSource%2F$consignmentId%2F$category")
+          .withUrl(s"/?list-type=2&max-keys=1000&prefix=$userId%2F$assetSource%2F$consignmentId%2F$metadataCategory")
       )
 
       wiremockS3.verify(
         exactly(0),
         getRequestedFor(anyUrl())
-          .withUrl(s"/$objectKey?partNumber=1")
+          .withUrl(s"/$metadataObjectKey?partNumber=1")
       )
 
       wiremockS3.verify(
         exactly(0),
         getRequestedFor(anyUrl())
-          .withUrl(s"/$objectKey?tagging")
+          .withUrl(s"/$metadataObjectKey?tagging")
       )
 
       wiremockSfnServer.verify(
@@ -355,19 +297,19 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
       wiremockS3.verify(
         exactly(0),
         getRequestedFor(anyUrl())
-          .withUrl(s"/?list-type=2&max-keys=1000&prefix=$userId%2F$assetSource%2F$consignmentId%2F$category")
+          .withUrl(s"/?list-type=2&max-keys=1000&prefix=$userId%2F$assetSource%2F$consignmentId%2F$metadataCategory")
       )
 
       wiremockS3.verify(
         exactly(0),
         getRequestedFor(anyUrl())
-          .withUrl(s"/$objectKey?partNumber=1")
+          .withUrl(s"/$metadataObjectKey?partNumber=1")
       )
 
       wiremockS3.verify(
         exactly(0),
         getRequestedFor(anyUrl())
-          .withUrl(s"/$objectKey?tagging")
+          .withUrl(s"/$metadataObjectKey?tagging")
       )
 
       wiremockSfnServer.verify(
@@ -403,19 +345,19 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
       wiremockS3.verify(
         exactly(0),
         getRequestedFor(anyUrl())
-          .withUrl(s"/?list-type=2&max-keys=1000&prefix=$userId%2F$assetSource%2F$consignmentId%2F$category")
+          .withUrl(s"/?list-type=2&max-keys=1000&prefix=$userId%2F$assetSource%2F$consignmentId%2F$metadataCategory")
       )
 
       wiremockS3.verify(
         exactly(0),
         getRequestedFor(anyUrl())
-          .withUrl(s"/$objectKey?partNumber=1")
+          .withUrl(s"/$metadataObjectKey?partNumber=1")
       )
 
       wiremockS3.verify(
         exactly(0),
         getRequestedFor(anyUrl())
-          .withUrl(s"/$objectKey?tagging")
+          .withUrl(s"/$metadataObjectKey?tagging")
       )
 
       wiremockSfnServer.verify(
@@ -435,8 +377,8 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
       val invalidSuppliedFields = s""""closure_type": "Open","description": "some kind of description",$invalidSuppliedMetadata"""
       val metadata = metadataJsonString(matchId, defaultFileSize, consignmentId, Some(invalidSuppliedFields), None)
       authOkJson()
-      mockS3GetObjectTagging(objectKey)
-      mockS3GetObjectStream(objectKey, metadata)
+      mockS3GetObjectTagging(metadataObjectKey)
+      mockS3GetObjectStream(metadataObjectKey, metadata)
       mockS3ListBucketResponse(userId, consignmentId, List(matchId), assetSource)
       mockSfnResponseOk()
       mockGraphQlAddFilesAndMetadataResponse
@@ -450,7 +392,9 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
         s"""
             {
               "metadataSourceBucket": "$metadataSourceBucket",
-              "metadataSourceObjectPrefix": "$userId/$assetSource/$consignmentId/$category",
+              "metadataSourceObjectPrefix": "$userId/$assetSource/$consignmentId/$metadataCategory",
+              "recordsSourceBucket": "$recordsSourceBucket",
+              "recordsSourceObjectPrefix": "$userId/$assetSource/$consignmentId/$recordsCategory",
               "dataLoadErrors": false,
               "ignoreSiteName": false,
               "loadedNumberOfFiles": 2
@@ -468,26 +412,26 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
       wiremockS3.verify(
         exactly(1),
         getRequestedFor(anyUrl())
-          .withUrl(s"/?list-type=2&max-keys=1000&prefix=$userId%2F$assetSource%2F$consignmentId%2F$category")
+          .withUrl(s"/?list-type=2&max-keys=1000&prefix=$userId%2F$assetSource%2F$consignmentId%2F$metadataCategory")
       )
 
       wiremockS3.verify(
         exactly(1),
         getRequestedFor(anyUrl())
-          .withUrl(s"/$objectKey?partNumber=1")
+          .withUrl(s"/$metadataObjectKey?partNumber=1")
       )
 
       if (assetSource == NetworkDrive.id.toLowerCase) {
         wiremockS3.verify(
           exactly(2),
           getRequestedFor(anyUrl())
-            .withUrl(s"/$objectKey?tagging")
+            .withUrl(s"/$metadataObjectKey?tagging")
         )
       } else {
         wiremockS3.verify(
           exactly(1),
           getRequestedFor(anyUrl())
-            .withUrl(s"/$objectKey?tagging")
+            .withUrl(s"/$metadataObjectKey?tagging")
         )
       }
 
@@ -508,8 +452,8 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
       "upload a draft-metadata.csv to S3 when supplied metadata present in uploaded metadata" in {
         val metadata = metadataJsonString(matchId, defaultFileSize, consignmentId, Some(defaultSuppliedFields), None)
         authOkJson()
-        mockS3GetObjectTagging(objectKey)
-        mockS3GetObjectStream(objectKey, metadata)
+        mockS3GetObjectTagging(metadataObjectKey)
+        mockS3GetObjectStream(metadataObjectKey, metadata)
         mockS3ListBucketResponse(userId, consignmentId, List(matchId), assetSource)
         mockSfnResponseOk()
         mockGraphQlAddFilesAndMetadataResponse
@@ -524,7 +468,9 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
           s"""
             {
               "metadataSourceBucket": "$metadataSourceBucket",
-              "metadataSourceObjectPrefix": "$userId/$assetSource/$consignmentId/$category",
+              "metadataSourceObjectPrefix": "$userId/$assetSource/$consignmentId/$metadataCategory",
+              "recordsSourceBucket": "$recordsSourceBucket",
+              "recordsSourceObjectPrefix": "$userId/$assetSource/$consignmentId/$recordsCategory",
               "dataLoadErrors": false,
               "ignoreSiteName": false,
               "loadedNumberOfFiles": 2
@@ -601,7 +547,7 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
     wiremockS3.verify(
       exactly(1),
       getRequestedFor(anyUrl())
-        .withUrl(s"/?list-type=2&max-keys=1000&prefix=$userId%2F$assetSource%2F$consignmentId%2F$category")
+        .withUrl(s"/?list-type=2&max-keys=1000&prefix=$userId%2F$assetSource%2F$consignmentId%2F$metadataCategory")
     )
 
     wiremockS3.verify(

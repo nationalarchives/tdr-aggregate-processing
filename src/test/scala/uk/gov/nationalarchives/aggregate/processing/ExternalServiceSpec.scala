@@ -168,6 +168,13 @@ class ExternalServiceSpec extends AnyFlatSpec with BeforeAndAfterEach with Befor
     )
   }
 
+  def mockS3HeadObjectResponse(key: String): StubMapping = {
+    wiremockS3.stubFor(
+      head(urlEqualTo(s"/$key?partNumber=1"))
+        .willReturn(aResponse().withStatus(200))
+    )
+  }
+
   def mockS3ListBucketResponse(userId: UUID, consignmentId: UUID, matchIds: List[String], assetSource: String): StubMapping = {
     val params = Map("list-type" -> equalTo("2"), "prefix" -> equalTo(s"$userId/$assetSource/$consignmentId/metadata")).asJava
     val response = <ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
