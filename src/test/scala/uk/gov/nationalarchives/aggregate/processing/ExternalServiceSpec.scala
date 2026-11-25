@@ -254,6 +254,13 @@ class ExternalServiceSpec extends AnyFlatSpec with BeforeAndAfterEach with Befor
     )
   }
 
+  def mockS3HeadObjectResponse(key: String): StubMapping = {
+    wiremockS3.stubFor(
+      head(urlEqualTo(s"/$key"))
+        .willReturn(aResponse().withStatus(200))
+    )
+  }
+
   def mockSfnResponseOk(): StubMapping = {
     wiremockSfnServer.stubFor(
       post(anyUrl())

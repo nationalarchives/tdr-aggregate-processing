@@ -15,11 +15,12 @@ import io.circe.generic.semiauto.deriveDecoder
 import io.circe.parser._
 import uk.gov.nationalarchives.aggregate.processing.AggregateProcessingLambda._
 import uk.gov.nationalarchives.aggregate.processing.config.ApplicationConfig.draftMetadataBucket
-import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorType.{ClientDataLoadError, ObjectCountError, S3Error, StateError, UploadError}
-import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorValue.{Failure, Incorrect, Mismatch, ReadError}
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorType.{ClientDataLoadError, S3Error, StateError}
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorValue.{Failure, Incorrect, ReadError}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.{AggregateProcessing, AssetProcessing}
 import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling
 import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling.BaseError
+import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.AssetProcessing.ProcessAssetInput
 import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.{AssetProcessing => AssetProcessingModule}
 import uk.gov.nationalarchives.aggregate.processing.modules.orchestration.TransferOrchestration
 import uk.gov.nationalarchives.aggregate.processing.modules.orchestration.TransferOrchestration.{AggregateProcessingEvent, OrchestrationResult}
@@ -71,23 +72,15 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
     val dataLoadErrors = event.dataLoadErrors
     val assetSource = objectContext.assetSource.get
     val dryRun = objectsPrefix.contains(DryRunMetadata.id)
-    val ignoreSiteName = event.ignoreSiteName
-    val allObjectsExpectedCount = event.loadedNumberOfFiles
     logger.info(s"Starting processing consignment: $consignmentId")
     for {
       details <- persistenceApi.getConsignmentDetails(consignmentId)
       incorrectState = !stateCorrect(details.get.consignmentStatuses)
       s3MetadataObjects <- IO(s3Utils.listAllObjectsWithPrefix(sourceBucket, objectsPrefix))
       metadataObjectKeys = s3MetadataObjects.map(_.key())
-      metadataObjectKeysCount = metadataObjectKeys.size
       assetProcessingResult <- dataLoadErrors match {
         case _ if incorrectState =>
           errorHandling.handleError(incorrectStateError(consignmentId), logger)
-          IO(errorProcessingResult)
-        // Each metadata object has a digital object associated with it
-        // Double the metadata object count to get the correct number of objects
-        case _ if metadataObjectKeysCount * 2 != allObjectsExpectedCount =>
-          errorHandling.handleError(objectCountMismatch(consignmentId, allObjectsExpectedCount, metadataObjectKeysCount), logger)
           IO(errorProcessingResult)
         case _ if dataLoadErrors =>
           errorHandling.handleError(dataLoadError(consignmentId), logger)
@@ -95,7 +88,7 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
         case _ if metadataObjectKeys.isEmpty =>
           errorHandling.handleError(noObjectsError(consignmentId, objectContext.category.get), logger)
           IO(errorProcessingResult)
-        case _ => processAssets(userId, consignmentId, sourceBucket, metadataObjectKeys, dryRun, ignoreSiteName)
+        case _ => processAssets(userId, consignmentId, metadataObjectKeys, dryRun, event)
       }
       orchestrationEvent = AggregateProcessingEvent(
         assetSource,
@@ -123,21 +116,12 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
   private def incorrectStateError(consignmentId: UUID) =
     AggregateProcessingError(Some(consignmentId), s"$AggregateProcessing.$StateError.$Incorrect", s"Transfer state incorrect for consignment: $consignmentId")
 
-  private def objectCountMismatch(consignmentId: UUID, expectedObjectCount: Int, objectKeyCount: Int) = {
-    AggregateProcessingError(
-      Some(consignmentId),
-      s"$AggregateProcessing.$ObjectCountError.$Mismatch",
-      s"Object count incorrect for consignment: $consignmentId. Expected count: $expectedObjectCount; object key count: $objectKeyCount"
-    )
-  }
-
   private def processAssets(
       userId: UUID,
       consignmentId: UUID,
-      sourceBucket: String,
-      objectKeys: List[String],
+      metadataObjectKeys: List[String],
       dryRun: Boolean,
-      ignoreSiteName: Boolean
+      event: AggregateEvent
   ): IO[AssetProcessingResult] = {
     def persist(assets: List[AssetProcessingModule.AssetProcessingResult], suppliedMetadata: Boolean): IO[Unit] =
       IO.defer {
@@ -159,8 +143,15 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
     }
 
     (for {
-      results <- IO(objectKeys.par.map(assetProcessor.processAsset(sourceBucket, _, ignoreSiteName)).toList)
-      assets = results.filterNot(_.ignoreAsset)
+      assetProcessingResults <-
+        IO(
+          metadataObjectKeys.par
+            .map(k =>
+              assetProcessor.processAsset(ProcessAssetInput(event.metadataSourceBucket, k, event.ignoreSiteName, event.recordsSourceBucket, event.recordsSourceObjectPrefix))
+            )
+            .toList
+        )
+      assets = assetProcessingResults.filterNot(_.ignoreAsset)
       errors = assetProcessingErrors(assets)
       suppliedMetadata = assets.exists(_.suppliedMetadata.nonEmpty)
       _ <- if (errors || dryRun) IO.unit else persist(assets, suppliedMetadata)
@@ -211,5 +202,13 @@ object AggregateProcessingLambda {
   }
 
   private case class AssetProcessingResult(errors: Boolean, suppliedMetadata: Boolean)
-  case class AggregateEvent(metadataSourceBucket: String, metadataSourceObjectPrefix: String, dataLoadErrors: Boolean, ignoreSiteName: Boolean, loadedNumberOfFiles: Int)
+  case class AggregateEvent(
+      metadataSourceBucket: String,
+      metadataSourceObjectPrefix: String,
+      recordsSourceBucket: String,
+      recordsSourceObjectPrefix: String,
+      dataLoadErrors: Boolean,
+      ignoreSiteName: Boolean,
+      loadedNumberOfFiles: Int
+  )
 }

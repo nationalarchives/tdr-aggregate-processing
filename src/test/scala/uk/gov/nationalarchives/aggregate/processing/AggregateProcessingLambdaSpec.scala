@@ -9,7 +9,7 @@ import org.mockito.MockitoSugar.mock
 import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper
 import org.scalatest.prop.{TableDrivenPropertyChecks, TableFor4}
 import uk.gov.nationalarchives.tdr.common.utils.objectkeycontext.AssetSources.{HardDrive, NetworkDrive, SharePoint}
-import uk.gov.nationalarchives.tdr.common.utils.objectkeycontext.ObjectCategories.Metadata
+import uk.gov.nationalarchives.tdr.common.utils.objectkeycontext.ObjectCategories.{Metadata, Records}
 import uk.gov.nationalarchives.tdr.common.utils.statuses.StatusValues
 import uk.gov.nationalarchives.tdr.common.utils.statuses.StatusValues.InProgressValue
 
@@ -20,12 +20,15 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
   private val userId: UUID = UUID.randomUUID()
   private val consignmentId: UUID = UUID.randomUUID()
   private val matchId = "match-id"
-  private val category: String = Metadata.id
+  private val metadataCategory: String = Metadata.id
+  private val recordsCategory: String = Records.id
   private def validMessageBody(assetSource: String): String =
     s"""
     {
       "metadataSourceBucket": "$metadataSourceBucket",
-      "metadataSourceObjectPrefix": "$userId/$assetSource/$consignmentId/$category",
+      "metadataSourceObjectPrefix": "$userId/$assetSource/$consignmentId/$metadataCategory",
+      "recordsSourceBucket": "$recordsSourceBucket",
+      "recordsSourceObjectPrefix": "$userId/$assetSource/$consignmentId/$recordsCategory",
       "dataLoadErrors": false,
       "ignoreSiteName": false,
       "loadedNumberOfFiles": 2
@@ -33,7 +36,7 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
     """.stripMargin
 
   def getMetadataObjectKey(assetSource: String) =
-    s"$userId/$assetSource/$consignmentId/$category/$matchId.metadata"
+    s"$userId/$assetSource/$consignmentId/$metadataCategory/$matchId.metadata"
 
   def getRecordObjectKey(assetSource: String) =
     s"$userId/$assetSource/$consignmentId/records/$matchId"
@@ -126,7 +129,9 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
         s"""
           {
             "metadataSourceBucket": "$metadataSourceBucket",
-            "metadataSourceObjectPrefix": "$userId/$assetSource/$consignmentId/$category",
+            "metadataSourceObjectPrefix": "$userId/$assetSource/$consignmentId/$metadataCategory",
+            "recordsSourceBucket": "$recordsSourceBucket",
+            "recordsSourceObjectPrefix": "$userId/$assetSource/$consignmentId/$recordsCategory",
             "dataLoadErrors": true,
             "ignoreSiteName": false,
             "loadedNumberOfFiles": 2
@@ -162,7 +167,9 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
         s"""
           {
             "metadataSourceBucket": "$metadataSourceBucket",
-            "metadataSourceObjectPrefix": "$userId/$assetSource/$consignmentId/$category",
+            "metadataSourceObjectPrefix": "$userId/$assetSource/$consignmentId/$metadataCategory",
+            "recordsSourceBucket": "$recordsSourceBucket",
+            "recordsSourceObjectPrefix": "$userId/$assetSource/$consignmentId/$recordsCategory",
             "dataLoadErrors": true,
             "ignoreSiteName": false,
             "loadedNumberOfFiles": 3
@@ -278,7 +285,9 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
         s"""
             {
               "metadataSourceBucket": "$metadataSourceBucket",
-              "metadataSourceObjectPrefix": "$userId/$assetSource/$consignmentId/$category",
+              "metadataSourceObjectPrefix": "$userId/$assetSource/$consignmentId/$metadataCategory",
+              "recordsSourceBucket": "$recordsSourceBucket",
+              "recordsSourceObjectPrefix": "$userId/$assetSource/$consignmentId/$recordsCategory",
               "dataLoadErrors": false,
               "ignoreSiteName": false,
               "loadedNumberOfFiles": 2
@@ -300,12 +309,14 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
       validatePublishSnsMessageRequests()
       validateErrorBucketPutRequests(numberOfErrors = 2)
 
+      val expectedNetworkDriveTagBodyXml = defaultPutTagsBodyXml("CompletedWithIssues")
+
       if (assetSource == NetworkDrive.id.toLowerCase) {
         validateGetTaggingRequests(metadataObjectKey, 2, recordObjectKey, 0)
-        validatePutTaggingRequests(metadataObjectKey, 1, recordObjectKey, 0, defaultPutTagsBodyXml("CompletedWithIssues"))
+        validatePutTaggingRequests(metadataObjectKey, 1, recordObjectKey, 0, expectedNetworkDriveTagBodyXml)
       } else {
-        validateGetTaggingRequests(metadataObjectKey, 1, recordObjectKey, 0)
-        validatePutTaggingRequests(metadataObjectKey, 0, recordObjectKey, 0, defaultPutTagsBodyXml())
+        validateGetTaggingRequests(metadataObjectKey, 2, recordObjectKey, 0)
+        validatePutTaggingRequests(metadataObjectKey, 1, recordObjectKey, 0, defaultPutTagsBodyXml("CompletedWithIssues"))
       }
     }
 
@@ -321,7 +332,9 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
           s"""
             {
               "metadataSourceBucket": "$metadataSourceBucket",
-              "metadataSourceObjectPrefix": "$userId/$assetSource/$consignmentId/$category",
+              "metadataSourceObjectPrefix": "$userId/$assetSource/$consignmentId/$metadataCategory",
+              "recordsSourceBucket": "$recordsSourceBucket",
+              "recordsSourceObjectPrefix": "$userId/$assetSource/$consignmentId/$recordsCategory",
               "dataLoadErrors": false,
               "ignoreSiteName": false,
               "loadedNumberOfFiles": 2
@@ -412,6 +425,7 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
     mockS3PutObjectTagging(metadataObjectKey)
     mockS3PutObjectTagging(recordObjectKey)
     mockS3ListBucketResponse(userId, consignmentId, List(matchId), assetSource)
+    mockS3HeadObjectResponse(recordObjectKey)
     mockSfnResponseOk()
     mockGraphQlAddFilesAndMetadataResponse
     mockGraphQlUpdateConsignmentStatusResponse
@@ -421,13 +435,14 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
     mockGetUserDetails(userId)
     mockSnsResponseOk()
     mockGraphQlUpdateDraftMetadataFileNameResponse
+    mockS3HeadObjectResponse(recordObjectKey)
   }
 
   private def validateGetObjectKeysRequests(numberOfRequests: Int = 1, assetSource: String): Unit = {
     wiremockS3.verify(
       exactly(numberOfRequests),
       getRequestedFor(anyUrl())
-        .withUrl(s"/?list-type=2&max-keys=1000&prefix=$userId%2F$assetSource%2F$consignmentId%2F$category")
+        .withUrl(s"/?list-type=2&max-keys=1000&prefix=$userId%2F$assetSource%2F$consignmentId%2F$metadataCategory")
     )
   }
 
