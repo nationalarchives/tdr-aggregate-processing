@@ -20,6 +20,7 @@ class ExternalServiceSpec extends AnyFlatSpec with BeforeAndAfterEach with Befor
   val wiremockAuthServer = new WireMockServer(9002)
   val wiremockSfnServer = new WireMockServer(9003)
   val wiremockSsmServer = new WireMockServer(9004)
+  val wiremockSnsServer = new WireMockServer(9005)
   val wiremockS3 = new WireMockServer(8003)
 
   val authPath = "/auth/realms/tdr/protocol/openid-connect/token"
@@ -31,6 +32,15 @@ class ExternalServiceSpec extends AnyFlatSpec with BeforeAndAfterEach with Befor
       .willReturn(okJson("""{"access_token": "abcde"}"""))
   )
 
+  def mockGetUserDetails(userId: UUID): StubMapping = wiremockAuthServer.stubFor(
+    get(urlEqualTo(s"/auth/admin/realms/tdr/users/$userId")).willReturn(okJson("""
+        |{"email": "abcde",
+        | "firstName": "abcde",
+        |  "lastName":  "abcde"
+        |  }
+        |""".stripMargin))
+  )
+
   def setupSsmServer(): Unit = {
     wiremockSsmServer
       .stubFor(
@@ -39,12 +49,17 @@ class ExternalServiceSpec extends AnyFlatSpec with BeforeAndAfterEach with Befor
       )
   }
 
+  def mockSnsResponseOk(): StubMapping = {
+    wiremockSnsServer.stubFor(post(urlEqualTo("/")).willReturn(aResponse().withStatus(200)))
+  }
+
   override def beforeAll(): Unit = {
     wiremockAuthServer.start()
     wiremockGraphqlServer.start()
     wiremockS3.start()
     wiremockSfnServer.start()
     wiremockSsmServer.start()
+    wiremockSnsServer.start()
   }
 
   override def afterAll(): Unit = {
@@ -53,6 +68,7 @@ class ExternalServiceSpec extends AnyFlatSpec with BeforeAndAfterEach with Befor
     wiremockS3.stop()
     wiremockSfnServer.stop()
     wiremockSsmServer.stop()
+    wiremockSnsServer.stop()
   }
 
   override def beforeEach(): Unit = {
@@ -65,24 +81,42 @@ class ExternalServiceSpec extends AnyFlatSpec with BeforeAndAfterEach with Befor
     wiremockS3.resetAll()
     wiremockSfnServer.resetAll()
     wiremockSsmServer.resetAll()
+    wiremockSnsServer.resetAll()
   }
 
   def mockGraphQlAddFilesAndMetadataResponse: StubMapping = wiremockGraphqlServer.stubFor(
     post(urlEqualTo(graphQlPath))
       .withRequestBody(containing("addFilesAndMetadata"))
-      .willReturn(ok("""{"data": {"addFilesAndMetadata": [{"fileId": "8b5bae20-5f12-11eb-ae93-0242ac130002", "matchId": "1"}]}}""".stripMargin))
+      .willReturn(okJson("""{"data": {"addFilesAndMetadata": [{"fileId": "8b5bae20-5f12-11eb-ae93-0242ac130002", "matchId": "1"}]}}""".stripMargin))
   )
 
   def mockGraphQlUpdateConsignmentStatusResponse: StubMapping = wiremockGraphqlServer.stubFor(
     post(urlEqualTo(graphQlPath))
       .withRequestBody(containing("updateConsignmentStatus"))
-      .willReturn(ok("""{"data": {"updateConsignmentStatus": 1}}""".stripMargin))
+      .willReturn(okJson("""{"data": {"updateConsignmentStatus": 1}}""".stripMargin))
+  )
+
+  def mockGraphQlAddConsignmentStatusResponse: StubMapping = wiremockGraphqlServer.stubFor(
+    post(urlEqualTo(graphQlPath))
+      .withRequestBody(containing("addConsignmentStatus"))
+      .willReturn(okJson("""{
+                       |"data": {
+                       |  "addConsignmentStatus": {
+                       |      "consignmentStatusId": "6e3b76c4-1745-4467-8ac5-b4dd736e1b3e",
+                       |      "consignmentId": "a8dc972d-58f9-4733-8bb2-4254b89a35f2",
+                       |      "statusType": "Upload",
+                       |      "value": "Completed",
+                       |      "createdDatetime": "2020-01-01T09:00:00Z",
+                       |      "modifiedDatetime": null
+                       |   }
+                       | }
+                       |}""".stripMargin))
   )
 
   def mockGraphQlUpdateDraftMetadataFileNameResponse: StubMapping = wiremockGraphqlServer.stubFor(
     post(urlEqualTo(graphQlPath))
       .withRequestBody(containing("updateClientSideDraftMetadataFileName"))
-      .willReturn(ok("""{"data": {"updateClientSideDraftMetadataFileName": 1}}""".stripMargin))
+      .willReturn(okJson("""{"data": {"updateClientSideDraftMetadataFileName": 1}}""".stripMargin))
   )
 
   def mockGraphQlGetConsignmentResponse(uploadStatusValue: StatusValue = CompletedValue, clientChecksStatusValue: StatusValue = InProgressValue): StubMapping = {
@@ -121,7 +155,7 @@ class ExternalServiceSpec extends AnyFlatSpec with BeforeAndAfterEach with Befor
     wiremockGraphqlServer.stubFor(
       post(urlEqualTo(graphQlPath))
         .withRequestBody(containing("getConsignment"))
-        .willReturn(ok(getConsignmentResponse))
+        .willReturn(okJson(getConsignmentResponse))
     )
   }
 
@@ -129,7 +163,7 @@ class ExternalServiceSpec extends AnyFlatSpec with BeforeAndAfterEach with Befor
     wiremockGraphqlServer.stubFor(
       post(urlEqualTo("/graphql"))
         .withRequestBody(containing("updateParentFolder"))
-        .willReturn(ok("""{"data":{"updateParentFolder": 1}}"""))
+        .willReturn(okJson("""{"data":{"updateParentFolder": 1}}"""))
     )
 
   def mockGraphQlResponseError: StubMapping = wiremockGraphqlServer.stubFor(
@@ -165,6 +199,12 @@ class ExternalServiceSpec extends AnyFlatSpec with BeforeAndAfterEach with Befor
     wiremockS3.stubFor(
       get(anyUrl())
         .willReturn(aResponse().withStatus(500).withBody("Internal server error"))
+    )
+  }
+
+  def mockS3PutObject(): StubMapping = {
+    wiremockS3.stubFor(
+      put(anyUrl()).willReturn(aResponse().withStatus(200))
     )
   }
 
@@ -204,6 +244,13 @@ class ExternalServiceSpec extends AnyFlatSpec with BeforeAndAfterEach with Befor
       get(anyUrl())
         .withQueryParams(params)
         .willReturn(aResponse().withStatus(500).withBody("Internal server error"))
+    )
+  }
+
+  def mockS3PutObjectTagging(key: String): StubMapping = {
+    wiremockS3.stubFor(
+      put(urlEqualTo(s"/$key?tagging"))
+        .willReturn(aResponse().withStatus(200))
     )
   }
 

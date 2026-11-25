@@ -139,28 +139,32 @@ class AggregateProcessingLambda extends RequestHandler[SQSEvent, Unit] {
       dryRun: Boolean,
       ignoreSiteName: Boolean
   ): IO[AssetProcessingResult] = {
+    def persist(assets: List[AssetProcessingModule.AssetProcessingResult], suppliedMetadata: Boolean): IO[Unit] =
+      IO.defer {
+        val metadata = assets.flatMap(_.clientSideMetadataInput)
+        val parentFolder = metadata.head.originalPath.split("/").head
+        for {
+          _ <- persistenceApi.addParentFolder(UpdateParentFolderInput(consignmentId, parentFolder, Some(userId)))
+          _ <- persistenceApi.addClientSideMetadata(AddFileAndMetadataInput(consignmentId, metadata, None, Some(userId)))
+          _ <- if (suppliedMetadata) handleSuppliedMetadata(assets, consignmentId) else IO.unit
+        } yield ()
+      }
+
+    def assetProcessingErrors(assets: List[AssetProcessingModule.AssetProcessingResult]): Boolean = {
+      if (assets.isEmpty) {
+        val error = AggregateProcessingError(Some(consignmentId), s"$AggregateProcessing.$AssetProcessing.$Failure", "No valid assets to process")
+        errorHandling.handleError(error, logger)
+        true
+      } else assets.exists(_.processingErrors)
+    }
+
     (for {
-      assetProcessingResults <- IO(objectKeys.par.map(assetProcessor.processAsset(sourceBucket, _, ignoreSiteName)).toList)
-      assetsToProcess = assetProcessingResults.filter(!_.ignoreAsset)
-      assetProcessingErrors = assetsToProcess.exists(_.processingErrors)
-      suppliedMetadata = assetsToProcess.exists(_.suppliedMetadata.nonEmpty)
-      _ <-
-        if (assetProcessingErrors || dryRun) {
-          IO.unit
-        } else {
-          val clientSideMetadataInput = assetsToProcess.flatMap(_.clientSideMetadataInput)
-          val addFileAndMetadataInput = AddFileAndMetadataInput(consignmentId, clientSideMetadataInput, None, Some(userId))
-          val updateParentFolderInput = UpdateParentFolderInput(consignmentId, parentFolder = clientSideMetadataInput.head.originalPath.split("/").head, Some(userId))
-          for {
-            _ <- persistenceApi.addParentFolder(updateParentFolderInput)
-            _ <- persistenceApi.addClientSideMetadata(addFileAndMetadataInput)
-            _ <-
-              if (suppliedMetadata) {
-                handleSuppliedMetadata(assetsToProcess, consignmentId)
-              } else IO.unit
-          } yield ()
-        }
-    } yield AssetProcessingResult(assetProcessingErrors, suppliedMetadata)).handleErrorWith { err =>
+      results <- IO(objectKeys.par.map(assetProcessor.processAsset(sourceBucket, _, ignoreSiteName)).toList)
+      assets = results.filterNot(_.ignoreAsset)
+      errors = assetProcessingErrors(assets)
+      suppliedMetadata = assets.exists(_.suppliedMetadata.nonEmpty)
+      _ <- if (errors || dryRun) IO.unit else persist(assets, suppliedMetadata)
+    } yield AssetProcessingResult(errors, suppliedMetadata)).handleErrorWith { err =>
       val error = AggregateProcessingError(Some(consignmentId), s"$AggregateProcessing.$AssetProcessing.$Failure", err.getMessage)
       errorHandling.handleError(error, logger)
       IO(errorProcessingResult)

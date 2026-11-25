@@ -4,11 +4,13 @@ import com.amazonaws.services.lambda.runtime.Context
 import com.amazonaws.services.lambda.runtime.events.SQSEvent
 import com.amazonaws.services.lambda.runtime.events.SQSEvent.SQSMessage
 import com.github.tomakehurst.wiremock.client.WireMock._
+import com.github.tomakehurst.wiremock.stubbing.StubMapping
 import org.mockito.MockitoSugar.mock
 import org.scalatest.matchers.should.Matchers.convertToAnyShouldWrapper
 import org.scalatest.prop.{TableDrivenPropertyChecks, TableFor4}
 import uk.gov.nationalarchives.tdr.common.utils.objectkeycontext.AssetSources.{HardDrive, NetworkDrive, SharePoint}
 import uk.gov.nationalarchives.tdr.common.utils.objectkeycontext.ObjectCategories.Metadata
+import uk.gov.nationalarchives.tdr.common.utils.statuses.StatusValues
 import uk.gov.nationalarchives.tdr.common.utils.statuses.StatusValues.InProgressValue
 
 import java.util.UUID
@@ -29,6 +31,12 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
       "loadedNumberOfFiles": 2
     }
     """.stripMargin
+
+  def getMetadataObjectKey(assetSource: String) =
+    s"$userId/$assetSource/$consignmentId/$category/$matchId.metadata"
+
+  def getRecordObjectKey(assetSource: String) =
+    s"$userId/$assetSource/$consignmentId/records/$matchId"
 
   val assetSources: TableFor4[String, (String, Long, UUID, Option[String], Option[String]) => String, String, String] = Table(
     ("Asset Source", "Metadata Json String", "Expected File Path", "Invalid Supplied Metadata"),
@@ -53,19 +61,14 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
   )
 
   forAll(assetSources) { (assetSource, metadataJsonString, expectedFilePath, invalidSuppliedMetadata) =>
-    val objectKey = s"$userId/$assetSource/$consignmentId/$category/$matchId.metadata"
+    val metadataObjectKey = getMetadataObjectKey(assetSource)
+    val recordObjectKey = getRecordObjectKey(assetSource)
 
     s"'handleRequest' with asset source $assetSource" should "process all valid messages in SQS event" in {
       val metadata = metadataJsonString(matchId, defaultFileSize, consignmentId, None, None)
-      authOkJson()
+      mockBaseResponses(metadataObjectKey, metadata, assetSource, recordObjectKey)
       mockGraphQlGetConsignmentResponse()
-      mockS3GetObjectTagging(objectKey)
-      mockS3GetObjectStream(objectKey, metadata)
-      mockS3ListBucketResponse(userId, consignmentId, List(matchId), assetSource)
-      mockSfnResponseOk()
-      mockGraphQlAddFilesAndMetadataResponse
-      mockGraphQlUpdateConsignmentStatusResponse
-      mockGraphQlUpdateParentFolderResponse
+
       val mockContext = mock[Context]
 
       val message1 = new SQSMessage()
@@ -77,49 +80,21 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
       sqsEvent.setRecords(messages)
       new AggregateProcessingLambda().handleRequest(sqsEvent, mockContext)
 
-      wiremockS3.verify(
-        exactly(2),
-        getRequestedFor(anyUrl())
-          .withUrl(s"/?list-type=2&max-keys=1000&prefix=$userId%2F$assetSource%2F$consignmentId%2F$category")
-      )
-
-      wiremockS3.verify(
-        exactly(2),
-        getRequestedFor(anyUrl())
-          .withUrl(s"/$objectKey?partNumber=1")
-      )
-
-      wiremockS3.verify(
-        exactly(4),
-        getRequestedFor(anyUrl())
-          .withUrl(s"/$objectKey?tagging")
-      )
-
-      wiremockSfnServer.verify(
-        exactly(2),
-        postRequestedFor(anyUrl())
-          .withRequestBody(containing(s"transfer_service_$consignmentId"))
-      )
-
-      wiremockGraphqlServer.verify(
-        exactly(10),
-        postRequestedFor(anyUrl())
-          .withUrl("/graphql")
-      )
+      validateGetObjectKeysRequests(numberOfRequests = 2, assetSource = assetSource)
+      validateMetadataReadRequests(numberOfRequests = 2, metadataObjectKey = metadataObjectKey)
+      validateTriggerStepFunctionRequests(numberOfRequests = 2)
+      validatePublishSnsMessageRequests(numberOfRequests = 2)
+      validatePersistenceRequests(10)
+      validateErrorBucketPutRequests(numberOfErrors = 0)
+      validateGetTaggingRequests(metadataObjectKey, 4, recordObjectKey, 0)
+      validatePutTaggingRequests(metadataObjectKey, 2, recordObjectKey, 0, defaultPutTagsBodyXml())
     }
 
     s"'handleRequest' with asset source $assetSource" should "process all valid messages in SQS event correctly when transfer state incorrect" in {
       val metadata = metadataJsonString(matchId, defaultFileSize, consignmentId, None, None)
-      val incorrectUploadStatusValue = InProgressValue
-      authOkJson()
+      val incorrectUploadStatusValue: StatusValues.StatusValue = InProgressValue
+      mockBaseResponses(metadataObjectKey, metadata, assetSource, recordObjectKey)
       mockGraphQlGetConsignmentResponse(uploadStatusValue = incorrectUploadStatusValue)
-      mockS3GetObjectTagging(objectKey)
-      mockS3GetObjectStream(objectKey, metadata)
-      mockS3ListBucketResponse(userId, consignmentId, List(matchId), assetSource)
-      mockSfnResponseOk()
-      mockGraphQlAddFilesAndMetadataResponse
-      mockGraphQlUpdateConsignmentStatusResponse
-      mockGraphQlUpdateParentFolderResponse
       val mockContext = mock[Context]
 
       val message = new SQSMessage()
@@ -130,47 +105,21 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
       sqsEvent.setRecords(messages)
       new AggregateProcessingLambda().handleRequest(sqsEvent, mockContext)
 
-      wiremockS3.verify(
-        exactly(1),
-        getRequestedFor(anyUrl())
-          .withUrl(s"/?list-type=2&max-keys=1000&prefix=$userId%2F$assetSource%2F$consignmentId%2F$category")
-      )
-
-      wiremockS3.verify(
-        exactly(0),
-        getRequestedFor(anyUrl())
-          .withUrl(s"/$objectKey?partNumber=1")
-      )
-
-      wiremockS3.verify(
-        exactly(0),
-        getRequestedFor(anyUrl())
-          .withUrl(s"/$objectKey?tagging")
-      )
-
-      wiremockSfnServer.verify(
-        exactly(0),
-        postRequestedFor(anyUrl())
-          .withRequestBody(containing(s"transfer_service_$consignmentId"))
-      )
-
-      wiremockGraphqlServer.verify(
-        exactly(3),
-        postRequestedFor(anyUrl())
-          .withUrl("/graphql")
-      )
+      validateGetObjectKeysRequests(assetSource = assetSource)
+      validateMetadataReadRequests(numberOfRequests = 0, metadataObjectKey = metadataObjectKey)
+      validateNoObjectTagging(metadataObjectKey, recordObjectKey)
+      validateTriggerStepFunctionRequests(numberOfRequests = 0)
+      validatePersistenceRequests(3)
+      validatePublishSnsMessageRequests()
+      validateErrorBucketPutRequests(numberOfErrors = 2)
+      validateGetTaggingRequests(metadataObjectKey, 0, recordObjectKey, 0)
+      validatePutTaggingRequests(metadataObjectKey, 0, recordObjectKey, 0, defaultPutTagsBodyXml())
     }
 
     s"'handleRequest' with asset source $assetSource" should "process request correctly where client side data load errors are present" in {
       val metadata = metadataJsonString(matchId, defaultFileSize, consignmentId, None, None)
-      authOkJson()
-      mockS3GetObjectTagging(objectKey)
-      mockS3GetObjectStream(objectKey, metadata)
-      mockS3ListBucketResponse(userId, consignmentId, List(matchId), assetSource)
-      mockSfnResponseOk()
+      mockBaseResponses(metadataObjectKey, metadata, assetSource, recordObjectKey)
       mockGraphQlGetConsignmentResponse()
-      mockGraphQlAddFilesAndMetadataResponse
-      mockGraphQlUpdateConsignmentStatusResponse
       val mockContext = mock[Context]
 
       val dataLoadErrorsMessageBody: String =
@@ -192,47 +141,21 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
       sqsEvent.setRecords(messages)
       new AggregateProcessingLambda().handleRequest(sqsEvent, mockContext)
 
-      wiremockS3.verify(
-        exactly(1),
-        getRequestedFor(anyUrl())
-          .withUrl(s"/?list-type=2&max-keys=1000&prefix=$userId%2F$assetSource%2F$consignmentId%2F$category")
-      )
-
-      wiremockS3.verify(
-        exactly(0),
-        getRequestedFor(anyUrl())
-          .withUrl(s"/$objectKey?partNumber=1")
-      )
-
-      wiremockS3.verify(
-        exactly(0),
-        getRequestedFor(anyUrl())
-          .withUrl(s"/$objectKey?tagging")
-      )
-
-      wiremockSfnServer.verify(
-        exactly(0),
-        postRequestedFor(anyUrl())
-          .withRequestBody(containing(s"transfer_service_$consignmentId"))
-      )
-
-      wiremockGraphqlServer.verify(
-        exactly(3),
-        postRequestedFor(anyUrl())
-          .withUrl("/graphql")
-      )
+      validateGetObjectKeysRequests(assetSource = assetSource)
+      validateMetadataReadRequests(numberOfRequests = 0, metadataObjectKey = metadataObjectKey)
+      validateNoObjectTagging(metadataObjectKey, recordObjectKey)
+      validateTriggerStepFunctionRequests(numberOfRequests = 0)
+      validatePersistenceRequests(3)
+      validatePublishSnsMessageRequests()
+      validateErrorBucketPutRequests(numberOfErrors = 2)
+      validateGetTaggingRequests(metadataObjectKey, 0, recordObjectKey, 0)
+      validatePutTaggingRequests(metadataObjectKey, 0, recordObjectKey, 0, defaultPutTagsBodyXml())
     }
 
     s"'handleRequest' with asset source $assetSource" should "process request correctly where there is an object count mis-match" in {
       val metadata = metadataJsonString(matchId, defaultFileSize, consignmentId, None, None)
-      authOkJson()
-      mockS3GetObjectTagging(objectKey)
-      mockS3GetObjectStream(objectKey, metadata)
-      mockS3ListBucketResponse(userId, consignmentId, List(matchId), assetSource)
-      mockSfnResponseOk()
+      mockBaseResponses(metadataObjectKey, metadata, assetSource, recordObjectKey)
       mockGraphQlGetConsignmentResponse()
-      mockGraphQlAddFilesAndMetadataResponse
-      mockGraphQlUpdateConsignmentStatusResponse
       val mockContext = mock[Context]
 
       val objectCountErrorsMessageBody: String =
@@ -254,46 +177,21 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
       sqsEvent.setRecords(messages)
       new AggregateProcessingLambda().handleRequest(sqsEvent, mockContext)
 
-      wiremockS3.verify(
-        exactly(1),
-        getRequestedFor(anyUrl())
-          .withUrl(s"/?list-type=2&max-keys=1000&prefix=$userId%2F$assetSource%2F$consignmentId%2F$category")
-      )
-
-      wiremockS3.verify(
-        exactly(0),
-        getRequestedFor(anyUrl())
-          .withUrl(s"/$objectKey?partNumber=1")
-      )
-
-      wiremockS3.verify(
-        exactly(0),
-        getRequestedFor(anyUrl())
-          .withUrl(s"/$objectKey?tagging")
-      )
-
-      wiremockSfnServer.verify(
-        exactly(0),
-        postRequestedFor(anyUrl())
-          .withRequestBody(containing(s"transfer_service_$consignmentId"))
-      )
-
-      wiremockGraphqlServer.verify(
-        exactly(3),
-        postRequestedFor(anyUrl())
-          .withUrl("/graphql")
-      )
+      validateGetObjectKeysRequests(assetSource = assetSource)
+      validateMetadataReadRequests(numberOfRequests = 0, metadataObjectKey = metadataObjectKey)
+      validateNoObjectTagging(metadataObjectKey, recordObjectKey)
+      validateTriggerStepFunctionRequests(numberOfRequests = 0)
+      validatePersistenceRequests(3)
+      validatePublishSnsMessageRequests()
+      validateErrorBucketPutRequests(numberOfErrors = 2)
+      validateGetTaggingRequests(metadataObjectKey, 0, recordObjectKey, 0)
+      validatePutTaggingRequests(metadataObjectKey, 0, recordObjectKey, 0, defaultPutTagsBodyXml())
     }
 
     s"'handleRequest' with asset source $assetSource" should "process request correctly when no objects are found for supplied object prefix" in {
       val metadata = metadataJsonString(matchId, defaultFileSize, consignmentId, None, None)
-      authOkJson()
-      mockS3GetObjectTagging(objectKey)
-      mockS3GetObjectStream(objectKey, metadata)
+      mockBaseResponses(metadataObjectKey, metadata, assetSource, recordObjectKey)
       mockS3ListBucketResponseEmpty(userId, consignmentId, assetSource)
-      mockSfnResponseOk()
-      mockGraphQlAddFilesAndMetadataResponse
-      mockGraphQlUpdateConsignmentStatusResponse
       mockGraphQlGetConsignmentResponse()
       val mockContext = mock[Context]
 
@@ -305,35 +203,15 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
       sqsEvent.setRecords(messages)
       new AggregateProcessingLambda().handleRequest(sqsEvent, mockContext)
 
-      wiremockS3.verify(
-        exactly(1),
-        getRequestedFor(anyUrl())
-          .withUrl(s"/?list-type=2&max-keys=1000&prefix=$userId%2F$assetSource%2F$consignmentId%2F$category")
-      )
-
-      wiremockS3.verify(
-        exactly(0),
-        getRequestedFor(anyUrl())
-          .withUrl(s"/$objectKey?partNumber=1")
-      )
-
-      wiremockS3.verify(
-        exactly(0),
-        getRequestedFor(anyUrl())
-          .withUrl(s"/$objectKey?tagging")
-      )
-
-      wiremockSfnServer.verify(
-        exactly(0),
-        postRequestedFor(anyUrl())
-          .withRequestBody(containing(s"transfer_service_$consignmentId"))
-      )
-
-      wiremockGraphqlServer.verify(
-        exactly(3),
-        postRequestedFor(anyUrl())
-          .withUrl("/graphql")
-      )
+      validateGetObjectKeysRequests(assetSource = assetSource)
+      validateMetadataReadRequests(numberOfRequests = 0, metadataObjectKey = metadataObjectKey)
+      validateNoObjectTagging(metadataObjectKey, recordObjectKey)
+      validateTriggerStepFunctionRequests(numberOfRequests = 0)
+      validatePersistenceRequests(3)
+      validatePublishSnsMessageRequests()
+      validateErrorBucketPutRequests(numberOfErrors = 2)
+      validateGetTaggingRequests(metadataObjectKey, 0, recordObjectKey, 0)
+      validatePutTaggingRequests(metadataObjectKey, 0, recordObjectKey, 0, defaultPutTagsBodyXml())
     }
 
     s"'handleRequest' with asset source $assetSource" should "throw an error for invalid message json" in {
@@ -349,35 +227,15 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
       }
       exception.getMessage shouldBe "Invalid JSON object: expected json value got 'some s...' (line 1, column 1)"
 
-      wiremockS3.verify(
-        exactly(0),
-        getRequestedFor(anyUrl())
-          .withUrl(s"/?list-type=2&max-keys=1000&prefix=$userId%2F$assetSource%2F$consignmentId%2F$category")
-      )
-
-      wiremockS3.verify(
-        exactly(0),
-        getRequestedFor(anyUrl())
-          .withUrl(s"/$objectKey?partNumber=1")
-      )
-
-      wiremockS3.verify(
-        exactly(0),
-        getRequestedFor(anyUrl())
-          .withUrl(s"/$objectKey?tagging")
-      )
-
-      wiremockSfnServer.verify(
-        exactly(0),
-        postRequestedFor(anyUrl())
-          .withRequestBody(containing(s"transfer_service_$consignmentId"))
-      )
-
-      wiremockGraphqlServer.verify(
-        exactly(0),
-        postRequestedFor(anyUrl())
-          .withUrl("/graphql")
-      )
+      validateGetObjectKeysRequests(numberOfRequests = 0, assetSource = assetSource)
+      validateMetadataReadRequests(numberOfRequests = 0, metadataObjectKey = metadataObjectKey)
+      validateNoObjectTagging(metadataObjectKey, recordObjectKey)
+      validateTriggerStepFunctionRequests(numberOfRequests = 0)
+      validatePersistenceRequests(0)
+      validatePublishSnsMessageRequests(numberOfRequests = 0)
+      validateErrorBucketPutRequests(numberOfErrors = 0)
+      validateGetTaggingRequests(metadataObjectKey, 0, recordObjectKey, 0)
+      validatePutTaggingRequests(metadataObjectKey, 0, recordObjectKey, 0, defaultPutTagsBodyXml())
     }
 
     s"'handleRequest' with asset source $assetSource" should "throw an error for invalid event" in {
@@ -397,49 +255,22 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
       }
       exception.getMessage shouldBe "Invalid event: DecodingFailure at .metadataSourceBucket: Missing required field"
 
-      wiremockS3.verify(
-        exactly(0),
-        getRequestedFor(anyUrl())
-          .withUrl(s"/?list-type=2&max-keys=1000&prefix=$userId%2F$assetSource%2F$consignmentId%2F$category")
-      )
-
-      wiremockS3.verify(
-        exactly(0),
-        getRequestedFor(anyUrl())
-          .withUrl(s"/$objectKey?partNumber=1")
-      )
-
-      wiremockS3.verify(
-        exactly(0),
-        getRequestedFor(anyUrl())
-          .withUrl(s"/$objectKey?tagging")
-      )
-
-      wiremockSfnServer.verify(
-        exactly(0),
-        postRequestedFor(anyUrl())
-          .withRequestBody(containing(s"transfer_service_$consignmentId"))
-      )
-
-      wiremockGraphqlServer.verify(
-        exactly(0),
-        postRequestedFor(anyUrl())
-          .withUrl("/graphql")
-      )
+      validateGetObjectKeysRequests(numberOfRequests = 0, assetSource = assetSource)
+      validateMetadataReadRequests(numberOfRequests = 0, metadataObjectKey = metadataObjectKey)
+      validateNoObjectTagging(metadataObjectKey, recordObjectKey)
+      validateTriggerStepFunctionRequests(numberOfRequests = 0)
+      validatePersistenceRequests(0)
+      validatePublishSnsMessageRequests(numberOfRequests = 0)
+      validateErrorBucketPutRequests(numberOfErrors = 0)
+      validateGetTaggingRequests(metadataObjectKey, 0, recordObjectKey, 0)
+      validatePutTaggingRequests(metadataObjectKey, 0, recordObjectKey, 0, defaultPutTagsBodyXml())
     }
 
     s"'handleRequest' with asset source $assetSource" should "throw an error if supplied metadata fails to process" in {
       val invalidSuppliedFields = s""""closure_type": "Open","description": "some kind of description",$invalidSuppliedMetadata"""
       val metadata = metadataJsonString(matchId, defaultFileSize, consignmentId, Some(invalidSuppliedFields), None)
-      authOkJson()
-      mockS3GetObjectTagging(objectKey)
-      mockS3GetObjectStream(objectKey, metadata)
-      mockS3ListBucketResponse(userId, consignmentId, List(matchId), assetSource)
-      mockSfnResponseOk()
-      mockGraphQlAddFilesAndMetadataResponse
-      mockGraphQlUpdateConsignmentStatusResponse
+      mockBaseResponses(metadataObjectKey, metadata, assetSource, recordObjectKey)
       mockGraphQlGetConsignmentResponse()
-      mockGraphQlUpdateParentFolderResponse
 
       val mockContext = mock[Context]
 
@@ -462,58 +293,27 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
 
       new AggregateProcessingLambda().handleRequest(sqsEvent, mockContext)
 
-      wiremockS3.verify(
-        exactly(1),
-        getRequestedFor(anyUrl())
-          .withUrl(s"/?list-type=2&max-keys=1000&prefix=$userId%2F$assetSource%2F$consignmentId%2F$category")
-      )
-
-      wiremockS3.verify(
-        exactly(1),
-        getRequestedFor(anyUrl())
-          .withUrl(s"/$objectKey?partNumber=1")
-      )
+      validateGetObjectKeysRequests(assetSource = assetSource)
+      validateMetadataReadRequests(metadataObjectKey = metadataObjectKey)
+      validateTriggerStepFunctionRequests(numberOfRequests = 0)
+      validatePersistenceRequests(3)
+      validatePublishSnsMessageRequests()
+      validateErrorBucketPutRequests(numberOfErrors = 2)
 
       if (assetSource == NetworkDrive.id.toLowerCase) {
-        wiremockS3.verify(
-          exactly(2),
-          getRequestedFor(anyUrl())
-            .withUrl(s"/$objectKey?tagging")
-        )
+        validateGetTaggingRequests(metadataObjectKey, 2, recordObjectKey, 0)
+        validatePutTaggingRequests(metadataObjectKey, 1, recordObjectKey, 0, defaultPutTagsBodyXml("CompletedWithIssues"))
       } else {
-        wiremockS3.verify(
-          exactly(1),
-          getRequestedFor(anyUrl())
-            .withUrl(s"/$objectKey?tagging")
-        )
+        validateGetTaggingRequests(metadataObjectKey, 1, recordObjectKey, 0)
+        validatePutTaggingRequests(metadataObjectKey, 0, recordObjectKey, 0, defaultPutTagsBodyXml())
       }
-
-      wiremockSfnServer.verify(
-        exactly(0),
-        postRequestedFor(anyUrl())
-          .withRequestBody(containing(s"transfer_service_$consignmentId"))
-      )
-
-      wiremockGraphqlServer.verify(
-        exactly(3),
-        postRequestedFor(anyUrl())
-          .withUrl("/graphql")
-      )
     }
 
     s"'handleRequest' with asset source $assetSource" should
       "upload a draft-metadata.csv to S3 when supplied metadata present in uploaded metadata" in {
         val metadata = metadataJsonString(matchId, defaultFileSize, consignmentId, Some(defaultSuppliedFields), None)
-        authOkJson()
-        mockS3GetObjectTagging(objectKey)
-        mockS3GetObjectStream(objectKey, metadata)
-        mockS3ListBucketResponse(userId, consignmentId, List(matchId), assetSource)
-        mockSfnResponseOk()
-        mockGraphQlAddFilesAndMetadataResponse
-        mockGraphQlUpdateConsignmentStatusResponse
+        mockBaseResponses(metadataObjectKey, metadata, assetSource, recordObjectKey)
         mockGraphQlGetConsignmentResponse()
-        mockGraphQlUpdateParentFolderResponse
-        mockGraphQlUpdateDraftMetadataFileNameResponse
 
         val mockContext = mock[Context]
 
@@ -536,11 +336,14 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
 
         new AggregateProcessingLambda().handleRequest(sqsEvent, mockContext)
 
-        wiremockGraphqlServer.verify(
-          exactly(6),
-          postRequestedFor(anyUrl())
-            .withUrl("/graphql")
-        )
+        validateGetObjectKeysRequests(assetSource = assetSource)
+        validateMetadataReadRequests(metadataObjectKey = metadataObjectKey)
+        validateTriggerStepFunctionRequests(numberOfRequests = 2)
+        validatePersistenceRequests(8)
+        validatePublishSnsMessageRequests()
+        validateErrorBucketPutRequests(numberOfErrors = 0)
+        validateGetTaggingRequests(metadataObjectKey, 2, recordObjectKey, 0)
+        validatePutTaggingRequests(metadataObjectKey, 1, recordObjectKey, 0, defaultPutTagsBodyXml())
 
         wiremockS3.verify(
           exactly(1),
@@ -556,9 +359,10 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
       }
   }
 
-  "'handleRequest'" should "handle an asset marked as 'ignored' correctly" in {
+  "'handleRequest'" should "handle where no valid assets to process correctly" in {
     val assetSource = SharePoint.id
-    val objectKey = s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata"
+    val metadataObjectKey = getMetadataObjectKey(assetSource)
+    val recordObjectKey = getRecordObjectKey(assetSource)
     val invalidNameMetadata = s"""{
       "Length": "12",
       "Modified": "2025-07-03T09:19:47Z",
@@ -577,58 +381,163 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
          |<Value>TRUE</Value></Tag>
          |</TagSet></Tagging>""".stripMargin.replaceAll("\\n", "")
 
-    authOkJson()
-    mockS3GetObjectTagging(objectKey)
-    mockS3GetObjectStream(objectKey, invalidNameMetadata)
-    mockS3ListBucketResponse(userId, consignmentId, List(matchId), assetSource)
-    mockSfnResponseOk()
-    mockGraphQlAddFilesAndMetadataResponse
-    mockGraphQlUpdateConsignmentStatusResponse
+    mockBaseResponses(metadataObjectKey, invalidNameMetadata, assetSource, recordObjectKey)
+    mockS3GetObjectStream(metadataObjectKey, invalidNameMetadata)
     mockGraphQlGetConsignmentResponse()
-    mockGraphQlUpdateParentFolderResponse
+
     val mockContext = mock[Context]
 
-    val message1 = new SQSMessage()
-    message1.setBody(validMessageBody(assetSource))
-    val messages: java.util.List[SQSMessage] = List(message1).asJava
+    val message = new SQSMessage()
+    message.setBody(validMessageBody(assetSource))
+    val messages: java.util.List[SQSMessage] = List(message).asJava
     val sqsEvent = new SQSEvent()
     sqsEvent.setRecords(messages)
     new AggregateProcessingLambda().handleRequest(sqsEvent, mockContext)
 
+    validateGetObjectKeysRequests(assetSource = assetSource)
+    validateMetadataReadRequests(metadataObjectKey = metadataObjectKey)
+    validateTriggerStepFunctionRequests(numberOfRequests = 0)
+    validatePublishSnsMessageRequests()
+    validatePersistenceRequests(3)
+    validateErrorBucketPutRequests(numberOfErrors = 2)
+    validateGetTaggingRequests(metadataObjectKey, 2, recordObjectKey, 1)
+    validatePutTaggingRequests(metadataObjectKey, 1, recordObjectKey, 1, expectedPutTagsRequestXml)
+  }
+
+  private def mockBaseResponses(metadataObjectKey: String, metadata: String, assetSource: String, recordObjectKey: String): StubMapping = {
+    authOkJson()
+    mockS3GetObjectTagging(metadataObjectKey)
+    mockS3GetObjectTagging(recordObjectKey)
+    mockS3GetObjectStream(metadataObjectKey, metadata)
+    mockS3PutObjectTagging(metadataObjectKey)
+    mockS3PutObjectTagging(recordObjectKey)
+    mockS3ListBucketResponse(userId, consignmentId, List(matchId), assetSource)
+    mockSfnResponseOk()
+    mockGraphQlAddFilesAndMetadataResponse
+    mockGraphQlUpdateConsignmentStatusResponse
+    mockGraphQlUpdateParentFolderResponse
+    mockGraphQlAddConsignmentStatusResponse
+    mockS3PutObject()
+    mockGetUserDetails(userId)
+    mockSnsResponseOk()
+    mockGraphQlUpdateDraftMetadataFileNameResponse
+  }
+
+  private def validateGetObjectKeysRequests(numberOfRequests: Int = 1, assetSource: String): Unit = {
     wiremockS3.verify(
-      exactly(1),
+      exactly(numberOfRequests),
       getRequestedFor(anyUrl())
         .withUrl(s"/?list-type=2&max-keys=1000&prefix=$userId%2F$assetSource%2F$consignmentId%2F$category")
     )
+  }
 
+  private def validateMetadataReadRequests(numberOfRequests: Int = 1, metadataObjectKey: String): Unit = {
     wiremockS3.verify(
-      exactly(1),
+      exactly(numberOfRequests),
       getRequestedFor(anyUrl())
-        .withUrl(s"/$objectKey?partNumber=1")
+        .withUrl(s"/$metadataObjectKey?partNumber=1")
     )
+  }
 
-    wiremockS3.verify(
-      exactly(2),
-      getRequestedFor(anyUrl())
-        .withUrl(s"/$objectKey?tagging")
-    )
-
-    wiremockS3.verify(
-      exactly(1),
-      putRequestedFor(urlMatching(".*\\?tagging"))
-        .withRequestBody(equalToXml(expectedPutTagsRequestXml))
-    )
-
+  private def validateTriggerStepFunctionRequests(numberOfRequests: Int = 1): Unit = {
     wiremockSfnServer.verify(
-      exactly(0),
+      exactly(numberOfRequests),
       postRequestedFor(anyUrl())
         .withRequestBody(containing(s"transfer_service_$consignmentId"))
     )
+  }
 
+  private def validatePublishSnsMessageRequests(numberOfRequests: Int = 1): Unit = {
+    wiremockSnsServer.verify(
+      exactly(numberOfRequests),
+      postRequestedFor(anyUrl())
+    )
+  }
+
+  private def validatePersistenceRequests(numberOfCalls: Int): Unit = {
     wiremockGraphqlServer.verify(
-      exactly(3),
+      exactly(numberOfCalls),
       postRequestedFor(anyUrl())
         .withUrl("/graphql")
     )
   }
+
+  private def validateErrorBucketPutRequests(numberOfErrors: Int): Unit = {
+    wiremockS3.verify(
+      exactly(numberOfErrors),
+      putRequestedFor(urlMatching(s"/transferErrorBucket/$consignmentId/load/.*"))
+    )
+  }
+
+  private def validateGetTaggingRequests(metadataObjectKey: String, numberOfMetadataRequests: Int, recordObjectKey: String, numberOfRecordRequests: Int): Unit = {
+    wiremockS3.verify(
+      exactly(numberOfMetadataRequests),
+      getRequestedFor(urlMatching(s"/$metadataObjectKey\\?tagging"))
+    )
+
+    wiremockS3.verify(
+      exactly(numberOfRecordRequests),
+      getRequestedFor(urlMatching(s"/$recordObjectKey\\?tagging"))
+    )
+  }
+
+  private def validatePutTaggingRequests(
+      metadataObjectKey: String,
+      numberOfMetadataRequests: Int,
+      recordObjectKey: String,
+      numberOfRecordRequests: Int,
+      expectedBodyXml: String
+  ): Unit = {
+    wiremockS3.verify(
+      exactly(numberOfMetadataRequests),
+      putRequestedFor(urlMatching(s"/$metadataObjectKey\\?tagging"))
+        .withRequestBody(equalToXml(expectedBodyXml))
+    )
+
+    wiremockS3.verify(
+      exactly(numberOfRecordRequests),
+      putRequestedFor(urlMatching(s"/$recordObjectKey\\?tagging"))
+        .withRequestBody(equalToXml(expectedBodyXml))
+    )
+  }
+
+  private def validateNoObjectTagging(metadataObjectKey: String, recordObjectKey: String): Unit = {
+    wiremockS3.verify(
+      exactly(0),
+      getRequestedFor(anyUrl())
+        .withUrl(s"/$metadataObjectKey?tagging")
+    )
+
+    wiremockS3.verify(
+      exactly(0),
+      putRequestedFor(anyUrl())
+        .withUrl(s"/$metadataObjectKey?tagging")
+    )
+
+    wiremockS3.verify(
+      exactly(0),
+      getRequestedFor(anyUrl())
+        .withUrl(s"/$recordObjectKey?tagging")
+    )
+
+    wiremockS3.verify(
+      exactly(0),
+      putRequestedFor(anyUrl())
+        .withUrl(s"/$recordObjectKey?tagging")
+    )
+  }
+
+  private def defaultPutTagsBodyXml(assetProcessingTagValue: String = "Completed"): String =
+    s"""<Tagging xmlns="http://s3.amazonaws.com/doc/2006-03-01/">
+          <TagSet>
+            <Tag>
+              <Key>GuardDutyMalwareScanStatus</Key>
+              <Value>NO_THREATS_FOUND</Value>
+            </Tag>
+            <Tag>
+              <Key>ASSET_PROCESSING</Key>
+              <Value>$assetProcessingTagValue</Value>
+            </Tag>
+          </TagSet>
+        </Tagging>""".stripMargin.replaceAll("\\n", "")
 }
