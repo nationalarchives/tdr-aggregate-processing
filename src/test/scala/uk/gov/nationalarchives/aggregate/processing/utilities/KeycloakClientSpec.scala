@@ -17,7 +17,6 @@ class KeycloakClientSpec extends ExternalServiceSpec {
   implicit val ec: ExecutionContext = ExecutionContext.global
 
   "KeycloakClient" should "return user details from KeycloakUtils" in {
-    setupSsmServer()
     val userId = UUID.randomUUID().toString
     val config = ConfigFactory.load()
     val keycloakUtils = mock[KeycloakUtils]
@@ -32,7 +31,6 @@ class KeycloakClientSpec extends ExternalServiceSpec {
   }
 
   "KeycloakClient" should "fail when KeycloakUtils returns a failed Future" in {
-    setupSsmServer()
     val userId = UUID.randomUUID().toString
     val config = ConfigFactory.load()
     val keycloakUtils = mock[KeycloakUtils]
