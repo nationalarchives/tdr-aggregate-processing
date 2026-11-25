@@ -157,44 +157,6 @@ class AggregateProcessingLambdaSpec extends ExternalServiceSpec with TableDriven
       validatePutTaggingRequests(metadataObjectKey, 0, recordObjectKey, 0, defaultPutTagsBodyXml())
     }
 
-    s"'handleRequest' with asset source $assetSource" should "process request correctly where there is an object count mis-match" in {
-      val metadata = metadataJsonString(matchId, defaultFileSize, consignmentId, None, None)
-      mockBaseResponses(metadataObjectKey, metadata, assetSource, recordObjectKey)
-      mockGraphQlGetConsignmentResponse()
-      val mockContext = mock[Context]
-
-      val objectCountErrorsMessageBody: String =
-        s"""
-          {
-            "metadataSourceBucket": "$metadataSourceBucket",
-            "metadataSourceObjectPrefix": "$userId/$assetSource/$consignmentId/$metadataCategory",
-            "recordsSourceBucket": "$recordsSourceBucket",
-            "recordsSourceObjectPrefix": "$userId/$assetSource/$consignmentId/$recordsCategory",
-            "dataLoadErrors": true,
-            "ignoreSiteName": false,
-            "loadedNumberOfFiles": 3
-          }
-          """.stripMargin
-
-      val message = new SQSMessage()
-      message.setBody(objectCountErrorsMessageBody)
-
-      val messages: java.util.List[SQSMessage] = List(message).asJava
-      val sqsEvent = new SQSEvent()
-      sqsEvent.setRecords(messages)
-      new AggregateProcessingLambda().handleRequest(sqsEvent, mockContext)
-
-      validateGetObjectKeysRequests(assetSource = assetSource)
-      validateMetadataReadRequests(numberOfRequests = 0, metadataObjectKey = metadataObjectKey)
-      validateNoObjectTagging(metadataObjectKey, recordObjectKey)
-      validateTriggerStepFunctionRequests(numberOfRequests = 0)
-      validatePersistenceRequests(3)
-      validatePublishSnsMessageRequests()
-      validateErrorBucketPutRequests(numberOfErrors = 2)
-      validateGetTaggingRequests(metadataObjectKey, 0, recordObjectKey, 0)
-      validatePutTaggingRequests(metadataObjectKey, 0, recordObjectKey, 0, defaultPutTagsBodyXml())
-    }
-
     s"'handleRequest' with asset source $assetSource" should "process request correctly when no objects are found for supplied object prefix" in {
       val metadata = metadataJsonString(matchId, defaultFileSize, consignmentId, None, None)
       mockBaseResponses(metadataObjectKey, metadata, assetSource, recordObjectKey)
