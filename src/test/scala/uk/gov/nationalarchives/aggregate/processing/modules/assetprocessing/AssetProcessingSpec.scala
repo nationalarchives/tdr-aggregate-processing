@@ -320,7 +320,13 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
         val mockLogger = mock[UnderlyingLogger]
         val s3UtilsMock = mock[S3Utils]
         val differentMatchId = UUID.randomUUID()
-        val expectedResult = AssetProcessingResult(None, processingErrors = true, None)
+        val input = ProcessAssetInput(metadataSourceBucket, s"$userId/$assetSource/$consignmentId/metadata/$differentMatchId.metadata", ignoreSiteName = false, "", "")
+
+        val expectedResult = AssetProcessingResult(
+          Some(differentMatchId.toString),
+          processingErrors = true,
+          Some(expectedMetadataInput(expectedParsedFilePath))
+        )
 
         when(mockLogger.isErrorEnabled()).thenReturn(true)
         when(mockLogger.isInfoEnabled()).thenReturn(true)
@@ -332,7 +338,6 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
         when(appConfigMock.blockCheckRecordExists).thenReturn(false)
 
         val assetProcessing = new AssetProcessing(s3UtilsMock, appConfigMock)(Logger(mockLogger))
-        val input = ProcessAssetInput(metadataSourceBucket, s"$userId/$assetSource/$consignmentId/metadata/$differentMatchId.metadata", ignoreSiteName = false, "", "")
         val result = assetProcessing.processAsset(input)
 
         result shouldEqual expectedResult
@@ -344,7 +349,7 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
         )
 
         verify(mockLogger).error(
-          s"AssetProcessingError: consignmentId: Some($consignmentId), matchId: None, source: Some($assetSource), errorCode: ASSET_PROCESSING.MATCH_ID.MISMATCH, errorMessage: Mismatched match ids: $differentMatchId and $matchId"
+          s"AssetProcessingError: consignmentId: Some($consignmentId), matchId: None, source: Some($assetSource), errorCode: INITIAL_CHECKS.MATCH_ID.MISMATCH, errorMessage: Mismatched match ids: $differentMatchId and $matchId"
         )
       }
 
@@ -352,7 +357,11 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
       "log an error and return asset processing result when there is no record" in {
         val mockLogger = mock[UnderlyingLogger]
         val s3UtilsMock = mock[S3Utils]
-        val expectedResult = AssetProcessingResult(None, processingErrors = true, None)
+        val expectedResult = AssetProcessingResult(
+          Some(matchId),
+          processingErrors = true,
+          Some(expectedMetadataInput(expectedParsedFilePath))
+        )
 
         when(mockLogger.isErrorEnabled()).thenReturn(true)
         when(mockLogger.isInfoEnabled()).thenReturn(true)
@@ -376,7 +385,7 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
         )
 
         verify(mockLogger).error(
-          s"AssetProcessingError: consignmentId: Some($consignmentId), matchId: None, source: Some($assetSource), errorCode: ASSET_PROCESSING.MISSING.RECORD, errorMessage: Record does not exist: $matchId"
+          s"AssetProcessingError: consignmentId: Some($consignmentId), matchId: None, source: Some($assetSource), errorCode: INITIAL_CHECKS.MISSING.RECORD, errorMessage: Record does not exist: $matchId"
         )
       }
 
@@ -421,7 +430,6 @@ class AssetProcessingSpec extends ExternalServiceSpec with TableDrivenPropertyCh
 
         verify(mockLogger, times(0)).isErrorEnabled
         verify(mockLogger).info("Asset metadata successfully processed for: {}", s"$userId/$assetSource/$consignmentId/metadata/$matchId.metadata")
-
       }
 
     s"'processAsset' with asset source of $assetSource" should

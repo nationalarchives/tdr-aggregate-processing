@@ -8,7 +8,7 @@ object Dependencies {
 
   private val nettyVersion = "4.1.137.Final"  
 
-  lazy val authUtils = "uk.gov.nationalarchives" %% "tdr-auth-utils" % "0.0.309"
+  lazy val authUtils = "uk.gov.nationalarchives" %% "tdr-auth-utils" % "0.0.310"
   lazy val awsLambdaCore = "com.amazonaws" % "aws-lambda-java-core" % "1.4.1"
   lazy val awsLambdaEvents = "com.amazonaws" % "aws-lambda-java-events" % "3.16.1"
 

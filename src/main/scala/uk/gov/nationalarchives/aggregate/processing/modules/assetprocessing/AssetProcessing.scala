@@ -16,12 +16,12 @@ import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorT
   ProcessErrorType,
   S3Error => s3e
 }
-import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorValue.{Invalid, Mismatch, ProcessErrorValue, ReadError, ThreatFound, Record}
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorValue.{Invalid, Mismatch, ProcessErrorValue, ReadError, Record, ThreatFound}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.{AssetProcessing => ptAp}
 import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling.BaseError
 import uk.gov.nationalarchives.aggregate.processing.modules._
 import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.AssetProcessing.{AssetProcessingError, AssetProcessingEvent, AssetProcessingResult, ProcessAssetInput}
-import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.initialchecks.{FileSizeCheck, InitialCheck, InvalidFileName}
+import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.initialchecks.{FileSizeCheck, InitialCheck, InvalidFileName, AssetObjectChecks}
 import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.metadata._
 import uk.gov.nationalarchives.aggregate.processing.utilities.UTF8ValidationHandler
 import uk.gov.nationalarchives.aws.utils.s3.{S3Clients, S3Utils}
@@ -37,9 +37,11 @@ import scala.util.{Failure, Success, Try}
 class AssetProcessing(s3Utils: S3Utils, appConfig: ApplicationConfig.type)(implicit logger: Logger) {
   private val fileSizeCheck = FileSizeCheck.apply()
   private val invalidFileNameCheck = InvalidFileName.apply()
-  private lazy val initialChecks: Set[InitialCheck] = Set(
+  private val assetObjectChecks = AssetObjectChecks.apply(s3Utils, appConfig)
+  private val initialChecks: Set[InitialCheck] = Set(
     fileSizeCheck,
-    invalidFileNameCheck
+    invalidFileNameCheck,
+    assetObjectChecks
   )
   private lazy val errorHandling = ErrorHandling()
 
@@ -167,27 +169,22 @@ class AssetProcessing(s3Utils: S3Utils, appConfig: ApplicationConfig.type)(impli
     val baseMetadata = handler.convertToBaseMetadata(sourceJson, Some(event.ignoreSiteName))
 
     def processConvertedMetadata(input: ClientSideMetadataInput): AssetProcessingResult = {
-      validateRecord(event, input) match {
-        case Some(error) =>
-          handleProcessError(List(error), bucket, objectKey)
-        case None =>
-          val initialChecksErrors = initialChecks.flatMap(_.runCheck(event, input)).toList
-          if (initialChecksErrors.nonEmpty) {
-            handleInitialChecksErrors(event, initialChecksErrors, input)
-          } else {
-            val classified = handler.classifyBaseMetadata(baseMetadata)
-            logger.info(s"Asset metadata successfully processed for: $objectKey")
-            s3Utils.addObjectTags(bucket, objectKey, Map(ptAp.toString -> CompletedValue.value))
+      val initialChecksErrors = initialChecks.flatMap(_.runCheck(event, input)).toList
+      if (initialChecksErrors.nonEmpty) {
+        handleInitialChecksErrors(event, initialChecksErrors, input)
+      } else {
+        val classified = handler.classifyBaseMetadata(baseMetadata)
+        logger.info(s"Asset metadata successfully processed for: $objectKey")
+        s3Utils.addObjectTags(bucket, objectKey, Map(ptAp.toString -> CompletedValue.value))
 
-            AssetProcessingResult(
-              Some(event.matchId),
-              processingErrors = false,
-              Some(input),
-              classified.getOrElse(MetadataClassification.System, Nil),
-              classified.getOrElse(MetadataClassification.Supplied, Nil),
-              classified.getOrElse(MetadataClassification.Custom, Nil)
-            )
-          }
+        AssetProcessingResult(
+          Some(event.matchId),
+          processingErrors = false,
+          Some(input),
+          classified.getOrElse(MetadataClassification.System, Nil),
+          classified.getOrElse(MetadataClassification.Supplied, Nil),
+          classified.getOrElse(MetadataClassification.Custom, Nil)
+        )
       }
     }
 
@@ -206,25 +203,25 @@ class AssetProcessing(s3Utils: S3Utils, appConfig: ApplicationConfig.type)(impli
     }
   }
 
-  private def validateRecord(event: AssetProcessingEvent, input: ClientSideMetadataInput): Option[AssetProcessingError] = {
-    def matchIdError(message: String, errorType: ProcessErrorType, errorValue: ProcessErrorValue): AssetProcessingError =
-      AssetProcessingError(
-        Some(event.consignmentId),
-        None,
-        Some(event.source.id),
-        s"$ptAp.$errorType.$errorValue",
-        message
-      )
-
-    if (event.matchId != input.matchId) {
-      Some(matchIdError(s"Mismatched match ids: ${event.matchId} and ${input.matchId}", MatchIdError, Mismatch))
-    } else if (
-      !appConfig.blockCheckRecordExists &&
-      !s3Utils.objectKeyExists(event.recordsS3Bucket, s"${event.recordsKeyPrefix}/${event.matchId}")
-    ) {
-      Some(matchIdError(s"Record does not exist: ${event.matchId}", MissingError, Record))
-    } else None
-  }
+//  private def validateRecord(event: AssetProcessingEvent, input: ClientSideMetadataInput): Option[AssetProcessingError] = {
+//    def matchIdError(message: String, errorType: ProcessErrorType, errorValue: ProcessErrorValue): AssetProcessingError =
+//      AssetProcessingError(
+//        Some(event.consignmentId),
+//        None,
+//        Some(event.source.id),
+//        s"$ptAp.$errorType.$errorValue",
+//        message
+//      )
+//
+//    if (event.matchId != input.matchId) {
+//      Some(matchIdError(s"Mismatched match ids: ${event.matchId} and ${input.matchId}", MatchIdError, Mismatch))
+//    } else if (
+//      !appConfig.blockCheckRecordExists &&
+//      !s3Utils.objectKeyExists(event.recordsS3Bucket, s"${event.recordsKeyPrefix}/${event.matchId}")
+//    ) {
+//      Some(matchIdError(s"Record does not exist: ${event.matchId}", MissingError, Record))
+//    } else None
+//  }
 
   private def generateErrorMessage(event: AssetProcessingEvent, errorCode: String, errorMessage: String): AssetProcessingError = {
     AssetProcessingError(
