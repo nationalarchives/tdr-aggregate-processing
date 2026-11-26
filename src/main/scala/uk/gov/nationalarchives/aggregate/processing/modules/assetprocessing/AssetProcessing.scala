@@ -6,22 +6,13 @@ import io.circe.{Json, parser}
 import uk.gov.nationalarchives.aggregate.processing.config.ApplicationConfig
 import uk.gov.nationalarchives.aggregate.processing.config.ApplicationConfig.{malwareScanKey, malwareScanThreatFound}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.MetadataClassification
-import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorType.{
-  EncodingError,
-  JsonError,
-  MalwareScanError,
-  MatchIdError,
-  MissingError,
-  ObjectKeyError,
-  ProcessErrorType,
-  S3Error => s3e
-}
-import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorValue.{Invalid, Mismatch, ProcessErrorValue, ReadError, Record, ThreatFound}
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorType.{EncodingError, JsonError, MalwareScanError, ObjectKeyError, S3Error => s3e}
+import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessErrorValue.{Invalid, ReadError, ThreatFound}
 import uk.gov.nationalarchives.aggregate.processing.modules.Common.ProcessType.{AssetProcessing => ptAp}
 import uk.gov.nationalarchives.aggregate.processing.modules.ErrorHandling.BaseError
 import uk.gov.nationalarchives.aggregate.processing.modules._
 import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.AssetProcessing.{AssetProcessingError, AssetProcessingEvent, AssetProcessingResult, ProcessAssetInput}
-import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.initialchecks.{FileSizeCheck, InitialCheck, InvalidFileName, AssetObjectChecks}
+import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.initialchecks.{AssetObjectChecks, FileSizeCheck, InitialCheck, InvalidFileName}
 import uk.gov.nationalarchives.aggregate.processing.modules.assetprocessing.metadata._
 import uk.gov.nationalarchives.aggregate.processing.utilities.UTF8ValidationHandler
 import uk.gov.nationalarchives.aws.utils.s3.{S3Clients, S3Utils}
@@ -202,26 +193,6 @@ class AssetProcessing(s3Utils: S3Utils, appConfig: ApplicationConfig.type)(impli
         processConvertedMetadata(input)
     }
   }
-
-//  private def validateRecord(event: AssetProcessingEvent, input: ClientSideMetadataInput): Option[AssetProcessingError] = {
-//    def matchIdError(message: String, errorType: ProcessErrorType, errorValue: ProcessErrorValue): AssetProcessingError =
-//      AssetProcessingError(
-//        Some(event.consignmentId),
-//        None,
-//        Some(event.source.id),
-//        s"$ptAp.$errorType.$errorValue",
-//        message
-//      )
-//
-//    if (event.matchId != input.matchId) {
-//      Some(matchIdError(s"Mismatched match ids: ${event.matchId} and ${input.matchId}", MatchIdError, Mismatch))
-//    } else if (
-//      !appConfig.blockCheckRecordExists &&
-//      !s3Utils.objectKeyExists(event.recordsS3Bucket, s"${event.recordsKeyPrefix}/${event.matchId}")
-//    ) {
-//      Some(matchIdError(s"Record does not exist: ${event.matchId}", MissingError, Record))
-//    } else None
-//  }
 
   private def generateErrorMessage(event: AssetProcessingEvent, errorCode: String, errorMessage: String): AssetProcessingError = {
     AssetProcessingError(
