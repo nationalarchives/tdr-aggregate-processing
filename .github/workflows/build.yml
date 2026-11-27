@@ -7,6 +7,17 @@ on:
         type: boolean
         required: false
         default: false
+      environment:
+        type: choice
+        description: 'Environment'
+        required: true
+        options:
+          - intg
+          - staging
+          - prod
+          - dev
+          - drdev
+        default: 'drdev'
   push:
     branches:
       - main
@@ -16,13 +27,15 @@ jobs:
     permissions:
       id-token: write
       contents: write
-    uses: nationalarchives/tdr-github-actions/.github/workflows/lambda_build.yml@5a96b84cf82bce1371168cc31cb89f88cad86763 # v0.0.53
+    uses: nationalarchives/tdr-github-actions/.github/workflows/lambda_build.yml@714115ab533f9f6b0b4fed5a4293e9d57c2b89d8 # v0.0.53
     with:
       lambda-name: aggregate-processing
       repo-name: tdr-aggregate-processing
       artifact-name: aggregate-processing
       snapshot: ${{ inputs.snapshot == true }}
       java-version: ${{vars.JAVA_RUNTIME}}
+      account-regional-code-bucket: true
+      environment: ${{ inputs.environment }}
       build-command: |
         sbt assembly
     secrets:
@@ -38,12 +51,11 @@ jobs:
         with:
           persist-credentials: false
       - run: |
-          if [ "$SNAPSHOT" = "true" ]; then
-            gh workflow run deploy.yml -f environment=dev -f to-deploy="$NEXT_VERSION"
-          else
-            gh workflow run deploy.yml -f environment=intg -f to-deploy="$NEXT_VERSION"
-          fi
+          gh workflow run deploy.yml --ref "$WORKFLOW_REF" \
+            -f environment=drdev \
+            -f to-deploy="$NEXT_VERSION"
         env:
           GITHUB_TOKEN: ${{ secrets.WORKFLOW_PAT }}
           NEXT_VERSION: ${{ needs.pre-deploy.outputs.next-version }}
           SNAPSHOT: ${{ inputs.snapshot == true }}
+          WORKFLOW_REF: ${{ github.ref_name }}
